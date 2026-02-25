@@ -1,65 +1,65 @@
+import type { Metadata } from "next";
+import dynamic from "next/dynamic";
 import Image from "next/image";
+import Link from "next/link";
+import { PageTitle } from "@/components/page-title";
+import { pageMetadata } from "@/lib/metadata";
+
+const HomeShaderBg = dynamic(
+  () => import("@/components/home-shader-bg").then((m) => ({ default: m.HomeShaderBg }))
+);
+
+export const metadata: Metadata = pageMetadata({
+  title: "Tretu Gaming Community",
+  description:
+    "Willkommen bei Tretu – deine Gaming-Community. Teamspeak, Discord, Livestreams auf Twitch, YouTube-Videos, Minecraft-Map und Rankings. Von Gamern, für Gamer.",
+  path: "/",
+  keywords: ["Tretu", "Gaming Community", "Teamspeak", "Discord", "Twitch", "YouTube", "Minecraft"],
+});
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div className="relative">
+      <section
+        className="relative w-full overflow-visible"
+        style={{
+          minHeight: "calc(100vh - var(--header-height) - var(--footer-height))",
+        }}
+      >
+        <HomeShaderBg />
+        <div
+          className="relative z-10 mx-auto flex w-full max-w-[1200px] flex-col items-center justify-center px-4 py-16 md:px-6"
+          style={{
+            minHeight: "calc(100vh - var(--header-height) - var(--footer-height))",
+          }}
+        >
+          <PageTitle title="Tretu Gaming Community" variant="hero" />
+          <div className="mt-12 grid w-full max-w-2xl grid-cols-1 gap-8 sm:grid-cols-2 sm:gap-12">
+            <Link
+              href="/teamspeak/"
+              className="group flex flex-col items-center gap-3 text-white transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-[var(--tretu-accent)]"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+              <span className="flex h-[50px] w-[50px] items-center justify-center transition-transform duration-200 group-hover:scale-110">
+                <Image src="/teamspeak.svg" alt="" width={50} height={50} className="h-full w-auto" priority />
+              </span>
+              <h2 className="text-lg font-semibold uppercase tracking-wide transition-all duration-200 group-hover:scale-105 group-hover:drop-shadow-md">
+                TEAMSPEAK
+              </h2>
+            </Link>
+            <Link
+              href="/discord/"
+              className="group flex flex-col items-center gap-3 text-white transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-[var(--tretu-accent)]"
             >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              <span className="flex h-[50px] w-[50px] items-center justify-center transition-transform duration-200 group-hover:scale-110">
+                <Image src="/discord.svg" alt="" width={50} height={50} className="h-full w-auto" priority />
+              </span>
+              <h2 className="text-lg font-semibold uppercase tracking-wide transition-all duration-200 group-hover:scale-105 group-hover:drop-shadow-md">
+                DISCORD
+              </h2>
+            </Link>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </section>
     </div>
   );
 }
