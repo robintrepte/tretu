@@ -40,6 +40,8 @@
   },
   "description": "Tretu Gaming Community — website for tretu.de",
   "homepage": "https://tretu.de",
+  "engines": { "node": ">=20" },
+  "keywords": ["tretu", "gaming", "nextjs", "community", "tretu.de"],
   "repository": {
     "type": "git",
     "url": "https://github.com/robintrepte/tretu.git"

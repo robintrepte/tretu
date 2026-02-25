@@ -1,8 +1,12 @@
 # Tretu Gaming Community
 
-**Live site:** [tretu.de](https://tretu.de)
+[![Website](https://img.shields.io/badge/website-tretu.de-ed6f1a?style=for-the-badge)](https://tretu.de)
+[![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
+[![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
 
-A modern, accessible website for the **Tretu** gaming community — Teamspeak, Discord, livestreams, videos, Minecraft map and rankings. Built with Next.js, TypeScript, and Tailwind CSS.
+Source code for the official **Tretu** gaming community website. Teamspeak, Discord, livestreams, videos, Minecraft map and rankings. Live at **[tretu.de](https://tretu.de)**.
 
 ---
 
@@ -35,38 +39,6 @@ A modern, accessible website for the **Tretu** gaming community — Teamspeak, D
 
 ---
 
-## Getting Started
-
-### Prerequisites
-
-- **Node.js** 20+
-- **npm** (or yarn / pnpm / bun)
-
-### Install & run
-
-```bash
-# Install dependencies
-npm install
-
-# Development (port 3020)
-npm run dev
-```
-
-Open [http://localhost:3020](http://localhost:3020).
-
-### Scripts
-
-| Command        | Description |
-|----------------|-------------|
-| `npm run dev`  | Start dev server on port 3020 |
-| `npm run build`| Production build |
-| `npm run start`| Start production server |
-| `npm run lint` | Run ESLint |
-| `npm run db:generate` | Drizzle: generate migrations |
-| `npm run db:push`     | Drizzle: push schema to DB |
-
----
-
 ## Project Structure
 
 ```
@@ -88,18 +60,7 @@ src/
 └── lib/                    # SEO config, metadata helpers, DB
 ```
 
-Site identity and default SEO (title, description, OG image, locale) are centralized in `src/lib/seo.ts`. The canonical URL is **https://tretu.de**.
-
----
-
-## Deployment
-
-The app is built for [tretu.de](https://tretu.de). It runs as a standard Next.js app:
-
-- **Build:** `npm run build`
-- **Start:** `npm run start`
-
-You can deploy to Vercel, Node hosting, or any platform that supports Next.js. No environment variables are required for the public site; adjust `src/lib/seo.ts` if you use a different domain.
+Site identity and default SEO are in `src/lib/seo.ts` (canonical URL: **https://tretu.de**).
 
 ---
 
