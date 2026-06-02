@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Jost } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "@/components/ui/sonner";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { HomePageBodyClass } from "@/components/home-page-body-class";
@@ -77,16 +78,17 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="de" className={jost.variable} suppressHydrationWarning>
-      <body className="min-h-screen bg-background font-sans text-foreground antialiased">
+      <body className="flex min-h-screen flex-col bg-background font-sans text-foreground antialiased">
         <HomeShaderFallback />
         <div id="home-shader-portal" className="fixed inset-0 -z-10 pointer-events-none" aria-hidden />
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <HomePageBodyClass />
           <Header />
-          <main className="min-h-[60vh]" id="main-content" aria-label="Hauptinhalt">
+          <main className="flex-1" id="main-content" aria-label="Hauptinhalt">
             {children}
           </main>
           <Footer />
+          <Toaster richColors />
         </ThemeProvider>
         <script
           type="application/ld+json"

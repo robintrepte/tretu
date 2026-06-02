@@ -3,7 +3,9 @@
  * Single source of truth for site identity and default metadata.
  */
 
-export const SITE_URL = "https://tretu.de" as const;
+import { SITE_URL } from "@/lib/env";
+
+export { SITE_URL };
 
 export const SITE_NAME = "Tretu" as const;
 export const SITE_NAME_FULL = "Tretu Gaming Community" as const;

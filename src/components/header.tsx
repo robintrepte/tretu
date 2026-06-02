@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { HeaderLogo } from "@/components/header-logo";
 import { MobileNav } from "@/components/mobile-nav";
+import { Button } from "@/components/ui/button";
 
 const navItems = [
   { label: "Teamspeak", href: "/teamspeak/", children: [{ label: "Ranking & Stats", href: "/ranking/" }] },
@@ -21,12 +22,28 @@ const socialLinks = [
 
 export function Header() {
   const [scrolled, setScrolled] = useState(false);
+  const [canAccessDashboard, setCanAccessDashboard] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 16);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    void fetch("/api/auth/dashboard-access", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : { allowed: false }))
+      .then((data: { allowed?: boolean }) => {
+        if (mounted) setCanAccessDashboard(Boolean(data.allowed));
+      })
+      .catch(() => {
+        if (mounted) setCanAccessDashboard(false);
+      });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   return (
@@ -76,6 +93,17 @@ export function Header() {
         </nav>
         <div className="flex shrink-0 items-center gap-3">
           <MobileNav />
+          {canAccessDashboard ? (
+            <Button
+              asChild
+              size="sm"
+              className="hidden md:inline-flex bg-[var(--tretu-accent)] hover:bg-[var(--tretu-accent-hover)] text-white"
+            >
+              <Link href="/dashboard/" title="Internes Game-Server-Dashboard (nur mit Berechtigung)">
+                Dashboard
+              </Link>
+            </Button>
+          ) : null}
           <ul className="hidden items-center gap-6 md:flex" aria-label="Soziale Netzwerke">
           {socialLinks.map(({ href, label, icon }) => (
             <li key={href}>

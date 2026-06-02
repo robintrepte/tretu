@@ -1,0 +1,43 @@
+import type { Permission, Role } from "@/lib/permissions/types";
+
+export const ROLE_PERMISSIONS: Record<Role, Set<Permission>> = {
+  admin: new Set([
+    "dashboard:view",
+    "instances:create",
+    "instances:update",
+    "instances:delete",
+    "instances:start",
+    "instances:stop",
+    "instances:restart",
+    "instances:delete-host",
+    "instances:backup",
+    "instances:restore",
+    "instances:config",
+    "instances:version",
+    "instances:mods",
+    "roles:manage",
+  ]),
+  operator: new Set([
+    "dashboard:view",
+    "instances:create",
+    "instances:update",
+    "instances:delete",
+    "instances:start",
+    "instances:stop",
+    "instances:restart",
+    "instances:delete-host",
+    "instances:backup",
+    "instances:restore",
+    "instances:config",
+    "instances:version",
+    "instances:mods",
+  ]),
+  manager: new Set([
+    "dashboard:view",
+    "instances:start",
+    "instances:stop",
+    "instances:restart",
+    "instances:backup",
+  ]),
+  user: new Set(),
+};

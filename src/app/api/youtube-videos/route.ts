@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
+import { YOUTUBE_CHANNEL_ID } from "@/lib/env/server";
+
 const MAX_VIDEOS = 24;
-const YOUTUBE_CHANNEL_ID = "UCrn4oucvfow7jUNGSeE7ySg"; // Tretu @ youtube.com/@Tretu
 const RSS_URL = "https://www.youtube.com/feeds/videos.xml?channel_id=";
 
 /** YouTube video IDs are 11 chars [A-Za-z0-9_-]. Reject anything else to avoid injection. */
@@ -90,7 +91,7 @@ export async function GET() {
       "Cache-Control": "public, max-age=300, stale-while-revalidate=60",
     };
     return NextResponse.json({ videos }, { headers: cacheHeaders });
-  } catch (e) {
+  } catch {
     console.error("YouTube RSS error");
     return NextResponse.json(
       { error: "Failed to fetch videos" },

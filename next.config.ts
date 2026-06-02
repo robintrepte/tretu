@@ -35,7 +35,7 @@ const securityHeaders = [
       "img-src 'self' data: https: blob:",
       "font-src 'self' data:",
       "connect-src 'self' https://www.googleapis.com",
-      "frame-src 'self' https://embed.twitch.tv https://discord.com https://www.youtube.com https://map.tretu.de https://ranks.tretu.de https://www.tsviewer.com",
+      "frame-src 'self' https://embed.twitch.tv https://discord.com https://www.youtube.com https://map.tretu.de https://www.tsviewer.com",
       "base-uri 'self'",
       "form-action 'self'",
       "frame-ancestors 'self'",
@@ -45,6 +45,8 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  /** Native addon + legacy assets; do not bundle (Turbopack cannot place them in ESM chunks). */
+  serverExternalPackages: ["ssh2"],
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "img.youtube.com", pathname: "/**" },

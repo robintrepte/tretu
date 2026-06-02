@@ -3,7 +3,7 @@
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 
-const DISCORD_SERVER_ID = "262342293250506752";
+import { DISCORD_SERVER_ID } from "@/lib/env";
 
 export function DiscordWidget() {
   const { resolvedTheme } = useTheme();

@@ -4,7 +4,6 @@ import {
   SITE_NAME,
   DEFAULT_OG_IMAGE,
   LOCALE,
-  DEFAULT_DESCRIPTION,
 } from "@/lib/seo";
 
 type PageMetadataOptions = {

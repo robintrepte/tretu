@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 
-const TWITCH_CHANNEL = "tretude";
+import { TWITCH_CHANNEL } from "@/lib/env";
+
 const EMBED_HEIGHT = 800;
 
 export function TwitchEmbed() {

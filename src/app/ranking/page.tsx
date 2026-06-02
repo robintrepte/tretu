@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+
 import { PageTitle } from "@/components/page-title";
+import { RankingLeaderboard } from "@/components/teamspeak-ranking/ranking-leaderboard";
 import { pageMetadata } from "@/lib/metadata";
 
 export const metadata: Metadata = pageMetadata({
@@ -13,17 +15,10 @@ export const metadata: Metadata = pageMetadata({
 export default function RankingPage() {
   return (
     <div className="w-full px-4 py-12 md:px-6 lg:px-8">
-      <div className="mx-auto max-w-[1200px]">
+      <div className="mx-auto max-w-[1200px] space-y-10">
         <PageTitle title="Teamspeak Ranking" icon="ranking" />
+        <RankingLeaderboard />
       </div>
-      <iframe
-        src="https://ranks.tretu.de/stats/top_month.php"
-        width="100%"
-        height={2000}
-        title="Teamspeak Ranking"
-        className="min-h-[500px] w-full rounded-lg border-0"
-        loading="lazy"
-      />
     </div>
   );
 }

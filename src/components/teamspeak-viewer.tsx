@@ -4,8 +4,9 @@ import { useTheme } from "next-themes";
 import Script from "next/script";
 import { useCallback, useEffect, useState } from "react";
 
+import { TSVIEWER_ID } from "@/lib/env";
+
 const TSVIEWER_LOADER = "https://static.tsviewer.com/short_expire/js/ts3viewer_loader.js";
-const TSVIEWER_ID = 1118784;
 const REFRESH_SEC = 100;
 
 /** TSViewer URL color params: text (general), s=server, i=?, c=channel?, u=user; _h = hover */
