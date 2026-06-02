@@ -1,5 +1,6 @@
 import path from "node:path";
 
+import "./src/lib/env/load-local-env.ts";
 import { defineConfig } from "drizzle-kit";
 
 const raw = process.env.SQLITE_DATABASE_PATH ?? "local.sqlite";
