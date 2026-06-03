@@ -7,9 +7,10 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   const userId = await getUserId();
+  const authenticated = Boolean(userId);
   const allowed = userId ? hasPermission(userId, "dashboard:view") : false;
   return NextResponse.json(
-    { allowed },
+    { allowed, authenticated },
     {
       headers: {
         "Cache-Control": "no-store",

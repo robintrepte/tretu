@@ -4,14 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-
-const navItems = [
-  { label: "Teamspeak", href: "/teamspeak/", children: [{ label: "Ranking & Stats", href: "/ranking/" }] },
-  { label: "Discord", href: "/discord/" },
-  { label: "Livestream", href: "/live/" },
-  { label: "Videos", href: "/videos/" },
-  { label: "Minecraft Map", href: "/map/" },
-];
+import type { NavItem } from "@/lib/nav/items";
 
 const socialLinks = [
   { label: "Twitch", href: "https://www.twitch.tv/TretuDE", icon: "twitch" },
@@ -19,7 +12,7 @@ const socialLinks = [
   { label: "Facebook", href: "https://www.facebook.com/TretuDE/", icon: "facebook" },
 ];
 
-export function MobileNav() {
+export function MobileNav({ navItems }: { navItems: NavItem[] }) {
   const [open, setOpen] = useState(false);
   return (
     <Sheet open={open} onOpenChange={setOpen}>
