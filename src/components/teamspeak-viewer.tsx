@@ -2,7 +2,7 @@
 
 import { useTheme } from "next-themes";
 import Script from "next/script";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 
 import { TSVIEWER_ID } from "@/lib/env";
 
@@ -74,32 +74,71 @@ declare global {
   }
 }
 
+function isTsViewerApiReady(): boolean {
+  return typeof window !== "undefined" && Boolean(window.ts3v_display);
+}
+
 export function TeamspeakViewer() {
   const { resolvedTheme } = useTheme();
-  const [scriptLoaded, setScriptLoaded] = useState(false);
+  const mountId = useId();
+  const [scriptReady, setScriptReady] = useState(isTsViewerApiReady);
 
   const theme = resolvedTheme === "dark" ? "dark" : "light";
   const viewerUrl = buildTsViewerUrl(theme);
+  const containerId = `ts3viewer_${TSVIEWER_ID}`;
 
   const initTsViewer = useCallback(() => {
-    if (typeof window === "undefined" || !window.ts3v_display) return;
+    if (!isTsViewerApiReady()) return;
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.replaceChildren();
     window.ts3v_url_1 = viewerUrl;
-    window.ts3v_display.init(viewerUrl, TSVIEWER_ID, REFRESH_SEC);
-  }, [viewerUrl]);
+    window.ts3v_display!.init(viewerUrl, TSVIEWER_ID, REFRESH_SEC);
+  }, [viewerUrl, containerId]);
 
   useEffect(() => {
-    if (!scriptLoaded) return;
+    if (isTsViewerApiReady()) {
+      setScriptReady(true);
+      return;
+    }
+
+    const existing = document.querySelector<HTMLScriptElement>(`script[src="${TSVIEWER_LOADER}"]`);
+    if (!existing) return;
+
+    const onReady = () => {
+      if (isTsViewerApiReady()) setScriptReady(true);
+    };
+
+    existing.addEventListener("load", onReady);
+    onReady();
+
+    return () => existing.removeEventListener("load", onReady);
+  }, []);
+
+  useEffect(() => {
+    if (!scriptReady) return;
     initTsViewer();
-  }, [scriptLoaded, initTsViewer]);
+  }, [scriptReady, initTsViewer, mountId]);
+
+  useEffect(() => {
+    return () => {
+      document.getElementById(containerId)?.replaceChildren();
+    };
+  }, [containerId]);
 
   return (
     <>
-      <div id={`ts3viewer_${TSVIEWER_ID}`} className="min-h-[200px]" />
-      <Script
-        src={TSVIEWER_LOADER}
-        strategy="afterInteractive"
-        onLoad={() => setScriptLoaded(true)}
-      />
+      <div id={containerId} className="min-h-[200px]" />
+      {!scriptReady ? (
+        <Script
+          src={TSVIEWER_LOADER}
+          strategy="afterInteractive"
+          onLoad={() => setScriptReady(true)}
+          onReady={() => {
+            if (isTsViewerApiReady()) setScriptReady(true);
+          }}
+        />
+      ) : null}
     </>
   );
 }
