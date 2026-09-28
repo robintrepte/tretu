@@ -13,9 +13,9 @@ type Entry = {
 };
 
 const medalStyles: Record<number, string> = {
-  1: "order-2 md:order-2 md:-mt-4 md:scale-105 border-[var(--tretu-accent)]/50 bg-gradient-to-b from-[var(--tretu-accent)]/15 to-card",
-  2: "order-1 md:order-1 md:mt-6",
-  3: "order-3 md:order-3 md:mt-8",
+  1: "md:order-2 md:-mt-4 md:scale-105 border-[var(--tretu-accent)]/50 bg-gradient-to-b from-[var(--tretu-accent)]/15 to-card",
+  2: "md:order-1 md:mt-6",
+  3: "md:order-3 md:mt-8",
 };
 
 const rankLabels: Record<number, string> = {
@@ -25,10 +25,7 @@ const rankLabels: Record<number, string> = {
 };
 
 export function RankingPodium({ entries }: { entries: Entry[] }) {
-  const ordered = [...entries].sort((a, b) => {
-    const order = [2, 1, 3];
-    return order.indexOf(a.rank) - order.indexOf(b.rank);
-  });
+  const ordered = [...entries].sort((a, b) => a.rank - b.rank);
 
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:items-end">

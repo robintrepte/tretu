@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, like, sql } from "drizzle-orm";
+import { and, asc, eq, gte, like, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
 import { db } from "@/db";
@@ -38,6 +38,8 @@ export type LeaderboardResult = {
     activeUsers: number;
     totalSeconds: number;
   };
+  /** Rows matching the current search, or the full board when not searching. */
+  matchCount: number;
 };
 
 function resolveLeaderboardQuery(period: LeaderboardPeriod, now = new Date()) {
@@ -95,17 +97,12 @@ export async function fetchLeaderboard(params: {
 }): Promise<LeaderboardResult> {
   const now = new Date();
   const { periodKey, orderColumn, extraFilters } = resolveLeaderboardQuery(params.period, now);
-  const limit = Math.min(Math.max(params.limit, 1), 100);
+  const limit = Math.min(Math.max(params.limit, 1), 1000);
 
   const search = params.search?.trim();
-  const searchFilter =
-    search && search.length >= 2 ? like(tsUsers.nickname, `%${search}%`) : undefined;
+  const boardFilters = [eq(tsUsers.excepted, false), ...extraFilters];
 
-  const baseFilters = [eq(tsUsers.excepted, false), searchFilter, ...extraFilters].filter(
-    Boolean
-  );
-
-  const rows = await db
+  const ranked = db
     .select({
       uuid: tsUsers.uuid,
       nickname: tsUsers.nickname,
@@ -114,17 +111,38 @@ export async function fetchLeaderboard(params: {
       level: tsUsers.currentLevel,
       levelTierName: tsRankTiers.name,
       isOnline: tsUsers.isOnline,
+      rank: sql<number>`row_number() over (
+        order by ${tsUsers.prestige} desc,
+          ${tsUsers.currentLevel} desc,
+          ${orderColumn} desc,
+          ${tsUsers.lastSeenAt} desc,
+          ${tsUsers.uuid} asc
+      )`.as("rank"),
     })
     .from(tsUsers)
     .leftJoin(tsRankTiers, eq(tsUsers.currentTierId, tsRankTiers.id))
-    .where(and(...baseFilters))
-    .orderBy(
-      desc(tsUsers.prestige),
-      desc(tsUsers.currentLevel),
-      desc(orderColumn),
-      desc(tsUsers.lastSeenAt)
-    )
+    .where(and(...boardFilters))
+    .as("ranked_users");
+
+  const searchFilter =
+    search && search.length >= 2 ? like(ranked.nickname, `%${search}%`) : undefined;
+
+  const rowsQuery = db
+    .select({
+      rank: ranked.rank,
+      uuid: ranked.uuid,
+      nickname: ranked.nickname,
+      onlineSeconds: ranked.onlineSeconds,
+      prestige: ranked.prestige,
+      level: ranked.level,
+      levelTierName: ranked.levelTierName,
+      isOnline: ranked.isOnline,
+    })
+    .from(ranked)
+    .orderBy(asc(ranked.rank))
     .limit(limit);
+
+  const rows = await (searchFilter ? rowsQuery.where(searchFilter) : rowsQuery);
 
   const summaryRows = await db
     .select({
@@ -132,28 +150,37 @@ export async function fetchLeaderboard(params: {
       total: sql<number>`coalesce(sum(${orderColumn}), 0)`,
     })
     .from(tsUsers)
-    .where(and(...baseFilters));
+    .where(and(...boardFilters));
 
   const summary = summaryRows[0] ?? { count: 0, total: 0 };
+  let matchCount = Number(summary.count);
+  if (search && search.length >= 2) {
+    const matchRows = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(tsUsers)
+      .where(and(...boardFilters, like(tsUsers.nickname, `%${search}%`)));
+    matchCount = Number(matchRows[0]?.count ?? 0);
+  }
 
   return {
     period: params.period,
     periodKey,
     generatedAt: now.toISOString(),
-    entries: rows.map((row, index) => ({
-      rank: index + 1,
+    entries: rows.map((row) => ({
+      rank: Number(row.rank),
       uuid: row.uuid,
       nickname: unescapeTsQueryString(row.nickname),
-      onlineSeconds: row.onlineSeconds,
+      onlineSeconds: Number(row.onlineSeconds) || 0,
       prestige: row.prestige,
       level: row.level,
       tierName: formatRankLabel(row.prestige, row.level, row.levelTierName),
       levelTierName: row.levelTierName,
-      isOnline: row.isOnline,
+      isOnline: Boolean(row.isOnline),
     })),
     summary: {
       activeUsers: Number(summary.count),
       totalSeconds: Number(summary.total),
     },
+    matchCount,
   };
 }

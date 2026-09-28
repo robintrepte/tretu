@@ -116,7 +116,7 @@ export function totalSecondsToPrestigeProgress(
     };
   }
 
-  let prestige = Math.min(Math.floor(totalOnlineSeconds / level100Threshold), MAX_PRESTIGE);
+  const prestige = Math.min(Math.floor(totalOnlineSeconds / level100Threshold), MAX_PRESTIGE);
   let cycle = totalOnlineSeconds - prestige * level100Threshold;
 
   if (prestige >= MAX_PRESTIGE) {
