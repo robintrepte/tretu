@@ -6,13 +6,13 @@ import { pageMetadata } from "@/lib/metadata";
 export const metadata: Metadata = pageMetadata({
   title: "Impressum",
   description:
-    "Impressum der Tretu Gaming Community. Angaben gemäß § 5 TMG: FollowerX GmbH, Hamburg. Kontakt und rechtliche Informationen.",
+    "Impressum der Tretu Gaming Community. Angaben gemäß § 5 DDG: FollowerX GmbH, Hamburg. Kontakt und rechtliche Informationen.",
   path: "/impressum",
   keywords: ["Impressum", "Tretu", "FollowerX", "Kontakt", "Rechtliches"],
 });
 
 const IMPRESSUM_DESCRIPTION =
-  "Impressum der Tretu Gaming Community. Angaben gemäß § 5 TMG: FollowerX GmbH, Hamburg. Kontakt und rechtliche Informationen.";
+  "Impressum der Tretu Gaming Community. Angaben gemäß § 5 DDG: FollowerX GmbH, Hamburg. Kontakt und rechtliche Informationen.";
 
 export default function ImpressumPage() {
   return (
@@ -23,7 +23,7 @@ export default function ImpressumPage() {
       <div className="prose prose-neutral dark:prose-invert max-w-none space-y-6 text-foreground">
         <section>
           <h2 className="text-xl font-semibold text-foreground">
-            Angaben gemäß § 5 TMG:
+            Angaben gemäß § 5 DDG:
           </h2>
           <p className="mt-2 text-muted-foreground">
             <em>Tretu ist eine Marke der</em>
@@ -49,7 +49,7 @@ export default function ImpressumPage() {
 
         <section>
           <h2 className="text-xl font-semibold text-foreground">
-            Inhaltlich Verantwortlicher gem. § 55 RStV
+            Inhaltlich Verantwortlicher gem. § 18 Abs. 2 MStV
           </h2>
           <p className="mt-2 text-muted-foreground">Robin Trepte, Lukas Tumpak</p>
         </section>
@@ -68,24 +68,6 @@ export default function ImpressumPage() {
           </p>
         </section>
 
-        <section>
-          <h2 className="text-xl font-semibold text-foreground">
-            Hinweis auf EU-Streitschlichtung
-          </h2>
-          <p className="mt-2 text-muted-foreground">
-            Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS)
-            bereit:{" "}
-            <a
-              href="https://ec.europa.eu/consumers/odr"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[var(--tretu-accent)] underline hover:no-underline"
-            >
-              https://ec.europa.eu/consumers/odr
-            </a>
-            . Unsere E-Mail-Adresse finden Sie oben im Impressum.
-          </p>
-        </section>
 
         <section>
           <h2 className="text-xl font-semibold text-foreground">
@@ -96,8 +78,8 @@ export default function ImpressumPage() {
             Haftung für Inhalte
           </h3>
           <p className="mt-2 text-muted-foreground">
-            Als Diensteanbieter sind wir gemäß § 7 Abs.1 TMG für eigene Inhalte auf diesen Seiten
-            nach den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 TMG sind wir als
+            Als Diensteanbieter sind wir gemäß § 7 Abs. 1 DDG für eigene Inhalte auf diesen Seiten
+            nach den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 DDG sind wir als
             Diensteanbieter jedoch nicht verpflichtet, übermittelte oder gespeicherte fremde
             Informationen zu überwachen oder nach Umständen zu forschen, die auf eine
             rechtswidrige Tätigkeit hinweisen.
