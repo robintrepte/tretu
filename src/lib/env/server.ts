@@ -15,23 +15,31 @@ export const AUTH_DISCORD_CLIENT_SECRET =
   process.env.AUTH_DISCORD_CLIENT_SECRET ?? "";
 export const CURSEFORGE_API_KEY = process.env.CURSEFORGE_API_KEY ?? "";
 
+/**
+ * Game-server dashboard. Hetzner/Cloudflare/CurseForge are normally configured in the dashboard
+ * setup (stored encrypted in the DB); these env vars are optional fallbacks.
+ */
 export const HETZNER_API_TOKEN = process.env.HETZNER_API_TOKEN ?? "";
 export const HETZNER_DEFAULT_REGION = process.env.HETZNER_DEFAULT_REGION ?? "fsn1";
-export const HETZNER_DEFAULT_VOLUME_GB = Number(process.env.HETZNER_DEFAULT_VOLUME_GB ?? 10);
 export const HETZNER_DEFAULT_SERVER_IMAGE =
   process.env.HETZNER_DEFAULT_SERVER_IMAGE ?? "ubuntu-24.04";
-export const HETZNER_SSH_PRIVATE_KEY_PATH =
-  process.env.HETZNER_SSH_PRIVATE_KEY_PATH ?? "";
 export const HETZNER_SSH_USER = process.env.HETZNER_SSH_USER ?? "root";
+export const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN ?? "";
+export const CLOUDFLARE_DOMAIN = process.env.CLOUDFLARE_DOMAIN ?? "";
 
-/** Comma-separated numeric SSH key IDs from Hetzner Cloud console (required to create servers). */
-export function getHetznerSshKeyIds(): number[] {
-  const raw = process.env.HETZNER_SSH_KEY_IDS ?? "";
-  return raw
+/** Key for encrypting stored secrets; falls back to AUTH_SECRET. Changing it makes stored secrets unreadable. */
+export const DASHBOARD_SECRET_KEY = process.env.DASHBOARD_SECRET_KEY || AUTH_SECRET;
+
+/** Discord user ids that are granted the admin role on login (comma-separated). */
+export function getDashboardAdminDiscordIds(): string[] {
+  return (process.env.DASHBOARD_ADMIN_DISCORD_IDS ?? "")
     .split(",")
-    .map((s) => Number(s.trim()))
-    .filter((n) => Number.isFinite(n) && n > 0);
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
+
+/** Run the orchestrator worker inside the Next.js server process (default). Set to "false" when using `npm run worker:orchestrator`. */
+export const ORCHESTRATOR_EMBEDDED = (process.env.ORCHESTRATOR_EMBEDDED ?? "true") !== "false";
 
 export const RANKSYSTEM_SQL_DUMP =
   process.env.RANKSYSTEM_SQL_DUMP ?? "./data/ranksystem-full.sql";

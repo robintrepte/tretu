@@ -1,14 +1,12 @@
-"use client";
-
 import { Sparkles } from "lucide-react";
 import Link from "next/link";
 
 import { GameThumbnail } from "@/components/dashboard/game-thumbnail";
 import { Button } from "@/components/ui/button";
 
-const previewTypes = ["minecraft", "cs2", "ark", "satisfactory"] as const;
+const previewTypes = ["minecraft", "valheim", "satisfactory", "cs2"] as const;
 
-export function DashboardEmptyState() {
+export function DashboardEmptyState({ canCreate }: { canCreate: boolean }) {
   return (
     <div className="relative mt-8 overflow-hidden rounded-3xl border border-border/80 bg-gradient-to-br from-card via-card to-muted/30 p-8 shadow-sm sm:p-10 dark:from-card dark:via-card dark:to-muted/15">
       <div
@@ -28,9 +26,10 @@ export function DashboardEmptyState() {
           </div>
           <h2 className="mt-4 text-xl font-semibold tracking-tight sm:text-2xl">Noch keine Server angelegt</h2>
           <p className="mt-3 max-w-lg text-sm leading-relaxed text-muted-foreground">
-            Ein Eintrag sichert Welten und Einstellungen dauerhaft; der Server selbst läuft nur, wenn du ihn brauchst. Leg
-            den ersten an und wähle Spiel, Version und Standort – der Rest läuft im Hintergrund.
+            Minecraft (auch mit Modpacks), Valheim, Satisfactory, Palworld, Terraria oder CS2: Spiel wählen, Größe festlegen,
+            fertig. VM, Speicher, Firewall und Adresse richtet das Dashboard automatisch ein.
           </p>
+          {canCreate ? (
           <div className="mt-6">
             <Button
               asChild
@@ -40,6 +39,7 @@ export function DashboardEmptyState() {
               <Link href="/dashboard/new">Ersten Server erstellen</Link>
             </Button>
           </div>
+          ) : null}
         </div>
 
         <div className="grid grid-cols-2 gap-2 sm:gap-3" aria-hidden>

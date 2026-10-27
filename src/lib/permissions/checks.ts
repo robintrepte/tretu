@@ -40,3 +40,33 @@ export function seedDefaultRoles(): void {
       .run();
   }
 }
+
+export function getUserRoles(userId: string): Role[] {
+  return getRoles(userId);
+}
+
+export function getPermissions(userId: string): Permission[] {
+  const set = new Set<Permission>();
+  for (const role of getRoles(userId)) for (const p of ROLE_PERMISSIONS[role]) set.add(p);
+  return [...set];
+}
+
+/** Replaces the roles of a user. */
+export function setUserRoles(userId: number, nextRoles: Role[]): void {
+  seedDefaultRoles();
+  const roleRows = db.select().from(roles).all();
+  db.transaction((tx) => {
+    tx.delete(userRoles).where(eq(userRoles.userId, userId)).run();
+    for (const key of new Set(nextRoles)) {
+      const role = roleRows.find((r) => r.key === key);
+      if (role) tx.insert(userRoles).values({ userId, roleId: role.id }).run();
+    }
+  });
+}
+
+export function grantRole(userId: number, role: Role): void {
+  if (getRoles(String(userId)).includes(role)) return;
+  seedDefaultRoles();
+  const row = db.select().from(roles).where(eq(roles.key, role)).get();
+  if (row) db.insert(userRoles).values({ userId, roleId: row.id }).onConflictDoNothing().run();
+}

@@ -1,62 +1,49 @@
-import { desc, eq, isNull } from "drizzle-orm";
+import { Plus } from "lucide-react";
+import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { DashboardEmptyState } from "@/components/dashboard/empty-state";
-import { GameCard } from "@/components/dashboard/game-card";
-import { db } from "@/db";
-import { gameInstances, infraServers, instanceStatusSnapshots } from "@/db/schema";
+import { InstanceGrid } from "@/components/dashboard/instance-grid";
+import { Button } from "@/components/ui/button";
+import { getUserId } from "@/lib/auth/session";
+import { listInstanceSummaries } from "@/lib/dashboard/view";
+import { hasPermission } from "@/lib/permissions/checks";
 
 export const dynamic = "force-dynamic";
 
-export default function DashboardPage() {
-  const instances = db.select().from(gameInstances).where(isNull(gameInstances.archivedAt)).all();
-
-  const data = instances.map((instance) => {
-    const server = db
-      .select()
-      .from(infraServers)
-      .where(eq(infraServers.instanceId, instance.id))
-      .orderBy(desc(infraServers.createdAt))
-      .get();
-    const latest = db
-      .select()
-      .from(instanceStatusSnapshots)
-      .where(eq(instanceStatusSnapshots.instanceId, instance.id))
-      .orderBy(desc(instanceStatusSnapshots.createdAt))
-      .get();
-
-    return {
-      id: instance.id,
-      name: instance.name,
-      gameType: instance.gameType,
-      status: (latest?.infraStatus ?? "offline") as
-        | "running"
-        | "offline"
-        | "provisioning"
-        | "deleting"
-        | "error",
-      playerCount: latest?.playerCount ?? null,
-      ip: server?.ipV4 ?? null,
-    };
-  });
+export default async function DashboardPage() {
+  const userId = await getUserId();
+  if (!userId) redirect("/login?callbackUrl=/dashboard");
+  const instances = await listInstanceSummaries();
+  const canCreate = hasPermission(userId, "instances:create");
 
   return (
-    <section>
-      <div className="rounded-2xl border border-border/60 bg-card/40 p-6 shadow-sm backdrop-blur-sm dark:bg-card/25 sm:p-8">
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Game-Server</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-          Welten und Einstellungen bleiben gespeichert. Der laufende Server kann bei Bedarf neu gestartet werden – du
-          verlierst nicht automatisch Fortschritt.
-        </p>
+    <section className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Game-Server</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            Server laufen nur, wenn ihr spielt. Ausgeschaltete Server behalten Welt und Einstellungen und kosten nur den
+            Speicher.
+          </p>
+        </div>
+        {canCreate && instances.length ? (
+          <Button asChild className="rounded-xl bg-[var(--tretu-accent)] text-white hover:bg-[var(--tretu-accent-hover)]">
+            <Link href="/dashboard/new">
+              <Plus /> Neuer Server
+            </Link>
+          </Button>
+        ) : null}
       </div>
 
-      {data.length === 0 ? (
-        <DashboardEmptyState />
+      {instances.length === 0 ? (
+        <DashboardEmptyState canCreate={canCreate} />
       ) : (
-        <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-          {data.map((game) => (
-            <GameCard key={game.id} game={game} />
-          ))}
-        </div>
+        <InstanceGrid
+          initial={instances}
+          canStart={hasPermission(userId, "instances:start")}
+          canStop={hasPermission(userId, "instances:stop")}
+        />
       )}
     </section>
   );

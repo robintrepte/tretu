@@ -1,20 +1,5 @@
-import { runOrchestratorTick } from "@/lib/orchestrator/runner";
-import { log } from "@/lib/observability/logger";
-import { seedDefaultRoles } from "@/lib/permissions/checks";
+import { startWorker } from "@/lib/orchestrator/worker";
 
-async function main() {
-  seedDefaultRoles();
-  log("info", "orchestrator.started");
-  while (true) {
-    try {
-      await runOrchestratorTick();
-    } catch (error) {
-      log("error", "orchestrator.tick.failed", {
-        error: error instanceof Error ? error.message : "unknown",
-      });
-    }
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-  }
-}
-
-void main();
+// Standalone worker; set ORCHESTRATOR_EMBEDDED=false for the Next.js server when using this.
+startWorker();
+setInterval(() => undefined, 1 << 30);

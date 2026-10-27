@@ -1,4 +1,4 @@
-import { CURSEFORGE_API_KEY } from "@/lib/env/server";
+import { getCurseForgeApiKey } from "@/lib/settings/store";
 
 const API = "https://api.curseforge.com/v1";
 const GAME_ID_MINECRAFT = 432;
@@ -11,6 +11,7 @@ type CfSearchResponse = {
     slug: string;
     summary: string;
     downloadCount: number;
+    logo?: { thumbnailUrl?: string } | null;
   }>;
 };
 
@@ -25,21 +26,14 @@ type CfFilesResponse = {
   }>;
 };
 
-type CfDownloadUrlResponse = {
-  data: string;
-};
-
-function assertApiKey() {
-  if (!CURSEFORGE_API_KEY) {
-    throw new Error("CURSEFORGE_API_KEY ist nicht gesetzt.");
-  }
-}
-
 async function cffetch<T>(path: string): Promise<T> {
-  assertApiKey();
+  const apiKey = getCurseForgeApiKey();
+  if (!apiKey) {
+    throw new Error("Für CurseForge fehlt der API-Key – bitte unter „Einrichtung“ hinterlegen.");
+  }
   const response = await fetch(`${API}${path}`, {
     cache: "no-store",
-    headers: { "x-api-key": CURSEFORGE_API_KEY },
+    headers: { "x-api-key": apiKey },
   });
   if (!response.ok) {
     throw new Error(`CurseForge API ${response.status}: ${path}`);
@@ -53,6 +47,7 @@ export type CurseForgeModpackHit = {
   title: string;
   description: string;
   downloads: number;
+  iconUrl: string | null;
 };
 
 export type CurseForgeFileSummary = {
@@ -75,6 +70,7 @@ export async function searchCurseForgeModpacks(query: string, pageSize = 40): Pr
     title: m.name,
     description: m.summary ?? "",
     downloads: Math.floor(m.downloadCount ?? 0),
+    iconUrl: m.logo?.thumbnailUrl ?? null,
   }));
 }
 
@@ -93,21 +89,4 @@ export async function listCurseForgeModpackFiles(modId: string): Promise<CurseFo
       gameVersions: f.gameVersions ?? [],
       downloadUrl: f.downloadUrl,
     }));
-}
-
-export async function resolveCurseForgeFileDownload(modId: string, fileId: string): Promise<{ url: string; filename: string }> {
-  const m = Number(modId);
-  const f = Number(fileId);
-  if (!Number.isFinite(m) || !Number.isFinite(f) || m <= 0 || f <= 0) {
-    throw new Error("Ungültige CurseForge modId/fileId.");
-  }
-
-  const byEndpoint = await cffetch<CfDownloadUrlResponse>(`/mods/${m}/files/${f}/download-url`);
-  const url = byEndpoint.data;
-  if (!url) {
-    throw new Error("CurseForge hat keine Download-URL für diese Datei geliefert.");
-  }
-
-  const filename = url.split("/").pop() || `curseforge-${m}-${f}.zip`;
-  return { url, filename };
 }

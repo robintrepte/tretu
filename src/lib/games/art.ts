@@ -1,11 +1,14 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  Axe,
   Blocks,
   Crosshair,
   Factory,
   Gamepad2,
   Headphones,
   Mountain,
+  PawPrint,
+  Pickaxe,
   Rocket,
   Shield,
   Swords,
@@ -30,6 +33,21 @@ const ART: Record<string, GameArt> = {
     Icon: Blocks,
     gradient: "from-emerald-800 via-green-700 to-lime-950",
     label: "Minecraft",
+  },
+  valheim: {
+    Icon: Axe,
+    gradient: "from-slate-700 via-cyan-900 to-stone-950",
+    label: "Valheim",
+  },
+  palworld: {
+    Icon: PawPrint,
+    gradient: "from-sky-600 via-teal-700 to-emerald-950",
+    label: "Palworld",
+  },
+  terraria: {
+    Icon: Pickaxe,
+    gradient: "from-green-700 via-emerald-800 to-amber-950",
+    label: "Terraria",
   },
   ark: {
     Icon: Mountain,

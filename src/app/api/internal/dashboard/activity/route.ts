@@ -2,17 +2,27 @@ import { desc } from "drizzle-orm";
 
 import { db } from "@/db";
 import { actionJobs, auditEvents } from "@/db/schema";
-import { ok, fail } from "@/lib/api/respond";
-import { getUserId } from "@/lib/auth/session";
-import { hasRole } from "@/lib/permissions/checks";
+import { requirePermission } from "@/lib/api/guard";
+import { ok } from "@/lib/api/respond";
+
+export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const userId = await getUserId();
-  if (!userId) return fail("Unauthorized", 401);
-  if (!hasRole(userId, "admin")) return fail("Forbidden", 403);
-
-  const jobs = db.select().from(actionJobs).orderBy(desc(actionJobs.createdAt)).limit(100).all();
+  const guard = await requirePermission("roles:manage");
+  if (guard.error) return guard.error;
+  const jobs = db
+    .select({
+      id: actionJobs.id,
+      instanceId: actionJobs.instanceId,
+      actionType: actionJobs.actionType,
+      status: actionJobs.status,
+      error: actionJobs.error,
+      createdAt: actionJobs.createdAt,
+    })
+    .from(actionJobs)
+    .orderBy(desc(actionJobs.createdAt))
+    .limit(100)
+    .all();
   const events = db.select().from(auditEvents).orderBy(desc(auditEvents.createdAt)).limit(100).all();
-
   return ok({ jobs, events });
 }

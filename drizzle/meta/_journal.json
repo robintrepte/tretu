@@ -43,6 +43,13 @@
       "when": 1780501000000,
       "tag": "0005_ts_users_week_year",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1780502000000,
+      "tag": "0006_dashboard_overhaul",
+      "breakpoints": true
     }
   ]
 }

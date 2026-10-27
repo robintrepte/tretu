@@ -14,3 +14,22 @@ export function dashboardApiErrorMessage(res: Response, body: Record<string, unk
   if (err) return err;
   return `Anfrage fehlgeschlagen (${res.status}).`;
 }
+
+/** Calls a dashboard API route and returns `data`, throwing an Error with a readable message otherwise. */
+export async function dashboardApi<T>(url: string, init?: RequestInit & { json?: unknown }): Promise<T> {
+  const { json, ...rest } = init ?? {};
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...rest,
+      headers: json !== undefined ? { "Content-Type": "application/json", ...(rest.headers ?? {}) } : rest.headers,
+      body: json !== undefined ? JSON.stringify(json) : rest.body,
+      cache: "no-store",
+    });
+  } catch {
+    throw new Error("Netzwerkfehler – bitte erneut versuchen.");
+  }
+  const body = await readDashboardJson(res);
+  if (!res.ok) throw new Error(dashboardApiErrorMessage(res, body));
+  return body.data as T;
+}

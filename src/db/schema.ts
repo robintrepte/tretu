@@ -52,6 +52,14 @@ export const gameInstances = sqliteTable("game_instances", {
   activeServerType: text("active_server_type").notNull(),
   configProfile: text("config_profile", { mode: "json" }).notNull().default(sql`'{}'`),
   idleDeleteAfterMinutes: integer("idle_delete_after_minutes").notNull().default(120),
+  /** Subdomain under the configured Cloudflare zone (e.g. "mc" → mc.tretu.de). */
+  subdomain: text("subdomain"),
+  dnsRecordId: text("dns_record_id"),
+  hetznerFirewallId: text("hetzner_firewall_id"),
+  /** Last time players were seen online (or the host was started); drives the idle shutdown. */
+  lastActivityAt: integer("last_activity_at", { mode: "timestamp" }),
+  backupRetention: integer("backup_retention").notNull().default(5),
+  backupOnHibernate: integer("backup_on_hibernate", { mode: "boolean" }).notNull().default(true),
   archivedAt: integer("archived_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
@@ -113,6 +121,10 @@ export const actionJobs = sqliteTable(
     payloadJson: text("payload_json", { mode: "json" }).notNull().default(sql`'{}'`),
     status: text("status").notNull().default("queued"),
     idempotencyKey: text("idempotency_key").notNull(),
+    /** Current step shown in the UI while the job runs. */
+    progress: text("progress"),
+    log: text("log").notNull().default(""),
+    error: text("error"),
     createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
     startedAt: integer("started_at", { mode: "timestamp" }),
     finishedAt: integer("finished_at", { mode: "timestamp" }),
@@ -177,6 +189,33 @@ export const backups = sqliteTable("backups", {
   restoredAt: integer("restored_at", { mode: "timestamp" }),
 });
 
+/** File-level backups (tar.gz) stored on the instance volume under /srv/game/backups. */
+export const gameBackups = sqliteTable(
+  "game_backups",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    instanceId: integer("instance_id")
+      .notNull()
+      .references(() => gameInstances.id, { onDelete: "cascade" }),
+    fileName: text("file_name").notNull(),
+    sizeBytes: integer("size_bytes"),
+    kind: text("kind").notNull().default("manual"),
+    createdByUserId: integer("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    instanceCreatedIdx: index("game_backups_instance_created_idx").on(table.instanceId, table.createdAt),
+  })
+);
+
+/** Key/value settings for the dashboard (Hetzner, Cloudflare, …); secrets are stored encrypted. */
+export const dashboardSettings = sqliteTable("dashboard_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  encrypted: integer("encrypted", { mode: "boolean" }).notNull().default(false),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+});
+
 export const auditEvents = sqliteTable(
   "audit_events",
   {
@@ -200,6 +239,7 @@ export const gameInstancesRelations = relations(gameInstances, ({ many }) => ({
   jobs: many(actionJobs),
   statuses: many(instanceStatusSnapshots),
   backupRecords: many(backups),
+  gameBackups: many(gameBackups),
 }));
 
 export const tsRankTiers = sqliteTable(

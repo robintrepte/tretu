@@ -89,11 +89,44 @@ export async function listProjectVersions(projectId: string): Promise<ModrinthVe
   });
 }
 
-export async function resolveModrinthVersionDownload(versionId: string): Promise<{ url: string; filename: string }> {
-  const url = `${API}/version/${encodeURIComponent(versionId)}`;
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error(`Modrinth version ${res.status}`);
-  const v = (await res.json()) as ModrinthVersion;
-  const file = pickPrimaryFile(v.files);
-  return { url: file.url, filename: file.filename };
+export type ModrinthProjectHit = {
+  projectId: string;
+  slug: string;
+  title: string;
+  description: string;
+  downloads: number;
+  iconUrl: string | null;
+};
+
+/** Searches server-compatible mods or plugins for a loader (and optionally a game version). */
+export async function searchProjects(input: {
+  query: string;
+  type: "mod" | "plugin";
+  category: string;
+  gameVersion?: string;
+  limit?: number;
+}): Promise<ModrinthProjectHit[]> {
+  const facets: string[][] = [
+    [`project_type:${input.type}`],
+    [`categories:${input.category}`],
+    ["server_side:required", "server_side:optional"],
+  ];
+  if (input.gameVersion && input.gameVersion !== "LATEST") facets.push([`versions:${input.gameVersion}`]);
+  const params = new URLSearchParams({
+    query: input.query,
+    facets: JSON.stringify(facets),
+    limit: String(Math.min(input.limit ?? 20, 50)),
+    index: input.query ? "relevance" : "downloads",
+  });
+  const res = await fetch(`${API}/search?${params}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Modrinth search ${res.status}`);
+  const data = (await res.json()) as SearchResponse;
+  return data.hits.map((h) => ({
+    projectId: h.project_id,
+    slug: h.slug,
+    title: h.title,
+    description: h.description,
+    downloads: h.downloads,
+    iconUrl: h.icon_url,
+  }));
 }

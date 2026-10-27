@@ -79,9 +79,10 @@ Site identity and default SEO are in `src/lib/seo.ts` (canonical URL: **https://
    - `AUTH_SECRET`
    - `AUTH_DISCORD_CLIENT_ID`
    - `AUTH_DISCORD_CLIENT_SECRET`
-   - `HETZNER_API_TOKEN`
-   - `HETZNER_SSH_PRIVATE_KEY_PATH`
+   - `DASHBOARD_ADMIN_DISCORD_IDS` (your Discord user id → admin role on login)
 3. Keep `.env.local` private and never commit it.
+
+Hetzner, Cloudflare and CurseForge are connected in the dashboard itself (`/dashboard/setup`), not via env.
 
 ---
 
@@ -115,33 +116,56 @@ Rank time counts **active** presence only: TeamSpeak `client_idle_time` must sta
 
 ---
 
-## Internal Dashboard
+## Game-Server Dashboard
 
-- Dashboard UI: `/dashboard`
-- Activity view: `/dashboard/activity`
-- Internal API namespace: `/api/internal/dashboard/*`
-- Auth flow: `/api/auth/signin` (Discord)
+`/dashboard` manages game servers on Hetzner Cloud. Each server is one Docker container on its own VM; worlds live on a
+Hetzner volume, so the VM only exists (and costs money) while people play.
+
+**Games:** Minecraft Java (Vanilla, Paper, Purpur, Fabric, Forge, NeoForge, Modrinth & CurseForge modpacks, extra Modrinth
+mods/plugins), Valheim, Satisfactory, Palworld, Terraria (TShock) and Counter-Strike 2. The catalog lives in
+`src/lib/games/catalog.ts`, the Docker runtime per game in `src/lib/games/runtime.ts`.
+
+### First-time setup
+
+1. Set `DASHBOARD_ADMIN_DISCORD_IDS` and log in once via Discord.
+2. Open **Einrichtung** (`/dashboard/setup`) and paste a Hetzner Cloud API token (read & write). The dashboard
+   generates its own SSH key and registers it in the Hetzner project.
+3. Optional: Cloudflare API token ("Edit zone DNS" template) + domain → every server gets `<name>.<domain>`, updated
+   automatically on each start. Optional: CurseForge API key for CurseForge modpacks.
+4. Assign roles to other members under **Team**.
+
+Tokens and the SSH key are stored AES-GCM encrypted in SQLite (key: `DASHBOARD_SECRET_KEY`, falls back to `AUTH_SECRET` —
+changing it makes stored secrets unreadable, simply reconnect then).
+
+### What a start does
+
+Hetzner volume (once) → firewall (SSH + game ports) → VM with the volume → Docker install & volume mount →
+Cloudflare A record → env file + `run.sh` on the volume → `docker run`. **Ausschalten** stops the game, takes a backup,
+unmounts and deletes the VM. With **Auto-Aus** enabled the worker does this automatically after N minutes without players.
+
+Backups are `tar.gz` files on the volume (`/srv/game/backups`, retention per server) and can be downloaded, restored or
+deleted from the UI. The UI also provides live logs, a console (Minecraft RCON, CS2 RCON), a file manager (upload
+mods/worlds, edit configs) and a per-server job log.
 
 ### Roles
 
-- `admin` — full access including role management
-- `operator` — full game lifecycle + infra actions
-- `manager` — dashboard access + start/stop/restart + backups
+- `admin` — everything incl. setup and role management
+- `operator` — create/configure/delete servers, console, files
+- `manager` — start, turn off, restart, backups
 - `user` — no dashboard access
 
-Role assignments are stored in DB (`users`, `roles`, `user_roles`).
+### Orchestrator worker
 
----
-
-## Orchestrator Worker
-
-Run the long-lived action processor in a separate process:
+The job worker and the status monitor run inside the Next.js server process by default (`src/instrumentation.ts`).
+A DB lease ensures only one process works at a time. To run it separately instead:
 
 ```bash
+ORCHESTRATOR_EMBEDDED=false   # for the Next.js process
 npm run worker:orchestrator
 ```
 
-The worker executes queued dashboard actions (provision/start/stop/restart/backup/deleteHost), handles retries, and records attempts/status.
+New tables/columns are created automatically on startup (`src/db/ensure-dashboard-schema.ts`); `npm run db:push` works
+as before.
 
 ---
 

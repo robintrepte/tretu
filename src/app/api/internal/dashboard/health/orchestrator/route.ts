@@ -1,13 +1,11 @@
-import { desc } from "drizzle-orm";
-
-import { db } from "@/db";
-import { actionJobs } from "@/db/schema";
+import { requirePermission } from "@/lib/api/guard";
 import { ok } from "@/lib/api/respond";
+import { workerHeartbeat } from "@/lib/orchestrator/worker";
+
+export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const latest = db.select().from(actionJobs).orderBy(desc(actionJobs.createdAt)).get();
-  return ok({
-    healthy: true,
-    latestActionAt: latest?.createdAt ?? null,
-  });
+  const guard = await requirePermission("dashboard:view");
+  if (guard.error) return guard.error;
+  return ok(workerHeartbeat());
 }

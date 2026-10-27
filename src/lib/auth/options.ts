@@ -8,7 +8,9 @@ import {
   AUTH_DISCORD_CLIENT_ID,
   AUTH_DISCORD_CLIENT_SECRET,
   AUTH_SECRET,
+  getDashboardAdminDiscordIds,
 } from "@/lib/env/server";
+import { grantRole } from "@/lib/permissions/checks";
 
 export const authOptions: NextAuthOptions = {
   secret: AUTH_SECRET,
@@ -56,6 +58,11 @@ export const authOptions: NextAuthOptions = {
             avatarUrl: user.image ?? null,
           })
           .run();
+      }
+
+      if (getDashboardAdminDiscordIds().includes(account.providerAccountId)) {
+        const dbUser = db.select().from(users).where(eq(users.discordId, account.providerAccountId)).get();
+        if (dbUser) grantRole(dbUser.id, "admin");
       }
 
       return true;
