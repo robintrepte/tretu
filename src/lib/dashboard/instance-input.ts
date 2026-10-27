@@ -117,6 +117,13 @@ export function requireDefinition(gameType: unknown): GameDefinition {
   return def;
 }
 
+/** Like `requireDefinition`, but only for games that can currently be created. */
+export function requireCreatableDefinition(gameType: unknown): GameDefinition {
+  const def = requireDefinition(gameType);
+  if (!def.available) throw new InputError(`${def.label} ist noch nicht verfügbar.`);
+  return def;
+}
+
 export function newProfile(def: GameDefinition, body: Record<string, unknown>): InstanceProfile {
   const volume = Math.round(Number(body.volumeSizeGb ?? def.defaultVolumeGb));
   if (!Number.isFinite(volume) || volume < def.minVolumeGb || volume > 2000) {

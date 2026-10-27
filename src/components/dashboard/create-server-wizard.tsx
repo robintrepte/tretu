@@ -19,6 +19,7 @@ import { formatEuro } from "@/lib/dashboard/format";
 import { defaultSettings, GAME_CATALOG, type GameDefinition, type SettingValues } from "@/lib/games/catalog";
 import type { MinecraftSource } from "@/lib/games/minecraft-source";
 import type { HetznerOptions } from "@/lib/hetzner/types";
+import { cn } from "@/lib/utils";
 
 export const IDLE_OPTIONS = [
   { value: "0", label: "Nie automatisch ausschalten" },
@@ -151,10 +152,21 @@ export function CreateServerWizard({
           <button
             key={def.id}
             type="button"
+            disabled={!def.available}
             onClick={() => selectGame(def)}
-            className="group overflow-hidden rounded-2xl border border-border/80 bg-card text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-[var(--tretu-accent)]/40 hover:shadow-md"
+            className={cn(
+              "group relative overflow-hidden rounded-2xl border border-border/80 bg-card text-left shadow-sm transition-all",
+              def.available
+                ? "hover:-translate-y-0.5 hover:border-[var(--tretu-accent)]/40 hover:shadow-md"
+                : "cursor-not-allowed opacity-50 grayscale"
+            )}
           >
             <GameThumbnail gameType={def.id} size="md" />
+            {!def.available ? (
+              <span className="absolute right-3 top-3 rounded-full bg-background/90 px-2.5 py-1 text-xs font-medium text-muted-foreground shadow-sm">
+                Bald verfügbar
+              </span>
+            ) : null}
             <div className="p-4">
               <h3 className="font-semibold tracking-tight">{def.label}</h3>
               <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{def.tagline}</p>

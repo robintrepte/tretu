@@ -39,6 +39,11 @@ export type GameDefinition = {
   recommendedRamGb: number;
   defaultVolumeGb: number;
   minVolumeGb: number;
+  /**
+   * Whether new servers of this game can be created. Games whose Docker setup has not been
+   * verified on a real server yet are shown greyed out in the dashboard.
+   */
+  available: boolean;
   features: {
     /** Send commands from the dashboard console. */
     console: boolean;
@@ -62,6 +67,7 @@ export const GAME_CATALOG: GameDefinition[] = [
     recommendedRamGb: 8,
     defaultVolumeGb: 20,
     minVolumeGb: 10,
+    available: true,
     features: { console: true, playerCount: true },
     connectHint: "Minecraft → Multiplayer → Server hinzufügen → Adresse einfügen.",
     notes: ["Größere Modpacks brauchen 12–16 GB RAM und beim ersten Start 5–10 Minuten."],
@@ -134,6 +140,7 @@ export const GAME_CATALOG: GameDefinition[] = [
     recommendedRamGb: 8,
     defaultVolumeGb: 20,
     minVolumeGb: 10,
+    available: false,
     features: { console: false, playerCount: true },
     connectHint: "Valheim → Spiel beitreten → IP hinzufügen → Adresse mit Port eingeben.",
     settings: [
@@ -182,6 +189,7 @@ export const GAME_CATALOG: GameDefinition[] = [
     recommendedRamGb: 16,
     defaultVolumeGb: 30,
     minVolumeGb: 20,
+    available: false,
     features: { console: false, playerCount: false },
     connectHint: "Satisfactory → Server Manager → Server hinzufügen → Adresse + Port 7777. Beim ersten Verbinden Name und Admin-Passwort festlegen.",
     notes: ["Satisfactory meldet keine Spielerzahl – die automatische Abschaltung im Leerlauf ist hier nicht möglich."],
@@ -204,6 +212,7 @@ export const GAME_CATALOG: GameDefinition[] = [
     recommendedRamGb: 16,
     defaultVolumeGb: 30,
     minVolumeGb: 20,
+    available: false,
     features: { console: false, playerCount: true },
     connectHint: "Palworld → Mehrspieler beitreten → unten Adresse mit Port eingeben.",
     settings: [
@@ -233,6 +242,7 @@ export const GAME_CATALOG: GameDefinition[] = [
     recommendedRamGb: 4,
     defaultVolumeGb: 10,
     minVolumeGb: 10,
+    available: false,
     features: { console: false, playerCount: false },
     connectHint: "Terraria → Mehrspieler → Über IP beitreten → Adresse und Port 7777.",
     notes: ["Terraria meldet keine Spielerzahl – die automatische Abschaltung im Leerlauf ist hier nicht möglich."],
@@ -268,6 +278,7 @@ export const GAME_CATALOG: GameDefinition[] = [
     recommendedRamGb: 8,
     defaultVolumeGb: 80,
     minVolumeGb: 60,
+    available: false,
     features: { console: true, playerCount: true },
     connectHint: "CS2 → Konsole (~) → connect <Adresse>; password <Passwort>.",
     notes: ["Der erste Start lädt ca. 60 GB von Steam und dauert 10–20 Minuten."],

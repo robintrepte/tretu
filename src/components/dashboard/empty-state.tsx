@@ -26,8 +26,8 @@ export function DashboardEmptyState({ canCreate }: { canCreate: boolean }) {
           </div>
           <h2 className="mt-4 text-xl font-semibold tracking-tight sm:text-2xl">Noch keine Server angelegt</h2>
           <p className="mt-3 max-w-lg text-sm leading-relaxed text-muted-foreground">
-            Minecraft (auch mit Modpacks), Valheim, Satisfactory, Palworld, Terraria oder CS2: Spiel wählen, Größe festlegen,
-            fertig. VM, Speicher, Firewall und Adresse richtet das Dashboard automatisch ein.
+            Minecraft – Vanilla, Paper, Fabric, Forge, NeoForge oder komplette Modpacks: Version wählen, Größe festlegen,
+            fertig. Weitere Spiele folgen. VM, Speicher, Firewall und Adresse richtet das Dashboard automatisch ein.
           </p>
           {canCreate ? (
           <div className="mt-6">

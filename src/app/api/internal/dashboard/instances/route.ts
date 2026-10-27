@@ -5,7 +5,7 @@ import { fail, ok } from "@/lib/api/respond";
 import {
   InputError,
   newProfile,
-  requireDefinition,
+  requireCreatableDefinition,
   slugify,
   uniqueSlug,
   validateIdleMinutes,
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
 
   const body = await readJson(request);
   try {
-    const def = requireDefinition(body.gameType);
+    const def = requireCreatableDefinition(body.gameType);
     const name = validateName(body.name);
     const slug = uniqueSlug(slugify(String(body.slug || name)));
     const { serverType, region } = await validateServerType(def, body.serverType, body.region);

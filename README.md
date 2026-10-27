@@ -122,8 +122,9 @@ Rank time counts **active** presence only: TeamSpeak `client_idle_time` must sta
 Hetzner volume, so the VM only exists (and costs money) while people play.
 
 **Games:** Minecraft Java (Vanilla, Paper, Purpur, Fabric, Forge, NeoForge, Modrinth & CurseForge modpacks, extra Modrinth
-mods/plugins), Valheim, Satisfactory, Palworld, Terraria (TShock) and Counter-Strike 2. The catalog lives in
-`src/lib/games/catalog.ts`, the Docker runtime per game in `src/lib/games/runtime.ts`.
+mods/plugins). Valheim, Satisfactory, Palworld, Terraria (TShock) and Counter-Strike 2 are prepared but shown as
+"Bald verfügbar" until their Docker setup has been verified on a real server — flip `available` in
+`src/lib/games/catalog.ts` to enable one. The Docker runtime per game lives in `src/lib/games/runtime.ts`.
 
 ### First-time setup
 

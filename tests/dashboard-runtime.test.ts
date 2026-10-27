@@ -189,3 +189,9 @@ test("host bootstrap script is valid bash", () => {
   );
   assertValidBash(script);
 });
+
+test("only verified games can be created", async () => {
+  const { requireCreatableDefinition, InputError } = await import("../src/lib/dashboard/instance-input");
+  assert.equal(requireCreatableDefinition("minecraft").id, "minecraft");
+  assert.throws(() => requireCreatableDefinition("valheim"), InputError);
+});
