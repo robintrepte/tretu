@@ -1,11 +1,11 @@
 "use client";
 
-import { LayoutDashboard, LogIn } from "lucide-react";
+import { Gamepad2, LayoutDashboard, LogIn } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect, useMemo } from "react";
 import { HeaderLogo } from "@/components/header-logo";
 import { MobileNav } from "@/components/mobile-nav";
-import { getNavItems } from "@/lib/nav/items";
+import { getNavItems, PLAY_URL } from "@/lib/nav/items";
 
 const socialLinks = [
   { label: "Twitch", href: "https://www.twitch.tv/TretuDE", icon: "twitch" },
@@ -80,7 +80,7 @@ export function Header() {
         </Link>
         <nav className="hidden flex-1 items-center justify-center md:flex" aria-label="Hauptmenü">
           <ul className="flex flex-wrap items-center justify-center gap-1 text-sm uppercase tracking-wide md:gap-4">
-            {navItems.map((item) => (
+            {navItems.filter((item) => !item.highlight).map((item) => (
               <li key={item.href} className="relative group">
                 {item.children ? (
                   <>
@@ -103,14 +103,6 @@ export function Header() {
                       ))}
                     </ul>
                   </>
-                ) : item.highlight ? (
-                  <a
-                    href={item.href}
-                    {...(item.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-                    className="ml-1 block rounded-full bg-[var(--tretu-accent)] px-4 py-1.5 font-semibold text-white shadow-md ring-2 ring-white/80 transition-colors hover:bg-[var(--tretu-accent-hover)]"
-                  >
-                    {item.label}
-                  </a>
                 ) : (
                   <Link
                     href={item.href}
@@ -124,6 +116,17 @@ export function Header() {
           </ul>
         </nav>
         <div className="flex shrink-0 items-center gap-3 md:gap-6">
+          <a
+            href={PLAY_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Tretu Play"
+            title="Tretu Play – Browser-Spiele mit Freunden"
+            className="hidden items-center gap-1.5 text-header-fg transition-colors hover:text-[var(--tretu-accent)] md:inline-flex"
+          >
+            <Gamepad2 className="h-5 w-5" aria-hidden />
+          </a>
+          <span aria-hidden className="hidden h-4 w-px shrink-0 bg-header-fg/25 md:block" />
           <ul className="hidden items-center gap-6 md:flex" aria-label="Soziale Netzwerke">
             {socialLinks.map(({ href, label, icon }) => (
               <li key={href}>
