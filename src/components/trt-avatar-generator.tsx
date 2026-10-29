@@ -298,7 +298,7 @@ export function TrtAvatarGenerator() {
             ))}
           </div>
           <Button variant="outline" className="w-full" onClick={() => setConfig((c) => randomAvatarConfig(c))}>
-            <Dices /> Zufälliger Verlauf
+            <Dices /> Zufall
           </Button>
         </Section>
 
@@ -395,21 +395,6 @@ export function TrtAvatarGenerator() {
               step={0.05}
               value={config.glow}
               onChange={(e) => update({ glow: Number(e.target.value) })}
-              className="w-full accent-[var(--tretu-accent)]"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="scale" className="flex justify-between">
-              Größe <span className="tabular-nums text-muted-foreground">{Math.round(config.logoScale * 100)} %</span>
-            </Label>
-            <input
-              id="scale"
-              type="range"
-              min={0.4}
-              max={0.9}
-              step={0.01}
-              value={config.logoScale}
-              onChange={(e) => update({ logoScale: Number(e.target.value) })}
               className="w-full accent-[var(--tretu-accent)]"
             />
           </div>

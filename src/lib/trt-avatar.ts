@@ -21,13 +21,14 @@ export type AvatarConfig = {
   logoColor: string;
   /** 0 = off, 1 = like the original avatars. */
   glow: number;
-  /** Logo width relative to the avatar (the originals use ~0.69). */
-  logoScale: number;
 };
+
+/** Logo width relative to the avatar, fixed to match the original clan avatars. */
+const LOGO_SCALE = 0.69;
 
 export type AvatarPreset = { id: string; label: string; config: AvatarConfig };
 
-const base = { direction: "vertical" as const, logoColor: "#ffffff", glow: 1, logoScale: 0.69 };
+const base = { direction: "vertical" as const, logoColor: "#ffffff", glow: 1 };
 
 /** Colours sampled from the existing TRT avatars. */
 export const AVATAR_PRESETS: AvatarPreset[] = [
@@ -81,7 +82,7 @@ function luminance(hex: string): number {
 
 /** Self-contained SVG markup of the avatar at the given pixel size. */
 export function buildAvatarSvg(config: AvatarConfig, size = 1080): string {
-  const scale = (size * config.logoScale) / LOGO_BOX.width;
+  const scale = (size * LOGO_SCALE) / LOGO_BOX.width;
   const tx = size / 2 - (LOGO_BOX.x + LOGO_BOX.width / 2) * scale;
   const ty = size / 2 - (LOGO_BOX.y + LOGO_BOX.height / 2) * scale;
   const glowRadius = 9 * config.glow / scale;
@@ -112,7 +113,6 @@ export function configToParams(config: AvatarConfig): URLSearchParams {
     d: config.direction,
     l: config.logoColor.slice(1),
     g: String(config.glow),
-    s: String(config.logoScale),
   });
 }
 
@@ -125,23 +125,33 @@ export function configFromParams(params: URLSearchParams): AvatarConfig | null {
   const direction = params.get("d") as GradientDirection;
   const logoColor = `#${params.get("l") ?? "ffffff"}`;
   const glow = Number(params.get("g") ?? 1);
-  const logoScale = Number(params.get("s") ?? 0.69);
   return {
     colors,
     direction: ["vertical", "diagonal", "horizontal", "radial"].includes(direction) ? direction : "vertical",
     logoColor: isHexColor(logoColor) ? logoColor : "#ffffff",
     glow: Number.isFinite(glow) ? Math.min(Math.max(glow, 0), 2) : 1,
-    logoScale: Number.isFinite(logoScale) ? Math.min(Math.max(logoScale, 0.3), 0.95) : 0.69,
   };
 }
 
-/** Random but pleasant two-colour gradient (neighbouring hues, darker at the bottom). */
+const DIRECTIONS: GradientDirection[] = ["vertical", "diagonal", "horizontal", "radial"];
+
+/**
+ * Random but pleasant gradient: 2–3 neighbouring hues getting darker towards the end,
+ * with a random gradient type. Logo colour and glow are kept.
+ */
 export function randomAvatarConfig(previous?: AvatarConfig): AvatarConfig {
-  const hue = Math.floor(Math.random() * 360);
-  const shift = 20 + Math.floor(Math.random() * 50) * (Math.random() < 0.5 ? -1 : 1);
-  const top = hslToHex(hue, 70 + Math.random() * 25, 45 + Math.random() * 15);
-  const bottom = hslToHex((hue + shift + 360) % 360, 60 + Math.random() * 30, 22 + Math.random() * 15);
-  return { ...(previous ?? DEFAULT_AVATAR), colors: [top, bottom], logoColor: "#ffffff", glow: previous?.glow || 1 };
+  const stops = Math.random() < 0.35 ? 3 : 2;
+  const step = (20 + Math.random() * 40) * (Math.random() < 0.5 ? -1 : 1);
+  const hue = Math.random() * 360;
+  const colors = Array.from({ length: stops }, (_, i) => {
+    const t = i / (stops - 1);
+    return hslToHex((hue + step * i + 360) % 360, 65 + Math.random() * 30, 55 - t * (25 + Math.random() * 10));
+  });
+  return {
+    ...(previous ?? DEFAULT_AVATAR),
+    colors,
+    direction: DIRECTIONS[Math.floor(Math.random() * DIRECTIONS.length)],
+  };
 }
 
 function hslToHex(h: number, s: number, l: number): string {
