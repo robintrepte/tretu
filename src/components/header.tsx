@@ -103,6 +103,14 @@ export function Header() {
                       ))}
                     </ul>
                   </>
+                ) : item.highlight ? (
+                  <a
+                    href={item.href}
+                    {...(item.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                    className="ml-1 block rounded-full bg-[var(--tretu-accent)] px-4 py-1.5 font-semibold text-white shadow-md ring-2 ring-white/80 transition-colors hover:bg-[var(--tretu-accent-hover)]"
+                  >
+                    {item.label}
+                  </a>
                 ) : (
                   <Link
                     href={item.href}

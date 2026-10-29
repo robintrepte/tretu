@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import dynamic from "next/dynamic";
 import Image from "next/image";
+import { Gamepad2 } from "lucide-react";
 import Link from "next/link";
 import { PageTitle } from "@/components/page-title";
 import { pageMetadata } from "@/lib/metadata";
+import { PLAY_URL } from "@/lib/nav/items";
 
 const HomeShaderBg = dynamic(
   () => import("@/components/home-shader-bg").then((m) => ({ default: m.HomeShaderBg }))
@@ -34,7 +36,7 @@ export default function Home() {
           }}
         >
           <PageTitle title="Tretu Gaming Community" variant="hero" />
-          <div className="mt-12 grid w-full max-w-2xl grid-cols-1 gap-8 sm:grid-cols-2 sm:gap-12">
+          <div className="mt-12 grid w-full max-w-3xl grid-cols-1 gap-8 sm:grid-cols-3 sm:gap-12">
             <Link
               href="/teamspeak/"
               className="group flex flex-col items-center gap-3 text-white transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-[var(--tretu-accent)]"
@@ -57,6 +59,19 @@ export default function Home() {
                 DISCORD
               </h2>
             </Link>
+            <a
+              href={PLAY_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex flex-col items-center gap-3 text-white transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-[var(--tretu-accent)]"
+            >
+              <span className="flex h-[50px] w-[50px] items-center justify-center transition-transform duration-200 group-hover:scale-110">
+                <Gamepad2 className="h-full w-full" strokeWidth={1.75} aria-hidden />
+              </span>
+              <h2 className="text-lg font-semibold uppercase tracking-wide transition-all duration-200 group-hover:scale-105 group-hover:drop-shadow-md">
+                PLAY
+              </h2>
+            </a>
           </div>
         </div>
       </section>

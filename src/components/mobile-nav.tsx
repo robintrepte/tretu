@@ -36,13 +36,24 @@ export function MobileNav({ navItems }: { navItems: NavItem[] }) {
           <ul className="flex flex-col items-center gap-2">
             {navItems.map((item) => (
               <li key={item.href} className="w-full max-w-xs">
-                <Link
-                  href={item.href}
-                  onClick={() => setOpen(false)}
-                  className="block rounded-lg px-6 py-5 text-3xl font-medium uppercase tracking-wide text-foreground transition-colors hover:bg-muted hover:text-[var(--tretu-accent)] active:bg-muted"
-                >
-                  {item.label}
-                </Link>
+                {item.highlight ? (
+                  <a
+                    href={item.href}
+                    onClick={() => setOpen(false)}
+                    {...(item.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                    className="mt-2 block rounded-full bg-[var(--tretu-accent)] px-6 py-4 text-3xl font-semibold uppercase tracking-wide text-white transition-colors hover:bg-[var(--tretu-accent-hover)]"
+                  >
+                    {item.label}
+                  </a>
+                ) : (
+                  <Link
+                    href={item.href}
+                    onClick={() => setOpen(false)}
+                    className="block rounded-lg px-6 py-5 text-3xl font-medium uppercase tracking-wide text-foreground transition-colors hover:bg-muted hover:text-[var(--tretu-accent)] active:bg-muted"
+                  >
+                    {item.label}
+                  </Link>
+                )}
                 {item.children?.map((child) => (
                   <Link
                     key={child.href}
