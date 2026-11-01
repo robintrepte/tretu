@@ -50,7 +50,7 @@ const securityHeaders = [
       "img-src 'self' data: https: blob:",
       "font-src 'self' data:",
       `connect-src 'self' https://www.googleapis.com${umami ? ` ${umami}` : ""}`,
-      "frame-src 'self' https://embed.twitch.tv https://discord.com https://www.youtube.com https://map.tretu.de https://www.tsviewer.com",
+      "frame-src 'self' https://embed.twitch.tv https://discord.com https://www.youtube.com https://www.youtube-nocookie.com https://map.tretu.de https://www.tsviewer.com",
       "base-uri 'self'",
       "form-action 'self'",
       "frame-ancestors 'self'",

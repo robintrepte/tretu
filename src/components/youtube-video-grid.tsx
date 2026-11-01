@@ -107,7 +107,7 @@ export function YouTubeVideoGrid() {
                     key={openVideo.id}
                     src={
                       safeYouTubeEmbedId(openVideo.id)
-                        ? `https://www.youtube.com/embed/${openVideo.id}?autoplay=1`
+                        ? `https://www.youtube-nocookie.com/embed/${openVideo.id}?autoplay=1`
                         : "about:blank"
                     }
                     title={openVideo.title}

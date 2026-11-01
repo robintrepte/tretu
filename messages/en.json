@@ -242,6 +242,16 @@
       "generic": "Sign-in failed ({code})."
     }
   },
+  "embeds": {
+    "notice": "This section embeds content from {provider}. Loading it sends data such as your IP address to {provider}, and {provider} may set cookies. Learn more in the <link>privacy policy</link>.",
+    "load": "Load {provider}",
+    "always": "Always load {provider}"
+  },
+  "legal": {
+    "updated": "Last updated: {date}",
+    "translationNotice": "This is a translation of the German original. Only the German version is legally binding.",
+    "toc": "Contents"
+  },
   "dashboard": {
     "nav": {
       "servers": "Servers",

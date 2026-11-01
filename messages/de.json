@@ -242,6 +242,16 @@
       "generic": "Anmeldung fehlgeschlagen ({code})."
     }
   },
+  "embeds": {
+    "notice": "Hier wird ein Inhalt von {provider} eingebunden. Beim Laden überträgt dein Browser Daten wie deine IP-Adresse an {provider}, und {provider} kann Cookies setzen. Mehr dazu in der <link>Datenschutzerklärung</link>.",
+    "load": "{provider} laden",
+    "always": "{provider} immer laden"
+  },
+  "legal": {
+    "updated": "Stand: {date}",
+    "translationNotice": "Dies ist eine Übersetzung. Rechtlich verbindlich ist die deutsche Fassung.",
+    "toc": "Inhalt"
+  },
   "dashboard": {
     "nav": {
       "servers": "Server",

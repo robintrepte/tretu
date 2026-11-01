@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import dynamic from "next/dynamic";
+import { EmbedGate } from "@/components/embed-gate";
 import { PageTitle } from "@/components/page-title";
 import { translatedMetadata } from "@/lib/metadata";
 
@@ -17,7 +18,9 @@ export default function TeamspeakPage() {
     <div className="mx-auto max-w-[1200px] px-4 py-12 md:px-6 lg:px-8">
       <PageTitle title="Teamspeak" icon="teamspeak" />
       <div>
-        <TeamspeakViewer />
+        <EmbedGate provider="tsviewer" minHeight={200}>
+          <TeamspeakViewer />
+        </EmbedGate>
       </div>
     </div>
   );

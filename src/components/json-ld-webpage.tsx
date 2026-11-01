@@ -4,12 +4,13 @@ type Props = {
   name: string;
   description: string;
   path: string;
+  lang?: string;
 };
 
 /**
  * Renders WebPage schema for the current page. Use once per page for richer snippets and LLM context.
  */
-export function JsonLdWebPage({ name, description, path }: Props) {
+export function JsonLdWebPage({ name, description, path, lang = "de" }: Props) {
   const url = `${SITE_URL}${path.startsWith("/") ? path : `/${path}`}`;
   const schema = {
     "@context": "https://schema.org",
@@ -17,7 +18,7 @@ export function JsonLdWebPage({ name, description, path }: Props) {
     name,
     description,
     url,
-    inLanguage: "de",
+    inLanguage: lang,
     isPartOf: { "@id": `${SITE_URL}/#website` },
   };
   return (

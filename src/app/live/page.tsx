@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import dynamic from "next/dynamic";
+import { EmbedGate } from "@/components/embed-gate";
 import { PageTitle } from "@/components/page-title";
 import { translatedMetadata } from "@/lib/metadata";
 
@@ -18,7 +19,9 @@ export default function LivestreamPage() {
       <div className="mx-auto max-w-[1200px]">
         <PageTitle title="Livestream" icon="twitch" />
       </div>
-      <TwitchEmbed />
+      <EmbedGate provider="twitch" minHeight={500}>
+        <TwitchEmbed />
+      </EmbedGate>
     </div>
   );
 }
