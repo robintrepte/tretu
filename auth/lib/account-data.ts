@@ -1,0 +1,57 @@
+import "server-only"
+import { and, desc, eq, gte, min } from "drizzle-orm"
+import { RENAME_INTERVAL_DAYS } from "@/lib/account"
+import { db } from "@/lib/db"
+import * as s from "@/lib/db/schema"
+import { env } from "@/lib/env"
+import { claimWindowOpen, legacyLinksOf } from "@/lib/legacy/claim"
+import { isAdmin } from "@/lib/users"
+
+/** Everything the account page shows, loaded in one go. */
+export async function loadAccountData(user: typeof s.user.$inferSelect, withActivity: boolean) {
+  const now = Date.now()
+  const [accounts, gameLinks, passkeys, activity, legacy, [importRow]] = await Promise.all([
+    db.select({ providerId: s.account.providerId, accountId: s.account.accountId }).from(s.account).where(eq(s.account.userId, user.id)),
+    db
+      .select({ provider: s.externalLink.provider, id: s.externalLink.providerAccountId, displayName: s.externalLink.displayName })
+      .from(s.externalLink)
+      .where(eq(s.externalLink.userId, user.id)),
+    db.select({ id: s.passkey.id, name: s.passkey.name, createdAt: s.passkey.createdAt }).from(s.passkey).where(eq(s.passkey.userId, user.id)),
+    withActivity
+      ? db
+          .select({
+            id: s.auditLog.id,
+            event: s.auditLog.event,
+            success: s.auditLog.success,
+            ipAddress: s.auditLog.ipAddress,
+            userAgent: s.auditLog.userAgent,
+            meta: s.auditLog.meta,
+            createdAt: s.auditLog.createdAt,
+          })
+          .from(s.auditLog)
+          .where(and(eq(s.auditLog.userId, user.id), gte(s.auditLog.createdAt, new Date(now - 90 * 86_400_000))))
+          .orderBy(desc(s.auditLog.createdAt))
+          .limit(40)
+      : Promise.resolve([]),
+    legacyLinksOf(db, user.id),
+    // The claim window runs from the legacy import (its earliest link), the same for everyone.
+    db.select({ firstImport: min(s.legacyLink.importedAt) }).from(s.legacyLink),
+  ])
+  const firstImport = importRow?.firstImport ?? null
+  const renameAt =
+    !user.usernamePending && user.usernameChangedAt ? new Date(user.usernameChangedAt.getTime() + RENAME_INTERVAL_DAYS * 86_400_000) : null
+  return {
+    accounts,
+    gameLinks,
+    passkeys,
+    activity,
+    legacy,
+    hasPassword: accounts.some((a) => a.providerId === "credential"),
+    providers: Object.fromEntries(accounts.filter((a) => a.providerId !== "credential").map((a) => [a.providerId, a.accountId])) as Record<string, string>,
+    admin: isAdmin(user.roles),
+    renameAt: renameAt && renameAt.getTime() > now ? renameAt.toISOString() : null,
+    firstImport,
+    claimOpen: !firstImport || claimWindowOpen(firstImport, env.LEGACY_CLAIM_DAYS),
+    claimUntil: firstImport ? new Date(firstImport.getTime() + env.LEGACY_CLAIM_DAYS * 86_400_000).toISOString() : null,
+  }
+}
