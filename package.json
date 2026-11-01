@@ -17,7 +17,12 @@
     "worker:orchestrator": "node --import tsx --import ./src/lib/env/load-local-env.ts ./scripts/orchestrator.ts",
     "worker:ts-rank": "node --import tsx --import ./src/lib/env/load-local-env.ts ./scripts/ts-rank-worker.ts",
     "ts:diagnose": "node --import tsx --import ./src/lib/env/load-local-env.ts ./scripts/ts-rank-diagnose.ts",
-    "ts:query-probe": "node --import tsx --import ./src/lib/env/load-local-env.ts ./scripts/ts-query-probe.ts"
+    "ts:query-probe": "node --import tsx --import ./src/lib/env/load-local-env.ts ./scripts/ts-query-probe.ts",
+    "test:platform": "tsx --test --test-concurrency=1 'tests/platform/*.spec.ts'",
+    "platform:db:push": "drizzle-kit push --config drizzle.platform.config.ts",
+    "platform:worker": "node --import tsx --import ./src/lib/env/load-local-env.ts ./scripts/platform-worker.ts",
+    "platform:seed-dev": "node --import tsx --import ./src/lib/env/load-local-env.ts ./scripts/platform-seed-dev.ts",
+    "platform:vapid-keys": "node --import tsx ./scripts/platform-vapid-keys.ts"
   },
   "dependencies": {
     "better-sqlite3": "^12.8.0",

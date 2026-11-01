@@ -187,7 +187,8 @@
       "migration": "Übernahme",
       "adjust": "Korrektur"
     },
-    "balanceAfter": "Saldo {balance, number} TC"
+    "balanceAfter": "Saldo {balance, number} TC",
+    "winReward": "Sieg in {app}"
   },
   "badges": {
     "metaTitle": "Abzeichen",

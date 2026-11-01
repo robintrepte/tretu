@@ -255,7 +255,7 @@ export async function declineFriendRequest(
   });
 }
 
-export async function removeFriend(db: Executor, sub: string, friendSub: string, now: Date = new Date()): Promise<void> {
+export async function removeFriend(db: Executor, sub: string, friendSub: string): Promise<void> {
   await inTransaction(db, async (tx) => {
     await lockProgressMany(tx, [sub, friendSub]);
     const [subA, subB] = orderedPair(sub, friendSub);

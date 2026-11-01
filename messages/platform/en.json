@@ -187,7 +187,8 @@
       "migration": "Migration",
       "adjust": "Adjustment"
     },
-    "balanceAfter": "Balance {balance, number} TC"
+    "balanceAfter": "Balance {balance, number} TC",
+    "winReward": "Win in {app}"
   },
   "badges": {
     "metaTitle": "Badges",
