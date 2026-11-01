@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
 /** YouTube video IDs are 11 chars. Sanitize before using in embed URL. */
@@ -15,6 +16,7 @@ import {
 import type { YouTubeVideoItem } from "@/app/api/youtube-videos/route";
 
 export function YouTubeVideoGrid() {
+  const t = useTranslations("videos");
   const [videos, setVideos] = useState<YouTubeVideoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,16 +28,12 @@ export function YouTubeVideoGrid() {
       .then((data) => {
         if (data.videos) setVideos(data.videos);
         if (data.error) {
-          setError(
-            data.error === "Service unavailable"
-              ? "Videos können gerade nicht geladen werden. Bitte später erneut versuchen."
-              : data.error
-          );
+          setError(data.error === "Service unavailable" ? t("unavailable") : t("loadFailed"));
         }
       })
-      .catch(() => setError("Videos konnten nicht geladen werden."))
+      .catch(() => setError(t("loadFailed")))
       .finally(() => setLoading(false));
-  }, []);
+  }, [t]);
 
   const openVideo = videos.find((v) => v.id === openVideoId);
 
@@ -55,7 +53,7 @@ export function YouTubeVideoGrid() {
   if (error || videos.length === 0) {
     return (
       <p className="text-muted-foreground">
-        {error ?? "Keine Videos gefunden."}
+        {error ?? t("empty")}
       </p>
     );
   }

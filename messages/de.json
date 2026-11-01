@@ -1,0 +1,752 @@
+{
+  "nav": {
+    "teamspeak": "Teamspeak",
+    "ranking": "Ranking & Stats",
+    "discord": "Discord",
+    "live": "Livestream",
+    "videos": "Videos",
+    "map": "Minecraft Map",
+    "play": "Play"
+  },
+  "header": {
+    "mainNav": "Hauptmenü",
+    "mobileNav": "Mobiles Menü",
+    "openMenu": "Menü öffnen",
+    "social": "Soziale Netzwerke",
+    "playTitle": "Tretu Play – Browser-Spiele mit Freunden",
+    "signIn": "Anmelden"
+  },
+  "userMenu": {
+    "open": "Menü von {name} öffnen",
+    "signedIn": "Angemeldet",
+    "dashboard": "Dashboard",
+    "account": "Mein Konto",
+    "signOut": "Abmelden",
+    "signingOut": "Wird abgemeldet…"
+  },
+  "footer": {
+    "legal": "Rechtliches",
+    "imprint": "Impressum",
+    "privacy": "Datenschutz",
+    "terms": "AGB",
+    "language": "Sprache",
+    "languages": {
+      "de": "Deutsch",
+      "en": "English"
+    },
+    "toggleTheme": "Farbschema umschalten",
+    "lightMode": "Zu Hellmodus wechseln",
+    "darkMode": "Zu Dunkelmodus wechseln"
+  },
+  "meta": {
+    "defaultDescription": "Willkommen auf der Webseite von Tretu! Unser Ziel ist es, das Community-Erlebnis auf ein neues Level zu bringen. Von Gamern, für Gamer. Teamspeak, Discord, Livestreams, Minecraft-Map und mehr.",
+    "mainContent": "Hauptinhalt",
+    "home": {
+      "title": "Tretu Gaming Community",
+      "description": "Willkommen bei Tretu – deine Gaming-Community. Teamspeak, Discord, Livestreams auf Twitch, YouTube-Videos, Minecraft-Map und Rankings. Von Gamern, für Gamer."
+    },
+    "teamspeak": {
+      "title": "Teamspeak",
+      "description": "Tretu Teamspeak-Server. Voice-Chat mit der Community, Kanäle und aktuelle Nutzer online. Verbinde dich mit dem Teamspeak-Server."
+    },
+    "discord": {
+      "title": "Discord",
+      "description": "Tretu Discord-Server. Tritt der Community bei, chatte mit anderen Gamern und bleib bei Events und News auf dem Laufenden."
+    },
+    "live": {
+      "title": "Livestream",
+      "description": "Schau den offiziellen Tretu Livestream auf Twitch. Gaming-Streams, Events und Community-Aktivitäten live verfolgen."
+    },
+    "videos": {
+      "title": "YouTube Videos",
+      "description": "YouTube-Videos der Tretu Gaming Community. Let's Plays, Stream-Highlights, Events und Gaming-Content."
+    },
+    "map": {
+      "title": "Minecraft Map",
+      "description": "Interaktive Minecraft-Map der Tretu Gaming Community. Erkunde die Welt, Server-Karte und Spielerpositionen in Echtzeit."
+    },
+    "ranking": {
+      "title": "Teamspeak Ranking",
+      "description": "Teamspeak-Ranking und Statistiken der Tretu Gaming Community. Monatliche Aktivitäts-Rangliste und Stimmzeit-Statistiken."
+    },
+    "trt": {
+      "title": "TRT Avatar Generator",
+      "description": "Erstelle dein eigenes TRT-Clan-Avatar: weißes TRT-Logo auf einem Farbverlauf deiner Wahl – als PNG zum Download."
+    },
+    "login": {
+      "title": "Anmelden",
+      "description": "Anmeldung bei Tretu."
+    },
+    "impressum": {
+      "title": "Impressum",
+      "description": "Impressum von Tretu und allen Tretu-Diensten. Angaben gemäß § 5 DDG: FollowerX GmbH, Hamburg."
+    },
+    "datenschutz": {
+      "title": "Datenschutz",
+      "description": "Datenschutzerklärung für tretu.de und alle Tretu-Dienste: Tretu-Konto, Saga, Play, Hollowmere, Minecraft, TeamSpeak und Discord."
+    },
+    "agb": {
+      "title": "AGB",
+      "description": "Allgemeine Geschäfts- und Nutzungsbedingungen für alle Tretu-Dienste einschließlich der Tretu-Credits."
+    },
+    "notFound": {
+      "title": "Seite nicht gefunden",
+      "description": "Die angeforderte Seite existiert nicht. Zurück zur Startseite von Tretu."
+    }
+  },
+  "notFound": {
+    "message": "Die angeforderte Seite wurde nicht gefunden.",
+    "home": "Zur Startseite"
+  },
+  "map": {
+    "title": "Minecraft Map",
+    "unavailable": "Die Karte ist gerade nicht erreichbar. Bitte später erneut versuchen."
+  },
+  "videos": {
+    "title": "YouTube Videos",
+    "unavailable": "Videos können gerade nicht geladen werden. Bitte später erneut versuchen.",
+    "loadFailed": "Videos konnten nicht geladen werden.",
+    "empty": "Keine Videos gefunden."
+  },
+  "ranking": {
+    "title": "Teamspeak Ranking",
+    "periodLabel": "Ranking-Zeitraum",
+    "periods": {
+      "week": "Woche",
+      "month": "Monat",
+      "year": "Jahr",
+      "all": "Gesamt"
+    },
+    "searchPlaceholder": "Nickname suchen…",
+    "searchLabel": "Nickname suchen",
+    "matches": "{count, plural, one {# Treffer} other {# Treffer}}",
+    "matchesOf": "{shown} von {total} Treffern",
+    "activity": "Aktivität",
+    "activeUsers": "{count, plural, one {# aktiver Nutzer} other {# aktive Nutzer}}",
+    "total": "<strong>{duration}</strong> gesamt",
+    "loading": "Ranking wird geladen…",
+    "loadFailed": "Ranking konnte nicht geladen werden.",
+    "empty": "Keine Einträge gefunden.",
+    "showMore": "Mehr anzeigen",
+    "online": "Online",
+    "usage": {
+      "title": "Server-Auslastung",
+      "rangeLabel": "Zeitraum",
+      "ranges": {
+        "24h": "24 Std.",
+        "7d": "7 Tage",
+        "30d": "30 Tage"
+      },
+      "rangeNames": {
+        "24h": "24 Stunden",
+        "7d": "7 Tage",
+        "30d": "30 Tage"
+      },
+      "description": "Alle verbundenen Spieler – {range}",
+      "noHistory": "(Verlauf startet mit dem Rank-Worker)",
+      "series": "Spieler online",
+      "onlineNow": "Jetzt online",
+      "peak": "Peak",
+      "average": "Ø im Zeitraum",
+      "now": "Jetzt",
+      "loading": "Chart wird geladen…",
+      "loadFailed": "Nutzungsdaten konnten nicht geladen werden."
+    }
+  },
+  "trt": {
+    "title": "TRT Avatar Generator",
+    "intro": "Vorlage wählen oder eigene Farben mischen – das Avatar wird direkt in deinem Browser erzeugt und lässt sich als PNG speichern, kopieren oder per Link teilen.",
+    "hex": "{label} (Hex)",
+    "copied": "Bild in die Zwischenablage kopiert",
+    "copyUnsupported": "Kopieren wird von diesem Browser nicht unterstützt – bitte herunterladen.",
+    "linkCopied": "Link kopiert – damit kann jeder genau diesen Avatar öffnen.",
+    "linkFailed": "Link konnte nicht kopiert werden.",
+    "unnamed": "Ohne Namen",
+    "saved": "In „Meine Avatare“ gespeichert",
+    "storageFailed": "Speichern im Browser nicht möglich.",
+    "exportFailed": "Das Bild konnte nicht erzeugt werden.",
+    "previewAlt": "Vorschau des TRT-Avatars",
+    "square": "Quadrat",
+    "round": "Rund (Discord/TS)",
+    "presets": "Vorlagen",
+    "presetNames": {
+      "blue": "Blau",
+      "red": "Rot",
+      "orange": "Orange",
+      "yellow": "Gelb",
+      "lime": "Limette",
+      "green": "Grün",
+      "pink": "Pink",
+      "purple": "Lila",
+      "dovah": "Dämmerung",
+      "bamboo": "Bambus",
+      "brown": "Braun",
+      "beige": "Beige",
+      "black": "Schwarz",
+      "classic": "Klassik"
+    },
+    "random": "Zufall",
+    "background": "Hintergrund",
+    "reverse": "Farben umdrehen",
+    "addColor": "Farbe hinzufügen",
+    "color": "Farbe {n}",
+    "removeColor": "Farbe {n} entfernen",
+    "directions": {
+      "vertical": "Vertikal",
+      "diagonal": "Diagonal",
+      "horizontal": "Horizontal",
+      "radial": "Radial"
+    },
+    "logo": "Logo",
+    "logoColor": "Logo-Farbe",
+    "white": "Weiß",
+    "black": "Schwarz",
+    "tretuOrange": "Tretu-Orange",
+    "glow": "Leuchten",
+    "save": "Speichern",
+    "nameLabel": "Name (für den Dateinamen)",
+    "namePlaceholder": "z. B. DovahChief",
+    "size": "Größe",
+    "downloadPng": "PNG herunterladen",
+    "remember": "Merken",
+    "copyImage": "Bild kopieren",
+    "shareLink": "Link teilen",
+    "myAvatars": "Meine Avatare",
+    "galleryHint": "Gespeichert in diesem Browser. Klicken zum Bearbeiten.",
+    "deleteAvatar": "{name} löschen"
+  },
+  "login": {
+    "title": "Anmelden",
+    "intro": "Nur für Team-Leute mit Discord-Konto und den passenden Rechten. Danach kommst du ins interne Dashboard.",
+    "introTretu": "Melde dich mit deinem Tretu-Konto an – ein Konto für alle Tretu-Dienste. Das interne Dashboard sehen nur Team-Leute mit den passenden Rechten.",
+    "withTretu": "Mit Tretu-Konto anmelden",
+    "withDiscord": "Mit Discord anmelden",
+    "withDiscordFallback": "Direkt mit Discord anmelden",
+    "redirecting": "Weiterleitung…",
+    "startFailed": "Die Anmeldung konnte nicht gestartet werden. Bitte versuche es erneut.",
+    "sessionNote": "Es wird ein technisch notwendiges Sitzungs-Cookie gespeichert. Ohne die richtige Freigabe im Team siehst du keine internen Inhalte.",
+    "tryAgain": "Bitte versuche es erneut.",
+    "errors": {
+      "access_denied": "Der Zugriff wurde abgelehnt.",
+      "account_not_linked": "Zu dieser E-Mail-Adresse gibt es schon ein Konto, das noch nicht verknüpft ist. Melde dich zuerst mit deiner bisherigen Methode an.",
+      "unable_to_link_account": "Das Konto konnte nicht verknüpft werden.",
+      "account_already_linked_to_different_user": "Dieses Konto ist bereits mit einem anderen Nutzer verknüpft.",
+      "email_not_found": "Der Anbieter hat keine E-Mail-Adresse übermittelt.",
+      "email_not_verified": "Bitte bestätige zuerst deine E-Mail-Adresse.",
+      "state_mismatch": "Die Anmeldung ist abgelaufen oder wurde in einem anderen Tab gestartet.",
+      "please_restart_the_process": "Die Anmeldung ist abgelaufen.",
+      "invalid_code": "Der Anmeldecode war ungültig oder abgelaufen.",
+      "unable_to_get_user_info": "Die Profildaten konnten nicht abgerufen werden.",
+      "oauth_provider_not_found": "Diese Anmeldemethode ist aktuell nicht verfügbar.",
+      "signup_disabled": "Neue Konten können derzeit nicht angelegt werden.",
+      "generic": "Anmeldung fehlgeschlagen ({code})."
+    }
+  },
+  "dashboard": {
+    "nav": {
+      "servers": "Server",
+      "new": "Neuer Server",
+      "activity": "Aktivität",
+      "team": "Team",
+      "setup": "Einrichtung"
+    },
+    "common": {
+      "copy": "Kopieren",
+      "copied": "Kopiert",
+      "copyFailed": "Kopieren nicht möglich",
+      "cancel": "Abbrechen",
+      "typeToConfirm": "Zum Bestätigen <code>{text}</code> eingeben:",
+      "hide": "Verbergen",
+      "show": "Anzeigen",
+      "generated": "wird automatisch erzeugt",
+      "perHour": "{price}/Std.",
+      "save": "Speichern",
+      "saving": "Speichert…",
+      "close": "Schließen",
+      "refresh": "Aktualisieren",
+      "unknownError": "Unbekannter Fehler"
+    },
+    "empty": {
+      "badge": "Los geht’s",
+      "title": "Noch keine Server angelegt",
+      "text": "Minecraft – Vanilla, Paper, Fabric, Forge, NeoForge oder komplette Modpacks: Version wählen, Größe festlegen, fertig. Weitere Spiele folgen. VM, Speicher, Firewall und Adresse richtet das Dashboard automatisch ein.",
+      "create": "Ersten Server erstellen"
+    },
+    "state": {
+      "offline": {
+        "label": "Aus",
+        "hint": "Keine VM aktiv – kostet nur den Speicher. Welt & Einstellungen bleiben erhalten."
+      },
+      "busy": {
+        "label": "Arbeitet…",
+        "hint": "Eine Aktion läuft gerade."
+      },
+      "starting": {
+        "label": "Startet…",
+        "hint": "Der Spielserver lädt noch. Das kann einige Minuten dauern."
+      },
+      "online": {
+        "label": "Online",
+        "hint": "Der Server ist erreichbar."
+      },
+      "stopped": {
+        "label": "Spiel gestoppt",
+        "hint": "Die VM läuft (und kostet), das Spiel ist aus. Starten oder ausschalten."
+      },
+      "crashed": {
+        "label": "Fehler",
+        "hint": "Der Spielserver ist abgestürzt oder antwortet nicht. Logs prüfen."
+      },
+      "unreachable": {
+        "label": "Nicht erreichbar",
+        "hint": "Die VM antwortet nicht per SSH."
+      }
+    },
+    "actions": {
+      "start": "Starten",
+      "stop": "Spiel stoppen",
+      "restart": "Neustart",
+      "apply": "Einstellungen anwenden",
+      "hibernate": "Ausschalten",
+      "backup": "Backup erstellen",
+      "restore": "Backup wiederherstellen",
+      "deleteBackup": "Backup löschen",
+      "resizeVolume": "Speicher vergrößern",
+      "wipe": "Daten zurücksetzen",
+      "destroy": "Server endgültig löschen",
+      "createVolume": "Speicher anlegen",
+      "provision": "Einrichten",
+      "deleteHost": "VM löschen"
+    },
+    "jobStatus": {
+      "queued": "Wartet",
+      "running": "Läuft",
+      "succeeded": "Fertig",
+      "failed": "Fehlgeschlagen",
+      "cancelled": "Abgebrochen"
+    },
+    "roles": {
+      "admin": {
+        "label": "Admin",
+        "description": "Alles inkl. Einrichtung (Hetzner, Cloudflare) und Rollenvergabe."
+      },
+      "operator": {
+        "label": "Operator",
+        "description": "Server anlegen, konfigurieren, löschen, Dateien & Konsole."
+      },
+      "manager": {
+        "label": "Manager",
+        "description": "Server starten, ausschalten, neu starten, Backups erstellen."
+      },
+      "user": {
+        "label": "Nutzer",
+        "description": "Kein Dashboard-Zugriff."
+      }
+    },
+    "activity": {
+      "title": "Aktivität",
+      "intro": "Alle Aktionen über alle Server – inklusive automatischer Abschaltungen.",
+      "empty": "Noch nichts passiert. Sobald im Dashboard etwas ausgelöst wird, erscheint es hier."
+    },
+    "team": {
+      "title": "Team",
+      "intro": "Wer darf was im Dashboard?",
+      "roles": "Rollen",
+      "members": "Mitglieder",
+      "membersHint": "Alle, die sich schon einmal angemeldet haben. Wer hier fehlt, muss sich einmal unter /login anmelden.",
+      "you": "(du)",
+      "lastActive": "Zuletzt aktiv {date}",
+      "saved": "Rollen gespeichert"
+    },
+    "grid": {
+      "confirmHibernate": "{count, plural, one {Es ist # Spieler online.} other {Es sind # Spieler online.}} Trotzdem ausschalten?",
+      "addressPending": "Adresse folgt beim Start",
+      "copyAddress": "Adresse kopieren",
+      "playersOnline": "{players} online",
+      "playersUnknown": "Spielerzahl unbekannt",
+      "autoOff": "Auto-Aus {when}",
+      "manage": "Verwalten",
+      "starting": "Server wird gestartet.",
+      "stopping": "Server wird ausgeschaltet.",
+      "summary": "{running} von {total} Servern laufen gerade · zusammen ca. <strong>{cost}</strong> pro Stunde"
+    },
+    "serverType": {
+      "recommended": "Empfohlen",
+      "soldOut": "ausverkauft",
+      "dedicated": "(dediziert)",
+      "perHourSuffix": "/ Std.",
+      "showDedicated": "Auch Server mit dedizierten CPUs zeigen (teurer, konstantere Leistung)",
+      "ramHint": "Mindestens {min} GB RAM, empfohlen {recommended} GB. Abgerechnet wird nur, solange der Server an ist."
+    },
+    "setup": {
+      "title": "Einrichtung",
+      "intro": "Einmalig Hetzner verbinden – danach läuft alles aus dem Dashboard. Cloudflare und CurseForge sind optional.",
+      "optional": "(optional)",
+      "ready": "<strong>Alles bereit.</strong> Server können angelegt und gestartet werden.",
+      "connect": "Verbinden",
+      "disconnect": "Trennen",
+      "save": "Speichern",
+      "hetzner": {
+        "title": "Hetzner Cloud verbinden",
+        "step1": "In der <link>Hetzner Console</link> ein Projekt öffnen (am besten ein eigenes nur für Game-Server).",
+        "step2": "Sicherheit → API-Tokens → „API-Token generieren“ mit Berechtigung <strong>Lesen & Schreiben</strong>.",
+        "step3": "Token hier einfügen. Den SSH-Schlüssel erzeugt und hinterlegt das Dashboard automatisch.",
+        "connected": "Hetzner verbunden",
+        "tokenStored": "Token hinterlegt – zum Ersetzen neuen eingeben",
+        "tokenPlaceholder": "Hetzner API-Token",
+        "replace": "Token ersetzen",
+        "location": "Standard-Standort für neue Server",
+        "locationHelp": "Nürnberg/Falkenstein haben die beste Anbindung in DE.",
+        "locationSaved": "Standort gespeichert",
+        "sshKey": "Öffentlicher SSH-Schlüssel des Dashboards"
+      },
+      "cloudflare": {
+        "title": "Cloudflare-DNS",
+        "intro": "Damit bekommt jeder Server eine feste Adresse wie <mono>{host}</mono>, die beim Start automatisch auf die neue IP zeigt. Ohne Cloudflare verbinden sich Spieler über die (wechselnde) IP.",
+        "step1": "<link>Cloudflare → API-Tokens</link> → „Token erstellen“ → Vorlage <strong>„DNS-Zone bearbeiten“</strong>.",
+        "step2": "Bei „Zonenressourcen“ die Domain auswählen, Token erstellen und hier einfügen.",
+        "connectedWith": "Verbunden mit <mono>{domain}</mono>",
+        "connected": "Cloudflare verbunden",
+        "disconnected": "Cloudflare getrennt",
+        "tokenPlaceholder": "Cloudflare API-Token"
+      },
+      "curseforge": {
+        "title": "CurseForge-Modpacks",
+        "intro": "Modrinth-Modpacks funktionieren sofort. Für CurseForge-Modpacks braucht es einen kostenlosen API-Key aus der <link>CurseForge Console</link> (API Keys).",
+        "remove": "Key entfernen",
+        "removed": "CurseForge-Key entfernt",
+        "connected": "CurseForge verbunden",
+        "keyPlaceholder": "CurseForge API-Key"
+      },
+      "security": {
+        "title": "Zugänge & Sicherheit",
+        "encrypted": "Tokens und der SSH-Schlüssel werden verschlüsselt in der Datenbank gespeichert (Schlüssel: DASHBOARD_SECRET_KEY bzw. AUTH_SECRET).",
+        "firewall": "Jeder Server bekommt eine eigene Hetzner-Firewall, die nur SSH und die Spiel-Ports öffnet.",
+        "team": "Wer das Dashboard nutzen darf, legst du unter <link>Team</link> fest. Neue Admins per Discord-ID über <mono>DASHBOARD_ADMIN_DISCORD_IDS</mono>."
+      }
+    },
+    "layout": {
+      "hetznerMissing": "Hetzner ist noch nicht verbunden – Server können erst danach gestartet werden.",
+      "toSetup": "Zur Einrichtung",
+      "askAdmin": "Ein Admin muss die Einrichtung abschließen."
+    },
+    "home": {
+      "title": "Game-Server",
+      "intro": "Server laufen nur, wenn ihr spielt. Ausgeschaltete Server behalten Welt und Einstellungen und kosten nur den Speicher.",
+      "new": "Neuer Server"
+    },
+    "idle": {
+      "0": "Nie automatisch ausschalten",
+      "15": "Nach 15 Minuten ohne Spieler",
+      "30": "Nach 30 Minuten ohne Spieler",
+      "60": "Nach 1 Stunde ohne Spieler",
+      "120": "Nach 2 Stunden ohne Spieler",
+      "240": "Nach 4 Stunden ohne Spieler",
+      "custom": "Nach {minutes} Minuten ohne Spieler"
+    },
+    "create": {
+      "title": "Neuer Server",
+      "intro": "Spiel wählen, Version und Größe festlegen – Hetzner-VM, Speicher, Firewall, Docker und DNS richtet das Dashboard automatisch ein.",
+      "hetznerMissing": "Hetzner ist noch nicht verbunden.",
+      "setupNow": "Jetzt einrichten",
+      "askAdmin": "Bitte einen Admin, die Einrichtung abzuschließen.",
+      "createdStarting": "Server angelegt – wird jetzt gestartet.",
+      "created": "Server angelegt.",
+      "comingSoon": "Bald verfügbar",
+      "ram": "ab {min} GB RAM · empfohlen {recommended} GB",
+      "otherGame": "Anderes Spiel wählen",
+      "name": "Name im Dashboard",
+      "address": "Adresse für Spieler",
+      "noCloudflare": "Ohne Cloudflare-Anbindung verbinden sich Spieler über die IP-Adresse (sie ändert sich bei jedem Einschalten).",
+      "minecraftTitle": "Minecraft-Version & Mods",
+      "minecraftHint": "Alles wird beim Start automatisch heruntergeladen und eingerichtet.",
+      "settingsTitle": "Spiel-Einstellungen",
+      "settingsHint": "Kannst du später jederzeit ändern.",
+      "powerTitle": "Leistung & Standort",
+      "powerHint": "Der Server läuft auf einer eigenen Hetzner-VM. Bezahlt wird nur die Laufzeit.",
+      "loadingTypes": "Lade Servertypen und Preise von Hetzner…",
+      "location": "Standort",
+      "volume": "Speicher für Welten (GB)",
+      "idle": "Automatisch ausschalten",
+      "perHourRuntime": "pro Stunde Laufzeit",
+      "storagePerMonth": "+ {price} / Monat Speicher",
+      "startNow": "Direkt starten",
+      "submit": "Server erstellen"
+    },
+    "minecraft": {
+      "pickVersion": "Version wählen",
+      "otherModpack": "Anderes Modpack",
+      "modpackVersion": "Modpack-Version",
+      "loadingVersions": "Versionen werden geladen…",
+      "searchModpack": "Modpack auf {provider} suchen…",
+      "searching": "Suche…",
+      "plugins": "Plugins",
+      "mods": "Mods",
+      "fromModrinth": "{noun} von Modrinth",
+      "extraHelp": "Werden beim Start automatisch in einer passenden Version installiert (inkl. Abhängigkeiten). Eigene {noun} kannst du später über „Dateien“ hochladen.",
+      "remove": "{name} entfernen",
+      "searchNoun": "{noun} suchen…",
+      "added": "hinzugefügt",
+      "closeSearch": "Suche schließen",
+      "addNoun": "{noun} hinzufügen",
+      "software": "Server-Software",
+      "curseforgeMissing": "CurseForge-API-Key fehlt (Einrichtung)",
+      "curseforgeHint": "CurseForge-Key in der Einrichtung hinterlegen",
+      "loaders": {
+        "vanilla": "Offizieller Mojang-Server ohne Mods.",
+        "paper": "Schneller Server mit Plugin-Support (Bukkit/Spigot).",
+        "purpur": "Paper-Fork mit vielen Extra-Optionen, Plugins.",
+        "fabric": "Leichter Mod-Loader für moderne Mods.",
+        "forge": "Klassischer Mod-Loader.",
+        "neoforge": "Moderner Forge-Nachfolger (ab 1.20.2).",
+        "modrinth": "Komplettes Modpack von modrinth.com.",
+        "curseforge": "Komplettes Modpack von curseforge.com."
+      },
+      "loaderNames": {
+        "modrinth": "Modpack (Modrinth)",
+        "curseforge": "Modpack (CurseForge)"
+      },
+      "switchWarning": "Ein Wechsel der Software oder ein Downgrade kann bestehende Welten beschädigen. Vorher ein Backup machen; bei Modpack-Wechseln die Daten am besten zurücksetzen.",
+      "version": "Minecraft-Version",
+      "versionHelp": "„Neueste“ aktualisiert den Server automatisch bei jedem Start.",
+      "loadingVersionList": "Lade Versionen…",
+      "latest": "Neueste ({version})"
+    },
+    "instance": {
+      "alreadyRunning": "Ist bereits in Arbeit.",
+      "actionStarted": "Aktion gestartet.",
+      "sections": "Server-Bereiche",
+      "tabs": {
+        "overview": "Übersicht",
+        "console": "Konsole & Logs",
+        "files": "Dateien",
+        "settings": "Einstellungen",
+        "backups": "Backups",
+        "history": "Verlauf"
+      },
+      "noOutput": "Noch keine Ausgabe…"
+    },
+    "history": {
+      "title": "Verlauf",
+      "intro": "Die letzten Aktionen an diesem Server. Klicke auf einen Eintrag für das Protokoll.",
+      "empty": "Noch keine Aktionen."
+    },
+    "overview": {
+      "startSuccess": "Server wird gestartet – das dauert meist 2–4 Minuten.",
+      "hibernateSuccess": "Server wird ausgeschaltet.",
+      "hibernateTitle": "Server ausschalten?",
+      "hibernateText": "Das Spiel wird sauber beendet und die VM gelöscht. Welt und Einstellungen bleiben auf dem Speicher erhalten – es fallen nur noch Speicherkosten an.",
+      "hibernateTextBackup": "Das Spiel wird sauber beendet, ein Backup erstellt und die VM gelöscht. Welt und Einstellungen bleiben auf dem Speicher erhalten – es fallen nur noch Speicherkosten an.",
+      "playersOnlineWarning": "{count, plural, one {Es ist gerade # Spieler online!} other {Es sind gerade # Spieler online!}}",
+      "queued": "(wartet)",
+      "preparing": "Wird vorbereitet…",
+      "details": "Details",
+      "failed": "<strong>{action}</strong> ist fehlgeschlagen",
+      "hideLog": "Log ausblenden",
+      "showLog": "Log anzeigen",
+      "connect": "Verbinden",
+      "reachableWhenRunning": "Erreichbar, sobald der Server läuft.",
+      "addressWhenRunning": "Die Adresse erscheint, sobald der Server läuft.",
+      "ip": "IP-Adresse:",
+      "controls": "Steuerung",
+      "restartSuccess": "Spielserver wird neu gestartet.",
+      "stopTitle": "Nur das Spiel stoppen?",
+      "stopText": "Der Spielserver wird beendet, die VM läuft aber weiter und kostet weiter Geld. Zum Sparen lieber „Ausschalten“ verwenden.",
+      "stopOnly": "Nur Spiel stoppen",
+      "controlsHint": "<strong>Starten</strong> erstellt die VM und richtet alles automatisch ein (2–4 Min., Modpacks länger). <strong>Ausschalten</strong> löscht die VM – Welt & Einstellungen bleiben gespeichert.",
+      "players": "Spieler online",
+      "noPlayerCount": "Spiel meldet keine Spielerzahl",
+      "serverType": "Servertyp",
+      "runningSince": "Läuft seit",
+      "status": "Status",
+      "autoOffAt": "Auto-Aus {when} ohne Spieler",
+      "costSoFar": "bisher ca. {cost}",
+      "autoOffAfter": "Auto-Aus nach {minutes} Min. ohne Spieler",
+      "noAutoOff": "Kein Auto-Aus",
+      "storage": "Speicher",
+      "storageUsed": "{used} belegt ({percent} %)",
+      "storageWhenRunning": "Belegung sichtbar, wenn der Server läuft",
+      "storageOnFirstStart": "Wird beim ersten Start angelegt"
+    },
+    "backups": {
+      "title": "Backups",
+      "intro": "Backups liegen auf dem Server-Speicher (behalte die letzten {count}). Herunterladen für eine Kopie auf deinem Rechner.",
+      "creating": "Backup wird erstellt.",
+      "onlyWhenRunning": "Backups erstellen, wiederherstellen und herunterladen geht, während der Server läuft.",
+      "empty": "Noch keine Backups.",
+      "kinds": {
+        "manual": "Manuell",
+        "auto": "Beim Ausschalten",
+        "idle": "Auto-Aus (Leerlauf)",
+        "beforeReset": "Vor Zurücksetzen",
+        "imported": "Importiert"
+      },
+      "download": "Download",
+      "restoring": "Backup wird eingespielt.",
+      "restoreTitle": "Backup wiederherstellen?",
+      "restoreText": "Der Server wird gestoppt und der Stand vom {date} eingespielt. Aktuelle Änderungen seit diesem Backup gehen verloren – erstelle vorher ggf. ein neues Backup.",
+      "restore": "Wiederherstellen",
+      "deleting": "Backup wird gelöscht.",
+      "deleteTitle": "Backup löschen?",
+      "deleteText": "Das Backup vom {date} wird endgültig gelöscht.",
+      "delete": "Löschen"
+    },
+    "console": {
+      "noOutput": "(keine Ausgabe)",
+      "onlyWhenRunning": "Logs und Konsole sind verfügbar, sobald der Server läuft.",
+      "log": "Server-Log",
+      "live": "Live",
+      "noLogs": "Noch keine Log-Ausgabe.",
+      "sendTitle": "Befehl senden",
+      "hintMinecraft": "Minecraft-Befehle ohne Schrägstrich, z. B. „say Hallo“, „op Spielername“, „whitelist add Name“.",
+      "hintRcon": "RCON-Befehle, z. B. „changelevel de_inferno“ oder „mp_restartgame 1“.",
+      "noPermission": "Du hast keine Berechtigung, Befehle zu senden.",
+      "placeholder": "Befehl eingeben…",
+      "send": "Senden"
+    },
+    "files": {
+      "uploadFailed": "Upload fehlgeschlagen ({status})",
+      "uploadDone": "Upload abgeschlossen",
+      "onlyWhenRunning": "Dateien sind erreichbar, solange der Server läuft.",
+      "title": "Dateien",
+      "intro": "Mods, Plugins, Welten und Konfigurationen. Änderungen an laufenden Spielen werden meist erst nach einem Neustart aktiv.",
+      "folder": "Ordner",
+      "uploading": "Lädt {name}…",
+      "upload": "Hochladen",
+      "emptyFolder": "Ordner ist leer.",
+      "download": "Herunterladen",
+      "rename": "Umbenennen / verschieben",
+      "delete": "Löschen",
+      "confirmDelete": "„{name}“ wirklich löschen?",
+      "deleted": "Gelöscht",
+      "propertiesWarning": "Werte, die im Dashboard unter „Einstellungen“ gepflegt werden (z. B. MOTD, Spieler, Schwierigkeit), überschreiben diese Datei beim nächsten Start.",
+      "saved": "Gespeichert",
+      "newFolder": "Neuer Ordner",
+      "name": "Name",
+      "folderCreated": "Ordner angelegt",
+      "create": "Anlegen",
+      "renameHint": "Pfad relativ zum Datenordner, z. B. „mods/alt/meinmod.jar“.",
+      "renamed": "Umbenannt"
+    },
+    "settings": {
+      "saved": "Gespeichert",
+      "savedApplying": "{message} – wird jetzt auf den laufenden Server angewendet (kurzer Neustart).",
+      "savedNextStart": "{message} – der neue Servertyp gilt ab dem nächsten Ausschalten & Starten.",
+      "general": "Allgemein",
+      "name": "Name",
+      "address": "Adresse",
+      "idle": "Automatisch ausschalten",
+      "idleUnavailable": "Dieses Spiel meldet keine Spielerzahl – Auto-Aus ist nicht möglich.",
+      "retention": "Backups behalten (Anzahl)",
+      "backupOnHibernate": "Beim Ausschalten automatisch ein Backup erstellen",
+      "backupOnHibernateHint": "Ältere Backups werden entsprechend „Backups behalten“ gelöscht.",
+      "minecraft": "Minecraft-Version & Mods",
+      "game": "Spiel-Einstellungen",
+      "gameRestartHint": "Beim Speichern wird der Spielserver mit den neuen Einstellungen neu gestartet.",
+      "hardware": "Leistung & Standort",
+      "hardwareHint": "Ein anderer Servertyp wird beim nächsten Einschalten verwendet (bei laufendem Server: ausschalten & neu starten).",
+      "loadingTypes": "Lade Servertypen…",
+      "location": "Standort",
+      "locationLocked": "Fest, weil der Speicher dort liegt.",
+      "danger": "Speicher & Gefahrenzone",
+      "resize": "Speicher vergrößern",
+      "resizeHint": "Aktuell {size} GB. Vergrößern geht jederzeit (auch im laufenden Betrieb), verkleinern nicht.",
+      "resizeNoVolume": "Der Speicher wird beim ersten Start angelegt.",
+      "resizeTitle": "Speicher auf {size} GB vergrößern?",
+      "resizeText": "Das lässt sich nicht rückgängig machen – Hetzner-Volumes können nicht verkleinert werden.",
+      "resizeButton": "Vergrößern",
+      "wipe": "Spieldaten zurücksetzen",
+      "wipeHint": "Löscht Welt, Mods & Konfiguration auf dem Speicher und startet frisch. Vorher wird automatisch ein Backup erstellt.",
+      "onlyWhenRunning": "Nur möglich, während der Server läuft",
+      "wipeTitle": "Spieldaten zurücksetzen?",
+      "wipeText": "Alle Daten im Datenordner werden gelöscht (ein Backup wird vorher erstellt).",
+      "wipeButton": "Zurücksetzen",
+      "destroy": "Server endgültig löschen",
+      "destroyHint": "Löscht VM, Speicher inkl. aller Backups, Firewall und DNS-Eintrag. Das kann nicht rückgängig gemacht werden.",
+      "destroyTitle": "Server endgültig löschen?",
+      "destroyText": "Alle Welten und Backups gehen verloren. Lade vorher bei Bedarf ein Backup herunter.",
+      "destroyConfirm": "Endgültig löschen",
+      "destroying": "Server wird gelöscht.",
+      "destroyButton": "Löschen",
+      "unsupported": "Dieses Spiel wird nicht mehr unterstützt. Du kannst den Server nur noch löschen.",
+      "readOnly": "Du kannst die Einstellungen ansehen, aber nicht ändern."
+    }
+  },
+  "api": {
+    "errors": {
+      "unknown": "Unbekannter Fehler.",
+      "notSignedIn": "Nicht angemeldet.",
+      "noPermission": "Keine Berechtigung für diese Aktion.",
+      "forbidden": "Keine Berechtigung.",
+      "invalidId": "Ungültige ID.",
+      "serverNotFound": "Server nicht gefunden.",
+      "serverOff": "Der Server ist aus. Starte ihn, um darauf zuzugreifen.",
+      "hetznerNotSetUp": "Hetzner ist noch nicht eingerichtet.",
+      "hetznerNotConnected": "Hetzner ist noch nicht verbunden – bitte im Dashboard unter „Einrichtung“ den API-Token hinterlegen.",
+      "hetznerUnreachable": "Hetzner nicht erreichbar: {detail}",
+      "unknownAction": "Unbekannte Aktion.",
+      "backupNotFound": "Backup nicht gefunden.",
+      "jobNotFound": "Job nicht gefunden.",
+      "userNotFound": "Nutzer nicht gefunden.",
+      "invalidCommand": "Ungültiger Befehl.",
+      "noConsole": "Dieses Spiel hat keine Konsole.",
+      "commandFailed": "Befehl fehlgeschlagen: {detail}",
+      "commandNotReady": "Befehl fehlgeschlagen: Server noch nicht bereit?",
+      "noContainer": "Der Spielserver-Container existiert (noch) nicht.",
+      "logsFailed": "Logs nicht abrufbar: {detail}",
+      "downloadFailed": "Download fehlgeschlagen: {detail}",
+      "fileAccessFailed": "Dateizugriff fehlgeschlagen: {detail}",
+      "noFile": "Keine Datei übertragen.",
+      "fileNotFound": "Datei oder Ordner nicht gefunden.",
+      "contentTooLarge": "Inhalt ist zu groß.",
+      "binaryFile": "Binärdatei – bitte herunterladen statt bearbeiten.",
+      "fileTooLarge": "Datei ist zu groß für den Editor – bitte herunterladen.",
+      "invalidPath": "Ungültiger Pfad.",
+      "rootDelete": "Der Hauptordner kann nicht gelöscht werden.",
+      "invalidFileName": "Ungültiger Dateiname.",
+      "unknownFileOp": "Unbekannte Dateioperation.",
+      "confirmName": "Zur Bestätigung bitte den exakten Servernamen eingeben.",
+      "unknownLocation": "Unbekannter Standort.",
+      "unknownServerType": "Unbekannter Servertyp.",
+      "serverTypeUnavailable": "{type} ist in {location} gerade nicht verfügbar.",
+      "minRam": "{game} braucht mindestens {gb} GB RAM.",
+      "unknownSection": "Unbekannter Bereich.",
+      "selfDemote": "Du kannst dir die Admin-Rolle nicht selbst entziehen.",
+      "noProjects": "Für diesen Server-Typ gibt es keine Mods/Plugins.",
+      "searchFailed": "Suche fehlgeschlagen: {detail}",
+      "versionsFailed": "Versionsliste nicht abrufbar: {detail}",
+      "modpackSearchFailed": "Modpack-Suche fehlgeschlagen: {detail}",
+      "nameLength": "Der Name muss 2–60 Zeichen lang sein.",
+      "subdomainFormat": "Subdomain: nur Kleinbuchstaben, Zahlen und Bindestriche.",
+      "subdomainTaken": "Die Subdomain „{subdomain}“ wird schon von einem anderen Server genutzt.",
+      "idleMinutes": "Leerlaufzeit: 0 (nie) bis 1440 Minuten.",
+      "unsupportedGame": "Dieses Spiel wird nicht unterstützt.",
+      "gameUnavailable": "{game} ist noch nicht verfügbar.",
+      "volumeSize": "Speicher: {min}–2000 GB.",
+      "backupRetention": "Backups behalten: 1–50.",
+      "locationLocked": "Der Standort kann nach dem ersten Start nicht mehr geändert werden (der Speicher liegt dort).",
+      "settings": "Die Einstellungen sind ungültig.",
+      "minecraft": {
+        "modpackRequired": "Bitte ein Modpack und eine Version wählen.",
+        "invalidVersion": "Ungültige Minecraft-Version.",
+        "tooManyProjects": "Höchstens 100 zusätzliche Mods/Plugins."
+      },
+      "settingsIssues": {
+        "range": "{label}: Zahl zwischen {min} und {max} erwartet.",
+        "select": "{label}: ungültige Auswahl.",
+        "maxLength": "{label}: höchstens {max} Zeichen.",
+        "minLength": "{label}: mindestens {min} Zeichen.",
+        "required": "{label} ist erforderlich.",
+        "valheimPassword": "Valheim: Das Passwort darf nicht im Servernamen vorkommen."
+      },
+      "hetznerTokenFormat": "Das sieht nicht nach einem Hetzner-API-Token aus.",
+      "hetznerTokenReadOnly": "Der Token hat nur Leserechte. Bitte in der Hetzner Console einen Token mit „Lesen & Schreiben“ erstellen.",
+      "domainFormat": "Bitte eine gültige Domain angeben, z. B. tretu.de.",
+      "cloudflareTokenRequired": "Bitte einen Cloudflare-API-Token angeben.",
+      "cloudflareZoneNotFound": "Zone „{domain}“ nicht gefunden. Der Token braucht die Berechtigungen „Zone → Zone → Read“ und „Zone → DNS → Edit“ für diese Domain.",
+      "curseforgeKeyInvalid": "CurseForge-Key funktioniert nicht: {detail}",
+      "curseforgeKeyMissing": "Für CurseForge fehlt der API-Key – bitte unter „Einrichtung“ hinterlegen."
+    }
+  },
+  "games": {}
+}

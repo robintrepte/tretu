@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,8 @@ const socialLinks = [
 ];
 
 export function MobileNav({ navItems }: { navItems: NavItem[] }) {
+  const t = useTranslations("header");
+  const tNav = useTranslations("nav");
   const [open, setOpen] = useState(false);
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -21,7 +24,7 @@ export function MobileNav({ navItems }: { navItems: NavItem[] }) {
           variant="ghost"
           size="icon"
           className="md:hidden size-11 min-w-11 min-h-11 text-header-fg hover:bg-black/5 dark:hover:bg-white/10 hover:text-header-fg"
-          aria-label="Menü öffnen"
+          aria-label={t("openMenu")}
         >
           <svg className="size-8 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -32,7 +35,7 @@ export function MobileNav({ navItems }: { navItems: NavItem[] }) {
         side="right"
         className="mobile-menu-sheet w-full max-w-full sm:max-w-full h-full min-h-dvh bg-background border-0 text-foreground p-0 data-[state=open]:duration-300 data-[state=closed]:duration-200"
       >
-        <nav className="flex h-full flex-col items-center justify-center px-8 py-12 text-center" aria-label="Mobile Menü">
+        <nav className="flex h-full flex-col items-center justify-center px-8 py-12 text-center" aria-label={t("mobileNav")}>
           <ul className="flex flex-col items-center gap-2">
             {navItems.map((item) => (
               <li key={item.href} className="w-full max-w-xs">
@@ -43,7 +46,7 @@ export function MobileNav({ navItems }: { navItems: NavItem[] }) {
                     {...(item.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                     className="mt-2 block rounded-full bg-[var(--tretu-accent)] px-6 py-4 text-3xl font-semibold uppercase tracking-wide text-white transition-colors hover:bg-[var(--tretu-accent-hover)]"
                   >
-                    {item.label}
+                    {tNav(item.labelKey)}
                   </a>
                 ) : (
                   <Link
@@ -51,7 +54,7 @@ export function MobileNav({ navItems }: { navItems: NavItem[] }) {
                     onClick={() => setOpen(false)}
                     className="block rounded-lg px-6 py-5 text-3xl font-medium uppercase tracking-wide text-foreground transition-colors hover:bg-muted hover:text-[var(--tretu-accent)] active:bg-muted"
                   >
-                    {item.label}
+                    {tNav(item.labelKey)}
                   </Link>
                 )}
                 {item.children?.map((child) => (
@@ -61,13 +64,13 @@ export function MobileNav({ navItems }: { navItems: NavItem[] }) {
                     onClick={() => setOpen(false)}
                     className="block rounded-lg px-8 py-4 text-2xl text-muted-foreground transition-colors hover:bg-muted hover:text-[var(--tretu-accent)] active:bg-muted"
                   >
-                    {child.label}
+                    {tNav(child.labelKey)}
                   </Link>
                 ))}
               </li>
             ))}
           </ul>
-          <ul className="mt-12 flex items-center justify-center gap-8" aria-label="Soziale Netzwerke">
+          <ul className="mt-12 flex items-center justify-center gap-8" aria-label={t("social")}>
             {socialLinks.map(({ href, label, icon }) => (
               <li key={href}>
                 <a

@@ -1,5 +1,9 @@
+"use client";
+
+import { useLocale, useTranslations } from "next-intl";
+
 import { RankDisplay } from "@/components/teamspeak-ranking/rank-display";
-import { formatDurationGerman } from "@/lib/teamspeak/format-duration";
+import { formatDuration } from "@/lib/teamspeak/format-duration";
 import { cn } from "@/lib/utils";
 
 type Entry = {
@@ -19,6 +23,8 @@ export function RankingRow({
   entry: Entry;
   emphasized?: boolean;
 }) {
+  const t = useTranslations("ranking");
+  const locale = useLocale();
   return (
     <li
       className={cn(
@@ -53,11 +59,11 @@ export function RankingRow({
         {entry.isOnline && (
           <span className="inline-flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
             <span className="h-2 w-2 rounded-full bg-current" aria-hidden />
-            Online
+            {t("online")}
           </span>
         )}
         <span className="shrink-0 text-sm font-medium tabular-nums text-[var(--tretu-accent)]">
-          {formatDurationGerman(entry.onlineSeconds)}
+          {formatDuration(entry.onlineSeconds, locale)}
         </span>
       </div>
     </li>

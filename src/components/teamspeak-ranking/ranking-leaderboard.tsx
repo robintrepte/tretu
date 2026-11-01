@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { RankingPodium } from "@/components/teamspeak-ranking/ranking-podium";
@@ -7,11 +8,8 @@ import { RankingRow } from "@/components/teamspeak-ranking/ranking-row";
 import { RankingUserSearch } from "@/components/teamspeak-ranking/ranking-user-search";
 import { ServerUsageChart } from "@/components/teamspeak-ranking/server-usage-chart";
 import { Button } from "@/components/ui/button";
-import { formatDurationGerman } from "@/lib/teamspeak/format-duration";
-import {
-  LEADERBOARD_PERIOD_LABELS,
-  type LeaderboardPeriod,
-} from "@/lib/teamspeak/leaderboard-period";
+import { formatDuration } from "@/lib/teamspeak/format-duration";
+import type { LeaderboardPeriod } from "@/lib/teamspeak/leaderboard-period";
 import { cn } from "@/lib/utils";
 
 const PERIOD_OPTIONS: LeaderboardPeriod[] = ["week", "month", "year", "all"];
@@ -41,12 +39,9 @@ type LeaderboardPayload = {
   matchCount: number;
 };
 
-function trefferLabel(shown: number, total: number): string {
-  if (shown >= total) return total === 1 ? "1 Treffer" : `${total} Treffer`;
-  return `${shown} von ${total} Treffern`;
-}
-
 export function RankingLeaderboard() {
+  const t = useTranslations("ranking");
+  const locale = useLocale();
   const [period, setPeriod] = useState<LeaderboardPeriod>("month");
   const [data, setData] = useState<LeaderboardPayload | null>(null);
   const [appliedSearch, setAppliedSearch] = useState("");
@@ -59,8 +54,10 @@ export function RankingLeaderboard() {
   const requestId = useRef(0);
   const dataRef = useRef(data);
   const queryRef = useRef(query);
-  dataRef.current = data;
-  queryRef.current = query;
+  useEffect(() => {
+    dataRef.current = data;
+    queryRef.current = query;
+  }, [data, query]);
 
   useEffect(() => {
     const trimmed = search.trim();
@@ -89,13 +86,13 @@ export function RankingLeaderboard() {
       const json = (await res.json()) as { data?: LeaderboardPayload; error?: string };
       if (id !== requestId.current) return;
       if (!res.ok || !json.data) {
-        throw new Error(json.error ?? "Ranking konnte nicht geladen werden");
+        throw new Error(t("loadFailed"));
       }
       setData(json.data);
       setAppliedSearch(query.length >= 2 ? query : "");
     } catch (e) {
       if (id !== requestId.current) return;
-      setError(e instanceof Error ? e.message : "Unbekannter Fehler");
+      setError(e instanceof Error && e.message ? e.message : t("loadFailed"));
       if (!dataRef.current) setData(null);
     } finally {
       if (id === requestId.current) {
@@ -103,7 +100,7 @@ export function RankingLeaderboard() {
         setRefreshing(false);
       }
     }
-  }, [period, query, pageSize]);
+  }, [period, query, pageSize, t]);
 
   useEffect(() => {
     void load();
@@ -125,7 +122,7 @@ export function RankingLeaderboard() {
           <div
             className="inline-flex flex-wrap rounded-xl border border-border/80 bg-muted/30 p-1"
             role="tablist"
-            aria-label="Ranking-Zeitraum"
+            aria-label={t("periodLabel")}
           >
             {PERIOD_OPTIONS.map((key) => (
               <button
@@ -144,7 +141,7 @@ export function RankingLeaderboard() {
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                {LEADERBOARD_PERIOD_LABELS[key]}
+                {t(`periods.${key}`)}
               </button>
             ))}
           </div>
@@ -152,7 +149,9 @@ export function RankingLeaderboard() {
             <RankingUserSearch value={search} onChange={setSearch} />
             {appliedSearch && data && (
               <p className="text-sm text-muted-foreground">
-                {trefferLabel(data.entries.length, data.matchCount)}
+                {data.entries.length >= data.matchCount
+                  ? t("matches", { count: data.matchCount })
+                  : t("matchesOf", { shown: data.entries.length, total: data.matchCount })}
               </p>
             )}
           </div>
@@ -163,22 +162,21 @@ export function RankingLeaderboard() {
         <p className="text-center text-sm text-muted-foreground">
           {period !== "all" ? (
             <>
-              Aktivität{" "}
-              <span className="font-medium text-foreground">{data.periodKey}</span>
+              {t("activity")} <span className="font-medium text-foreground">{data.periodKey}</span>
               {" · "}
             </>
           ) : null}
-          {data.summary.activeUsers} aktive Nutzer ·{" "}
-          <span className="font-medium text-foreground">
-            {formatDurationGerman(data.summary.totalSeconds)}
-          </span>{" "}
-          gesamt
+          {t("activeUsers", { count: data.summary.activeUsers })} ·{" "}
+          {t.rich("total", {
+            duration: formatDuration(data.summary.totalSeconds, locale),
+            strong: (chunks) => <span className="font-medium text-foreground">{chunks}</span>,
+          })}
         </p>
       )}
 
       {loading && !data && (
         <p className="rounded-2xl border border-dashed border-border/80 bg-muted/20 px-5 py-12 text-center text-sm text-muted-foreground">
-          Ranking wird geladen…
+          {t("loading")}
         </p>
       )}
 
@@ -190,7 +188,7 @@ export function RankingLeaderboard() {
 
       {data && data.entries.length === 0 && !loading && (
         <p className="rounded-2xl border border-dashed border-border/80 bg-muted/20 px-5 py-12 text-center text-sm text-muted-foreground">
-          Keine Einträge gefunden.
+          {t("empty")}
         </p>
       )}
 
@@ -210,7 +208,7 @@ export function RankingLeaderboard() {
                 disabled={refreshing}
                 onClick={() => setPageSize((size) => size + PAGE_SIZE)}
               >
-                Mehr anzeigen
+                {t("showMore")}
               </Button>
             </div>
           )}

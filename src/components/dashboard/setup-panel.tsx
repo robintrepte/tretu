@@ -1,6 +1,7 @@
 "use client";
 
 import { CircleCheck, Cloud, ExternalLink, KeyRound, Loader2, Package, Server } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
@@ -11,14 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { dashboardApi } from "@/lib/api/dashboard-client";
 import type { LocationOption } from "@/lib/hetzner/types";
-import type { SetupStatus } from "@/lib/settings/store";
+import type { SetupSnapshot } from "@/lib/settings/store";
 
-export type SetupSnapshot = {
-  status: SetupStatus;
-  defaultLocation: string;
-  cloudflareDomain: string | null;
-  sshPublicKey: string | null;
-};
+export type { SetupSnapshot };
 
 function Step({
   number,
@@ -35,6 +31,7 @@ function Step({
   optional?: boolean;
   children: ReactNode;
 }) {
+  const t = useTranslations("dashboard.setup");
   return (
     <Panel
       title={
@@ -51,7 +48,7 @@ function Step({
           <span className="flex items-center gap-2">
             {icon}
             {title}
-            {optional ? <span className="text-xs font-normal text-muted-foreground">(optional)</span> : null}
+            {optional ? <span className="text-xs font-normal text-muted-foreground">{t("optional")}</span> : null}
           </span>
         </span>
       }
@@ -71,6 +68,7 @@ function ExtLink({ href, children }: { href: string; children: ReactNode }) {
 }
 
 export function SetupPanel({ initial }: { initial: SetupSnapshot }) {
+  const t = useTranslations("dashboard.setup");
   const [snap, setSnap] = useState(initial);
   const [busy, setBusy] = useState<string | null>(null);
   const [hetznerToken, setHetznerToken] = useState("");
@@ -104,25 +102,26 @@ export function SetupPanel({ initial }: { initial: SetupSnapshot }) {
     <div className="space-y-5">
       {snap.status.ready ? (
         <Hint>
-          <span className="font-medium text-foreground">Alles bereit.</span> Server können angelegt und gestartet werden.
+          {t.rich("ready", { strong: (chunks) => <span className="font-medium text-foreground">{chunks}</span> })}
         </Hint>
       ) : null}
 
-      <Step number={1} done={snap.status.ready} icon={<Server className="size-4" />} title="Hetzner Cloud verbinden">
+      <Step number={1} done={snap.status.ready} icon={<Server className="size-4" />} title={t("hetzner.title")}>
         <div className="space-y-4">
           <ol className="list-decimal space-y-1 pl-5 text-sm leading-relaxed text-muted-foreground">
             <li>
-              In der <ExtLink href="https://console.hetzner.com/projects">Hetzner Console</ExtLink> ein Projekt öffnen (am besten
-              ein eigenes nur für Game-Server).
+              {t.rich("hetzner.step1", {
+                link: (chunks) => <ExtLink href="https://console.hetzner.com/projects">{chunks}</ExtLink>,
+              })}
             </li>
-            <li>Sicherheit → API-Tokens → „API-Token generieren“ mit Berechtigung <strong>Lesen &amp; Schreiben</strong>.</li>
-            <li>Token hier einfügen. Den SSH-Schlüssel erzeugt und hinterlegt das Dashboard automatisch.</li>
+            <li>{t.rich("hetzner.step2", { strong: (chunks) => <strong>{chunks}</strong> })}</li>
+            <li>{t("hetzner.step3")}</li>
           </ol>
           <form
             className="flex flex-col gap-2 sm:flex-row"
             onSubmit={async (e) => {
               e.preventDefault();
-              if (await submit("hetzner", { token: hetznerToken }, "Hetzner verbunden")) setHetznerToken("");
+              if (await submit("hetzner", { token: hetznerToken }, t("hetzner.connected"))) setHetznerToken("");
             }}
           >
             <Input
@@ -130,22 +129,22 @@ export function SetupPanel({ initial }: { initial: SetupSnapshot }) {
               autoComplete="off"
               value={hetznerToken}
               onChange={(e) => setHetznerToken(e.target.value)}
-              placeholder={snap.status.hetzner ? "Token hinterlegt – zum Ersetzen neuen eingeben" : "Hetzner API-Token"}
+              placeholder={snap.status.hetzner ? t("hetzner.tokenStored") : t("hetzner.tokenPlaceholder")}
               className="font-mono"
             />
             <Button type="submit" disabled={!hetznerToken.trim() || busy !== null} className="shrink-0">
               {busy === "hetzner" ? <Loader2 className="animate-spin" /> : null}
-              {snap.status.hetzner ? "Token ersetzen" : "Verbinden"}
+              {snap.status.hetzner ? t("hetzner.replace") : t("connect")}
             </Button>
           </form>
 
           {snap.status.hetzner && locations.length ? (
             <div className="max-w-sm space-y-2">
-              <FieldLabel label="Standard-Standort für neue Server" help="Nürnberg/Falkenstein haben die beste Anbindung in DE." />
+              <FieldLabel label={t("hetzner.location")} help={t("hetzner.locationHelp")} />
               <Select
                 value={snap.defaultLocation}
                 disabled={busy !== null}
-                onValueChange={(location) => submit("location", { location }, "Standort gespeichert")}
+                onValueChange={(location) => void submit("location", { location }, t("hetzner.locationSaved"))}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -162,38 +161,45 @@ export function SetupPanel({ initial }: { initial: SetupSnapshot }) {
           ) : null}
           {snap.sshPublicKey ? (
             <details className="text-xs text-muted-foreground">
-              <summary className="cursor-pointer">Öffentlicher SSH-Schlüssel des Dashboards</summary>
+              <summary className="cursor-pointer">{t("hetzner.sshKey")}</summary>
               <code className="mt-2 block break-all rounded-lg bg-muted p-2 font-mono">{snap.sshPublicKey}</code>
             </details>
           ) : null}
         </div>
       </Step>
 
-      <Step number={2} done={snap.status.cloudflare} icon={<Cloud className="size-4" />} title="Cloudflare-DNS" optional>
+      <Step number={2} done={snap.status.cloudflare} icon={<Cloud className="size-4" />} title={t("cloudflare.title")} optional>
         <div className="space-y-4">
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Damit bekommt jeder Server eine feste Adresse wie <span className="font-mono">mc.{cfDomain || "tretu.de"}</span>, die
-            beim Start automatisch auf die neue IP zeigt. Ohne Cloudflare verbinden sich Spieler über die (wechselnde) IP.
+            {t.rich("cloudflare.intro", {
+              host: `mc.${cfDomain || "tretu.de"}`,
+              mono: (chunks) => <span className="font-mono">{chunks}</span>,
+            })}
           </p>
           <ol className="list-decimal space-y-1 pl-5 text-sm leading-relaxed text-muted-foreground">
             <li>
-              <ExtLink href="https://dash.cloudflare.com/profile/api-tokens">Cloudflare → API-Tokens</ExtLink> → „Token
-              erstellen“ → Vorlage <strong>„DNS-Zone bearbeiten“</strong>.
+              {t.rich("cloudflare.step1", {
+                link: (chunks) => <ExtLink href="https://dash.cloudflare.com/profile/api-tokens">{chunks}</ExtLink>,
+                strong: (chunks) => <strong>{chunks}</strong>,
+              })}
             </li>
-            <li>Bei „Zonenressourcen“ die Domain auswählen, Token erstellen und hier einfügen.</li>
+            <li>{t("cloudflare.step2")}</li>
           </ol>
           {snap.status.cloudflare ? (
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-sm">
-                Verbunden mit <span className="font-mono font-semibold">{snap.cloudflareDomain}</span>
+                {t.rich("cloudflare.connectedWith", {
+                  domain: snap.cloudflareDomain ?? "",
+                  mono: (chunks) => <span className="font-mono font-semibold">{chunks}</span>,
+                })}
               </span>
               <Button
                 variant="outline"
                 size="sm"
                 disabled={busy !== null}
-                onClick={() => submit("cloudflare", { remove: true }, "Cloudflare getrennt")}
+                onClick={() => void submit("cloudflare", { remove: true }, t("cloudflare.disconnected"))}
               >
-                Trennen
+                {t("disconnect")}
               </Button>
             </div>
           ) : (
@@ -201,7 +207,7 @@ export function SetupPanel({ initial }: { initial: SetupSnapshot }) {
               className="grid gap-2 sm:grid-cols-[1fr_200px_auto]"
               onSubmit={async (e) => {
                 e.preventDefault();
-                if (await submit("cloudflare", { token: cfToken, domain: cfDomain }, "Cloudflare verbunden")) setCfToken("");
+                if (await submit("cloudflare", { token: cfToken, domain: cfDomain }, t("cloudflare.connected"))) setCfToken("");
               }}
             >
               <Input
@@ -209,39 +215,40 @@ export function SetupPanel({ initial }: { initial: SetupSnapshot }) {
                 autoComplete="off"
                 value={cfToken}
                 onChange={(e) => setCfToken(e.target.value)}
-                placeholder="Cloudflare API-Token"
+                placeholder={t("cloudflare.tokenPlaceholder")}
                 className="font-mono"
               />
               <Input value={cfDomain} onChange={(e) => setCfDomain(e.target.value)} placeholder="tretu.de" className="font-mono" />
               <Button type="submit" disabled={!cfToken.trim() || !cfDomain.trim() || busy !== null}>
-                {busy === "cloudflare" ? <Loader2 className="animate-spin" /> : null} Verbinden
+                {busy === "cloudflare" ? <Loader2 className="animate-spin" /> : null} {t("connect")}
               </Button>
             </form>
           )}
         </div>
       </Step>
 
-      <Step number={3} done={snap.status.curseforge} icon={<Package className="size-4" />} title="CurseForge-Modpacks" optional>
+      <Step number={3} done={snap.status.curseforge} icon={<Package className="size-4" />} title={t("curseforge.title")} optional>
         <div className="space-y-4">
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Modrinth-Modpacks funktionieren sofort. Für CurseForge-Modpacks braucht es einen kostenlosen API-Key aus der{" "}
-            <ExtLink href="https://console.curseforge.com/">CurseForge Console</ExtLink> (API Keys).
+            {t.rich("curseforge.intro", {
+              link: (chunks) => <ExtLink href="https://console.curseforge.com/">{chunks}</ExtLink>,
+            })}
           </p>
           {snap.status.curseforge ? (
             <Button
               variant="outline"
               size="sm"
               disabled={busy !== null}
-              onClick={() => submit("curseforge", { remove: true }, "CurseForge-Key entfernt")}
+              onClick={() => void submit("curseforge", { remove: true }, t("curseforge.removed"))}
             >
-              Key entfernen
+              {t("curseforge.remove")}
             </Button>
           ) : (
             <form
               className="flex flex-col gap-2 sm:flex-row"
               onSubmit={async (e) => {
                 e.preventDefault();
-                if (await submit("curseforge", { apiKey: cfKey }, "CurseForge verbunden")) setCfKey("");
+                if (await submit("curseforge", { apiKey: cfKey }, t("curseforge.connected"))) setCfKey("");
               }}
             >
               <Input
@@ -249,11 +256,11 @@ export function SetupPanel({ initial }: { initial: SetupSnapshot }) {
                 autoComplete="off"
                 value={cfKey}
                 onChange={(e) => setCfKey(e.target.value)}
-                placeholder="CurseForge API-Key"
+                placeholder={t("curseforge.keyPlaceholder")}
                 className="font-mono"
               />
               <Button type="submit" disabled={!cfKey.trim() || busy !== null} className="shrink-0">
-                {busy === "curseforge" ? <Loader2 className="animate-spin" /> : null} Speichern
+                {busy === "curseforge" ? <Loader2 className="animate-spin" /> : null} {t("save")}
               </Button>
             </form>
           )}
@@ -263,16 +270,22 @@ export function SetupPanel({ initial }: { initial: SetupSnapshot }) {
       <Panel
         title={
           <span className="flex items-center gap-2">
-            <KeyRound className="size-4" /> Zugänge &amp; Sicherheit
+            <KeyRound className="size-4" /> {t("security.title")}
           </span>
         }
       >
         <ul className="list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-muted-foreground">
-          <li>Tokens und der SSH-Schlüssel werden verschlüsselt in der Datenbank gespeichert (Schlüssel: DASHBOARD_SECRET_KEY bzw. AUTH_SECRET).</li>
-          <li>Jeder Server bekommt eine eigene Hetzner-Firewall, die nur SSH und die Spiel-Ports öffnet.</li>
+          <li>{t("security.encrypted")}</li>
+          <li>{t("security.firewall")}</li>
           <li>
-            Wer das Dashboard nutzen darf, legst du unter <a href="/dashboard/team" className="underline">Team</a> fest. Neue Admins
-            per Discord-ID über <span className="font-mono">DASHBOARD_ADMIN_DISCORD_IDS</span>.
+            {t.rich("security.team", {
+              link: (chunks) => (
+                <a href="/dashboard/team" className="underline">
+                  {chunks}
+                </a>
+              ),
+              mono: (chunks) => <span className="font-mono">{chunks}</span>,
+            })}
           </li>
         </ul>
       </Panel>

@@ -1,6 +1,7 @@
 "use client";
 
 import { Loader2, RefreshCw, Send } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useInstance } from "@/components/dashboard/instance/instance-context";
@@ -14,6 +15,8 @@ import { getGameDefinition } from "@/lib/games/catalog";
 type HistoryEntry = { command: string; output: string; error?: boolean };
 
 export function ConsoleTab() {
+  const t = useTranslations("dashboard.console");
+  const tCommon = useTranslations("dashboard.common");
   const { detail, can } = useInstance();
   const def = getGameDefinition(detail.gameType);
   const hostUp = Boolean(detail.ip);
@@ -45,8 +48,8 @@ export function ConsoleTab() {
     if (!hostUp) return;
     void load();
     if (!follow) return;
-    const t = setInterval(() => document.visibilityState === "visible" && void load(), 5000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => document.visibilityState === "visible" && void load(), 5000);
+    return () => clearInterval(timer);
   }, [hostUp, follow, load]);
 
   useEffect(() => {
@@ -62,9 +65,9 @@ export function ConsoleTab() {
         method: "POST",
         json: { command: cmd },
       });
-      setHistory((h) => [...h.slice(-30), { command: cmd, output: res.output || "(keine Ausgabe)" }]);
+      setHistory((h) => [...h.slice(-30), { command: cmd, output: res.output || t("noOutput") }]);
       setCommand("");
-      setTimeout(load, 1000);
+      setTimeout(() => void load(), 1000);
     } catch (error) {
       setHistory((h) => [...h.slice(-30), { command: cmd, output: (error as Error).message, error: true }]);
     } finally {
@@ -73,20 +76,20 @@ export function ConsoleTab() {
   };
 
   if (!hostUp) {
-    return <Hint>Logs und Konsole sind verfügbar, sobald der Server läuft.</Hint>;
+    return <Hint>{t("onlyWhenRunning")}</Hint>;
   }
 
   return (
     <div className="space-y-5">
       <Panel
-        title="Server-Log"
+        title={t("log")}
         actions={
           <>
             <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
-              <Checkbox checked={follow} onCheckedChange={(c) => setFollow(c === true)} /> Live
+              <Checkbox checked={follow} onCheckedChange={(c) => setFollow(c === true)} /> {t("live")}
             </label>
-            <Button variant="outline" size="sm" onClick={load} disabled={loading}>
-              {loading ? <Loader2 className="animate-spin" /> : <RefreshCw />} Aktualisieren
+            <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
+              {loading ? <Loader2 className="animate-spin" /> : <RefreshCw />} {tCommon("refresh")}
             </Button>
           </>
         }
@@ -96,21 +99,17 @@ export function ConsoleTab() {
           ref={logRef}
           className="h-[28rem] overflow-auto whitespace-pre-wrap break-words rounded-xl bg-zinc-950 p-3 font-mono text-[11px] leading-relaxed text-zinc-200"
         >
-          {logs || "Noch keine Log-Ausgabe."}
+          {logs || t("noLogs")}
         </pre>
       </Panel>
 
       {def?.features.console ? (
         <Panel
-          title="Befehl senden"
-          description={
-            detail.gameType === "minecraft"
-              ? "Minecraft-Befehle ohne Schrägstrich, z. B. „say Hallo“, „op Spielername“, „whitelist add Name“."
-              : "RCON-Befehle, z. B. „changelevel de_inferno“ oder „mp_restartgame 1“."
-          }
+          title={t("sendTitle")}
+          description={detail.gameType === "minecraft" ? t("hintMinecraft") : t("hintRcon")}
         >
           {!can("instances:console") ? (
-            <Hint>Du hast keine Berechtigung, Befehle zu senden.</Hint>
+            <Hint>{t("noPermission")}</Hint>
           ) : (
             <div className="space-y-3">
               {history.length ? (
@@ -135,12 +134,12 @@ export function ConsoleTab() {
                 <Input
                   value={command}
                   onChange={(e) => setCommand(e.target.value)}
-                  placeholder="Befehl eingeben…"
+                  placeholder={t("placeholder")}
                   className="font-mono"
                   disabled={sending}
                 />
                 <Button type="submit" disabled={sending || !command.trim()}>
-                  {sending ? <Loader2 className="animate-spin" /> : <Send />} Senden
+                  {sending ? <Loader2 className="animate-spin" /> : <Send />} {t("send")}
                 </Button>
               </form>
             </div>

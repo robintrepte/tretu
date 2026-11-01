@@ -17,6 +17,8 @@ export const DEFAULT_OG_IMAGE = `${SITE_URL}/logo.svg`;
 
 export const LOCALE = "de_DE" as const;
 export const LANG = "de" as const;
+/** Open Graph locale per UI language. */
+export const OG_LOCALE = { de: "de_DE", en: "en_GB" } as const;
 
 /** Social / sameAs for Organization schema and footer */
 export const SOCIAL_LINKS = [

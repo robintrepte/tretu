@@ -1,8 +1,11 @@
+"use client";
+
 import Link from "next/link";
+import { useTranslations } from "next-intl";
+
+import { useFormat } from "@/components/dashboard/use-format";
 
 import { Badge } from "@/components/ui/badge";
-import { formatDateTime } from "@/lib/dashboard/format";
-import { JOB_STATUS_LABELS } from "@/lib/orchestrator/action-types";
 
 type Item = {
   id: number;
@@ -22,10 +25,12 @@ const VARIANT: Record<string, "secondary" | "warning" | "danger" | "success"> = 
 };
 
 export function ActivityList({ items }: { items: Item[] }) {
+  const t = useTranslations("dashboard");
+  const format = useFormat();
   if (!items.length) {
     return (
       <p className="rounded-2xl border border-dashed border-border/80 bg-muted/20 px-5 py-8 text-center text-sm text-muted-foreground dark:bg-muted/10">
-        Noch nichts passiert. Sobald im Dashboard etwas ausgelöst wird, erscheint es hier.
+        {t("activity.empty")}
       </p>
     );
   }
@@ -39,11 +44,11 @@ export function ActivityList({ items }: { items: Item[] }) {
               {item.title}
             </Link>
             <p className="truncate text-xs text-muted-foreground">
-              {formatDateTime(item.createdAt)}
+              {format.dateTime(item.createdAt)}
               {item.subtitle ? ` · ${item.subtitle}` : ""}
             </p>
           </div>
-          <Badge variant={VARIANT[item.status] ?? "secondary"}>{JOB_STATUS_LABELS[item.status] ?? item.status}</Badge>
+          <Badge variant={VARIANT[item.status] ?? "secondary"}>{t.has(`jobStatus.${item.status}`) ? t(`jobStatus.${item.status}`) : item.status}</Badge>
         </li>
       ))}
     </ul>

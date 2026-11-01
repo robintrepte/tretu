@@ -14,15 +14,16 @@ import {
   TriangleAlert,
   Users,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useState, type ReactNode } from "react";
 
 import { CopyButton } from "@/components/dashboard/copy-button";
 import { JobLog } from "@/components/dashboard/instance/job-log";
 import { useInstance } from "@/components/dashboard/instance/instance-context";
+import { useFormat, useGameText } from "@/components/dashboard/use-format";
 import { useNow } from "@/components/dashboard/use-now";
 import { Hint, Panel } from "@/components/dashboard/panel";
 import { Button } from "@/components/ui/button";
-import { formatBytes, formatDuration, formatEuro, formatRelative } from "@/lib/dashboard/format";
 import { getGameDefinition } from "@/lib/games/catalog";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +41,10 @@ function Stat({ icon, label, value, sub }: { icon: ReactNode; label: string; val
 }
 
 export function OverviewTab() {
+  const t = useTranslations("dashboard.overview");
+  const tDash = useTranslations("dashboard");
+  const format = useFormat();
+  const gameText = useGameText();
   const { detail, can, runAction } = useInstance();
   const now = useNow();
   const uptimeMs = now !== null && detail.hostSince ? now - Date.parse(detail.hostSince) : null;
@@ -51,24 +56,25 @@ export function OverviewTab() {
   const busy = detail.state === "busy";
   const job = detail.activeJob;
 
-  const start = () => runAction("start", { success: "Server wird gestartet – das dauert meist 2–4 Minuten." });
+  const start = () => runAction("start", { success: t("startSuccess") });
   const hibernate = () =>
     runAction("hibernate", {
-      success: "Server wird ausgeschaltet.",
+      success: t("hibernateSuccess"),
       confirm: {
-        title: "Server ausschalten?",
+        title: t("hibernateTitle"),
         description: (
           <>
-            <p>
-              Das Spiel wird sauber beendet{detail.backupOnHibernate ? ", ein Backup erstellt" : ""} und die VM gelöscht. Welt
-              und Einstellungen bleiben auf dem Speicher erhalten – es fallen nur noch Speicherkosten an.
-            </p>
-            {detail.players ? <p className="font-medium text-foreground">Es sind gerade {detail.players} Spieler online!</p> : null}
+            <p>{detail.backupOnHibernate ? t("hibernateTextBackup") : t("hibernateText")}</p>
+            {detail.players ? (
+              <p className="font-medium text-foreground">{t("playersOnlineWarning", { count: detail.players })}</p>
+            ) : null}
           </>
         ),
-        confirmLabel: "Ausschalten",
+        confirmLabel: tDash("actions.hibernate"),
       },
     });
+  const jobLabel = (actionType: string, fallback: string) =>
+    tDash.has(`actions.${actionType}`) ? tDash(`actions.${actionType}`) : fallback;
 
   return (
     <div className="space-y-5">
@@ -77,14 +83,14 @@ export function OverviewTab() {
           title={
             <span className="flex items-center gap-2">
               <Loader2 className="size-4 animate-spin text-sky-500" />
-              {job.label}
-              {job.status === "queued" ? <span className="text-sm font-normal text-muted-foreground">(wartet)</span> : null}
+              {jobLabel(job.actionType, job.label)}
+              {job.status === "queued" ? <span className="text-sm font-normal text-muted-foreground">{t("queued")}</span> : null}
             </span>
           }
-          description={job.progress ?? "Wird vorbereitet…"}
+          description={job.progress ?? t("preparing")}
           actions={
             <Button variant="ghost" size="sm" onClick={() => setShowJobLog((v) => !v)}>
-              Details <ChevronDown className={cn("transition-transform", showJobLog && "rotate-180")} />
+              {t("details")} <ChevronDown className={cn("transition-transform", showJobLog && "rotate-180")} />
             </Button>
           }
         >
@@ -99,13 +105,18 @@ export function OverviewTab() {
               <span className="flex items-start gap-2">
                 <TriangleAlert className="mt-0.5 size-4 shrink-0" />
                 <span>
-                  <strong>{detail.lastFailedJob.label}</strong> ist fehlgeschlagen
-                  {detail.lastFailedJob.finishedAt && now !== null ? ` (${formatRelative(detail.lastFailedJob.finishedAt, now)})` : ""}:{" "}
-                  {detail.lastFailedJob.error}
+                  {t.rich("failed", {
+                    action: jobLabel(detail.lastFailedJob.actionType, detail.lastFailedJob.label),
+                    strong: (chunks) => <strong>{chunks}</strong>,
+                  })}
+                  {detail.lastFailedJob.finishedAt && now !== null
+                    ? ` (${format.relative(detail.lastFailedJob.finishedAt, now)})`
+                    : ""}
+                  : {detail.lastFailedJob.error}
                 </span>
               </span>
               <button type="button" className="text-xs underline-offset-2 hover:underline" onClick={() => setShowFailedLog((v) => !v)}>
-                {showFailedLog ? "Log ausblenden" : "Log anzeigen"}
+                {showFailedLog ? t("hideLog") : t("showLog")}
               </button>
             </div>
           </Hint>
@@ -113,27 +124,27 @@ export function OverviewTab() {
         </div>
       ) : null}
 
-      <Panel title="Verbinden" description={def?.connectHint}>
+      <Panel title={t("connect")} description={def ? gameText.connectHint(def) : undefined}>
         {detail.address ? (
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex min-w-0 items-center gap-2 rounded-xl border border-border/70 bg-muted/40 py-1.5 pl-4 pr-1.5 dark:bg-muted/20">
               <Globe className="size-4 shrink-0 text-muted-foreground" />
               <span className="truncate font-mono text-base font-semibold">{detail.address}</span>
-              <CopyButton value={detail.address} label="Adresse kopieren" />
+              <CopyButton value={detail.address} label={tDash("grid.copyAddress")} />
             </div>
-            {!hostUp ? <span className="text-sm text-muted-foreground">Erreichbar, sobald der Server läuft.</span> : null}
+            {!hostUp ? <span className="text-sm text-muted-foreground">{t("reachableWhenRunning")}</span> : null}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">Die Adresse erscheint, sobald der Server läuft.</p>
+          <p className="text-sm text-muted-foreground">{t("addressWhenRunning")}</p>
         )}
         {hostUp && detail.address !== detail.ip && detail.ip ? (
           <p className="mt-2 text-xs text-muted-foreground">
-            IP-Adresse: <span className="font-mono">{detail.ip}</span>
+            {t("ip")} <span className="font-mono">{detail.ip}</span>
           </p>
         ) : null}
       </Panel>
 
-      <Panel title="Steuerung">
+      <Panel title={t("controls")}>
         <div className="flex flex-wrap gap-2.5">
           {!hostUp || detail.state === "stopped" ? (
             <Button
@@ -142,7 +153,7 @@ export function OverviewTab() {
               onClick={start}
               className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-600/90"
             >
-              <Play /> Starten
+              <Play /> {tDash("actions.start")}
             </Button>
           ) : null}
           {hostUp ? (
@@ -153,7 +164,7 @@ export function OverviewTab() {
               onClick={hibernate}
               className="rounded-xl"
             >
-              <Power /> Ausschalten
+              <Power /> {tDash("actions.hibernate")}
             </Button>
           ) : null}
           {hostUp && detail.state !== "stopped" ? (
@@ -162,10 +173,10 @@ export function OverviewTab() {
                 size="lg"
                 variant="outline"
                 disabled={busy || !can("instances:restart")}
-                onClick={() => runAction("restart", { success: "Spielserver wird neu gestartet." })}
+                onClick={() => runAction("restart", { success: t("restartSuccess") })}
                 className="rounded-xl"
               >
-                <RotateCw /> Neustart
+                <RotateCw /> {tDash("actions.restart")}
               </Button>
               <Button
                 size="lg"
@@ -174,63 +185,64 @@ export function OverviewTab() {
                 onClick={() =>
                   runAction("stop", {
                     confirm: {
-                      title: "Nur das Spiel stoppen?",
-                      description:
-                        "Der Spielserver wird beendet, die VM läuft aber weiter und kostet weiter Geld. Zum Sparen lieber „Ausschalten“ verwenden.",
-                      confirmLabel: "Spiel stoppen",
+                      title: t("stopTitle"),
+                      description: t("stopText"),
+                      confirmLabel: tDash("actions.stop"),
                     },
                   })
                 }
                 className="rounded-xl text-muted-foreground"
               >
-                <Square /> Nur Spiel stoppen
+                <Square /> {t("stopOnly")}
               </Button>
             </>
           ) : null}
         </div>
         <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-          <strong>Starten</strong> erstellt die VM und richtet alles automatisch ein (2–4 Min., Modpacks länger).{" "}
-          <strong>Ausschalten</strong> löscht die VM – Welt & Einstellungen bleiben gespeichert.
+          {t.rich("controlsHint", { strong: (chunks) => <strong>{chunks}</strong> })}
         </p>
       </Panel>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat
           icon={<Users className="size-3.5" />}
-          label="Spieler online"
+          label={t("players")}
           value={detail.players !== null ? `${detail.players}${detail.maxPlayers ? ` / ${detail.maxPlayers}` : ""}` : "–"}
-          sub={def && !def.features.playerCount ? "Spiel meldet keine Spielerzahl" : undefined}
+          sub={def && !def.features.playerCount ? t("noPlayerCount") : undefined}
         />
         <Stat
           icon={<Server className="size-3.5" />}
-          label="Servertyp"
+          label={t("serverType")}
           value={<span className="font-mono uppercase">{detail.serverType}</span>}
-          sub={`${formatEuro(detail.pricePerHour, 3)} / Std. · ${detail.region}`}
+          sub={`${tDash("common.perHour", { price: format.euro(detail.pricePerHour, 3) })} · ${detail.region}`}
         />
         <Stat
           icon={<Clock className="size-3.5" />}
-          label={hostUp ? "Läuft seit" : "Status"}
-          value={hostUp && uptimeMs !== null ? formatDuration(uptimeMs) : hostUp ? "–" : "Aus"}
+          label={hostUp ? t("runningSince") : t("status")}
+          value={hostUp && uptimeMs !== null ? format.duration(uptimeMs) : hostUp ? "–" : tDash("state.offline.label")}
           sub={
             detail.idleShutdownAt && now !== null
-              ? `Auto-Aus ${formatRelative(detail.idleShutdownAt, now)} ohne Spieler`
+              ? t("autoOffAt", { when: format.relative(detail.idleShutdownAt, now) })
               : hostUp && detail.pricePerHour && uptimeMs !== null
-                ? `bisher ca. ${formatEuro((uptimeMs / 3_600_000) * detail.pricePerHour)}`
+                ? t("costSoFar", { cost: format.euro((uptimeMs / 3_600_000) * detail.pricePerHour) })
                 : detail.idleMinutes > 0
-                  ? `Auto-Aus nach ${detail.idleMinutes} Min. ohne Spieler`
-                  : "Kein Auto-Aus"
+                  ? t("autoOffAfter", { minutes: detail.idleMinutes })
+                  : t("noAutoOff")
           }
         />
         <Stat
           icon={<HardDrive className="size-3.5" />}
-          label="Speicher"
+          label={t("storage")}
           value={detail.volume ? `${detail.volume.sizeGb} GB` : "–"}
           sub={
             detail.volume?.usedBytes != null && detail.volume.totalBytes
-              ? `${formatBytes(detail.volume.usedBytes)} belegt (${Math.round((detail.volume.usedBytes / detail.volume.totalBytes) * 100)} %)`
+              ? t("storageUsed", {
+                  used: format.bytes(detail.volume.usedBytes),
+                  percent: Math.round((detail.volume.usedBytes / detail.volume.totalBytes) * 100),
+                })
               : detail.volume
-                ? "Belegung sichtbar, wenn der Server läuft"
-                : "Wird beim ersten Start angelegt"
+                ? t("storageWhenRunning")
+                : t("storageOnFirstStart")
           }
         />
       </div>

@@ -1,4 +1,19 @@
 import type { NextConfig } from "next";
+import createNextIntlPlugin from "next-intl/plugin";
+
+const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
+
+/** Origin of the self-hosted Umami script (only when analytics is configured). */
+function umamiOrigin(): string | null {
+  const src = process.env.NEXT_PUBLIC_UMAMI_SRC;
+  if (!src || !process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID) return null;
+  try {
+    return new URL(src).origin;
+  } catch {
+    return null;
+  }
+}
+const umami = umamiOrigin();
 
 /** Security headers applied to all routes. */
 const securityHeaders = [
@@ -30,11 +45,11 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.tsviewer.com https://www.tsviewer.com",
+      `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.tsviewer.com https://www.tsviewer.com${umami ? ` ${umami}` : ""}`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https: blob:",
       "font-src 'self' data:",
-      "connect-src 'self' https://www.googleapis.com",
+      `connect-src 'self' https://www.googleapis.com${umami ? ` ${umami}` : ""}`,
       "frame-src 'self' https://embed.twitch.tv https://discord.com https://www.youtube.com https://map.tretu.de https://www.tsviewer.com",
       "base-uri 'self'",
       "form-action 'self'",
@@ -61,6 +76,18 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["lucide-react"],
   },
+  async redirects() {
+    // Former per-app legal routes and English aliases all point to the one legal home.
+    return [
+      { source: "/imprint", destination: "/impressum", permanent: true },
+      { source: "/legal-notice", destination: "/impressum", permanent: true },
+      { source: "/privacy", destination: "/datenschutz", permanent: true },
+      { source: "/privacy-policy", destination: "/datenschutz", permanent: true },
+      { source: "/datenschutzerklaerung", destination: "/datenschutz", permanent: true },
+      { source: "/terms", destination: "/agb", permanent: true },
+      { source: "/nutzungsbedingungen", destination: "/agb", permanent: true },
+    ];
+  },
   async headers() {
     return [
       {
@@ -71,4 +98,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withNextIntl(nextConfig);

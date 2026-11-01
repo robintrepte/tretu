@@ -1,5 +1,7 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
+
 import { Download, Loader2, Package, Plus, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -31,7 +33,8 @@ function useDebounced<T>(value: T, ms = 350): T {
   return debounced;
 }
 
-const compactNumber = (n: number) => n.toLocaleString("de-DE", { notation: "compact", maximumFractionDigits: 1 });
+const compactNumber = (n: number, locale: string) =>
+  n.toLocaleString(locale === "en" ? "en-GB" : "de-DE", { notation: "compact", maximumFractionDigits: 1 });
 
 function ModpackPicker({
   source,
@@ -42,6 +45,8 @@ function ModpackPicker({
   onChange: (next: MinecraftSource) => void;
   disabled?: boolean;
 }) {
+  const t = useTranslations("dashboard.minecraft");
+  const locale = useLocale();
   const provider = source.loader === "curseforge" ? "curseforge" : "modrinth";
   const [query, setQuery] = useState("");
   const debounced = useDebounced(query);
@@ -104,7 +109,7 @@ function ModpackPicker({
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{source.modpack.title}</p>
               <p className="text-xs text-muted-foreground">
-                {source.modpack.versionName || "Version wählen"} · Minecraft {source.version}
+                {source.modpack.versionName || t("pickVersion")} · Minecraft {source.version}
               </p>
             </div>
           </div>
@@ -114,7 +119,7 @@ function ModpackPicker({
               className="text-xs text-muted-foreground underline-offset-2 hover:underline"
               onClick={() => onChange({ ...source, modpack: null })}
             >
-              Anderes Modpack
+              {t("otherModpack")}
             </button>
           ) : null}
         </div>
@@ -122,15 +127,15 @@ function ModpackPicker({
 
       {source.modpack ? (
         <div className="space-y-2">
-          <FieldLabel label="Modpack-Version" />
+          <FieldLabel label={t("modpackVersion")} />
           {loadingVersions ? (
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" /> Versionen werden geladen…
+              <Loader2 className="size-4 animate-spin" /> {t("loadingVersions")}
             </p>
           ) : (
             <Select value={source.modpack.versionId} disabled={disabled} onValueChange={pickVersion}>
               <SelectTrigger>
-                <SelectValue placeholder="Version wählen" />
+                <SelectValue placeholder={t("pickVersion")} />
               </SelectTrigger>
               <SelectContent className="max-h-80">
                 {versions.map((v) => (
@@ -152,7 +157,7 @@ function ModpackPicker({
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={`Modpack auf ${provider === "curseforge" ? "CurseForge" : "Modrinth"} suchen…`}
+              placeholder={t("searchModpack", { provider: provider === "curseforge" ? "CurseForge" : "Modrinth" })}
               className="pl-9"
               disabled={disabled}
             />
@@ -161,7 +166,7 @@ function ModpackPicker({
           <div className="grid max-h-96 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
             {searching && !hits.length ? (
               <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="size-4 animate-spin" /> Suche…
+                <Loader2 className="size-4 animate-spin" /> {t("searching")}
               </p>
             ) : null}
             {hits.map((hit) => (
@@ -189,7 +194,7 @@ function ModpackPicker({
                   <p className="truncate text-sm font-medium">{hit.title}</p>
                   <p className="line-clamp-2 text-xs text-muted-foreground">{hit.description}</p>
                   <p className="mt-1 inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                    <Download className="size-3" /> {compactNumber(hit.downloads)}
+                    <Download className="size-3" /> {compactNumber(hit.downloads, locale)}
                   </p>
                 </div>
               </button>
@@ -210,6 +215,7 @@ function ExtraProjects({
   onChange: (next: MinecraftSource) => void;
   disabled?: boolean;
 }) {
+  const t = useTranslations("dashboard.minecraft");
   const kind = modrinthProjectKind(source.loader);
   const [query, setQuery] = useState("");
   const debounced = useDebounced(query);
@@ -234,14 +240,14 @@ function ExtraProjects({
   }, [debounced, kind, open, source.loader, source.version]);
 
   if (!kind) return null;
-  const noun = kind.type === "plugin" ? "Plugins" : "Mods";
+  const noun = kind.type === "plugin" ? t("plugins") : t("mods");
   const selected = new Set(source.extraProjects.map((p) => p.projectId || p.slug));
 
   return (
     <div className="space-y-3">
       <FieldLabel
-        label={`${noun} von Modrinth`}
-        help={`Werden beim Start automatisch in einer passenden Version installiert (inkl. Abhängigkeiten). Eigene ${noun} kannst du später über „Dateien“ hochladen.`}
+        label={t("fromModrinth", { noun })}
+        help={t("extraHelp", { noun })}
       />
       {source.extraProjects.length ? (
         <div className="flex flex-wrap gap-2">
@@ -254,7 +260,7 @@ function ExtraProjects({
               {!disabled ? (
                 <button
                   type="button"
-                  aria-label={`${p.title} entfernen`}
+                  aria-label={t("remove", { name: p.title || p.slug })}
                   className="rounded-full p-0.5 hover:bg-muted"
                   onClick={() =>
                     onChange({ ...source, extraProjects: source.extraProjects.filter((x) => x !== p) })
@@ -276,7 +282,7 @@ function ExtraProjects({
                 autoFocus
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder={`${noun} suchen…`}
+                placeholder={t("searchNoun", { noun })}
                 className="pl-9"
               />
             </div>
@@ -308,7 +314,7 @@ function ExtraProjects({
                       <span className="block truncate text-xs text-muted-foreground">{hit.description}</span>
                     </span>
                     {isSelected ? (
-                      <span className="text-xs text-muted-foreground">hinzugefügt</span>
+                      <span className="text-xs text-muted-foreground">{t("added")}</span>
                     ) : (
                       <Plus className="size-4 text-muted-foreground" />
                     )}
@@ -317,7 +323,7 @@ function ExtraProjects({
               })}
             </div>
             <button type="button" className="text-xs text-muted-foreground hover:underline" onClick={() => setOpen(false)}>
-              Suche schließen
+              {t("closeSearch")}
             </button>
           </div>
         ) : (
@@ -326,7 +332,7 @@ function ExtraProjects({
             onClick={() => setOpen(true)}
             className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-2 text-sm text-muted-foreground hover:border-[var(--tretu-accent)]/50 hover:text-foreground"
           >
-            <Plus className="size-4" /> {noun} hinzufügen
+            <Plus className="size-4" /> {t("addNoun", { noun })}
           </button>
         )
       ) : null}
@@ -348,6 +354,7 @@ export function MinecraftSourceEditor({
   /** Show a warning about switching loaders on an existing world. */
   existingWorld?: boolean;
 }) {
+  const t = useTranslations("dashboard.minecraft");
   const [meta, setMeta] = useState<VersionLists | null>(null);
   const [metaError, setMetaError] = useState<string | null>(null);
 
@@ -374,7 +381,7 @@ export function MinecraftSourceEditor({
   return (
     <div className="space-y-5">
       <div className="space-y-2">
-        <FieldLabel label="Server-Software" />
+        <FieldLabel label={t("software")} />
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {MINECRAFT_LOADERS.map((loader) => {
             const unavailable = loader.id === "curseforge" && !curseforgeAvailable;
@@ -384,7 +391,7 @@ export function MinecraftSourceEditor({
                 type="button"
                 disabled={disabled || unavailable}
                 onClick={() => setLoader(loader.id)}
-                title={unavailable ? "CurseForge-API-Key fehlt (Einrichtung)" : loader.description}
+                title={unavailable ? t("curseforgeMissing") : t(`loaders.${loader.id}`)}
                 className={cn(
                   "rounded-xl border p-3 text-left transition-colors",
                   value.loader === loader.id
@@ -393,9 +400,9 @@ export function MinecraftSourceEditor({
                   (disabled || unavailable) && "cursor-not-allowed opacity-50"
                 )}
               >
-                <span className="block text-sm font-semibold">{loader.label}</span>
+                <span className="block text-sm font-semibold">{t.has(`loaderNames.${loader.id}`) ? t(`loaderNames.${loader.id}`) : loader.label}</span>
                 <span className="mt-1 block text-xs leading-snug text-muted-foreground">
-                  {unavailable ? "CurseForge-Key in der Einrichtung hinterlegen" : loader.description}
+                  {unavailable ? t("curseforgeHint") : t(`loaders.${loader.id}`)}
                 </span>
               </button>
             );
@@ -403,8 +410,7 @@ export function MinecraftSourceEditor({
         </div>
         {existingWorld ? (
           <Hint tone="warning">
-            Ein Wechsel der Software oder ein Downgrade kann bestehende Welten beschädigen. Vorher ein Backup machen; bei
-            Modpack-Wechseln die Daten am besten zurücksetzen.
+            {t("switchWarning")}
           </Hint>
         ) : null}
       </div>
@@ -413,14 +419,14 @@ export function MinecraftSourceEditor({
         <ModpackPicker source={value} onChange={onChange} disabled={disabled} />
       ) : (
         <div className="space-y-2">
-          <FieldLabel label="Minecraft-Version" help="„Neueste“ aktualisiert den Server automatisch bei jedem Start." />
+          <FieldLabel label={t("version")} help={t("versionHelp")} />
           {metaError ? <Hint tone="danger">{metaError}</Hint> : null}
           <Select value={value.version} disabled={disabled || !meta} onValueChange={(v) => onChange({ ...value, version: v })}>
             <SelectTrigger className="sm:max-w-xs">
-              <SelectValue placeholder={meta ? "Version wählen" : "Lade Versionen…"} />
+              <SelectValue placeholder={meta ? t("pickVersion") : t("loadingVersionList")} />
             </SelectTrigger>
             <SelectContent className="max-h-80">
-              <SelectItem value="LATEST">Neueste ({meta?.latestRelease ?? "…"})</SelectItem>
+              <SelectItem value="LATEST">{t("latest", { version: meta?.latestRelease ?? "…" })}</SelectItem>
               {versions.map((v) => (
                 <SelectItem key={v} value={v}>
                   {v}

@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { ConfirmDialog, type ConfirmOptions } from "@/components/dashboard/confirm-dialog";
@@ -38,6 +39,7 @@ export function InstanceProvider({
   curseforgeAvailable: boolean;
   children: ReactNode;
 }) {
+  const t = useTranslations("dashboard.instance");
   const [detail, setDetail] = useState(initial);
   const [dialog, setDialog] = useState<{ options: ConfirmOptions; onConfirm: () => Promise<void> } | null>(null);
   const timer = useRef<NodeJS.Timeout | null>(null);
@@ -53,9 +55,11 @@ export function InstanceProvider({
   const fast = detail.state === "busy" || detail.state === "starting";
   useEffect(() => {
     const schedule = () => {
-      timer.current = setTimeout(async () => {
-        if (document.visibilityState === "visible") await refresh();
-        schedule();
+      timer.current = setTimeout(() => {
+        void (async () => {
+          if (document.visibilityState === "visible") await refresh();
+          schedule();
+        })();
       }, fast ? 2500 : 10_000);
     };
     schedule();
@@ -71,13 +75,13 @@ export function InstanceProvider({
           method: "POST",
           json: { action, payload: payload ?? {} },
         });
-        toast.success(res.deduplicated ? "Ist bereits in Arbeit." : (success ?? "Aktion gestartet."));
+        toast.success(res.deduplicated ? t("alreadyRunning") : (success ?? t("actionStarted")));
         await refresh();
       } catch (error) {
         toast.error((error as Error).message);
       }
     },
-    [initial.id, refresh]
+    [initial.id, refresh, t]
   );
 
   const value: InstanceContextValue = {

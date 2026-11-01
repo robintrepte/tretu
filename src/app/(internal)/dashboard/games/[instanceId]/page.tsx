@@ -13,15 +13,10 @@ export default async function GameDetailPage({ params }: { params: Promise<{ ins
   if (!userId) redirect("/login?callbackUrl=/dashboard");
 
   const instanceId = Number((await params).instanceId);
-  if (!Number.isInteger(instanceId)) notFound();
+  if (!Number.isInteger(instanceId) || instanceId <= 0) notFound();
   const detail = await getInstanceDetail(instanceId);
   if (!detail) notFound();
+  const [permissions, setup] = await Promise.all([getPermissions(userId), getSetupStatus()]);
 
-  return (
-    <InstanceManager
-      initial={detail}
-      permissions={getPermissions(userId)}
-      curseforgeAvailable={getSetupStatus().curseforge}
-    />
-  );
+  return <InstanceManager initial={detail} permissions={permissions} curseforgeAvailable={setup.curseforge} />;
 }

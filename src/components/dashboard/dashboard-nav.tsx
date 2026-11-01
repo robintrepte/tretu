@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 import { cn } from "@/lib/utils";
 
@@ -16,15 +17,16 @@ export function DashboardNav({
   canManageSettings: boolean;
   canManageRoles: boolean;
 }) {
+  const t = useTranslations("dashboard.nav");
   const pathname = usePathname() ?? "";
 
-  const links: LinkItem[] = [{ href: "/dashboard", label: "Server" }];
-  if (canCreate) links.push({ href: "/dashboard/new", label: "Neuer Server" });
+  const links: LinkItem[] = [{ href: "/dashboard", label: t("servers") }];
+  if (canCreate) links.push({ href: "/dashboard/new", label: t("new") });
   if (canManageRoles) {
-    links.push({ href: "/dashboard/activity", label: "Aktivität" });
-    links.push({ href: "/dashboard/team", label: "Team" });
+    links.push({ href: "/dashboard/activity", label: t("activity") });
+    links.push({ href: "/dashboard/team", label: t("team") });
   }
-  if (canManageSettings) links.push({ href: "/dashboard/setup", label: "Einrichtung" });
+  if (canManageSettings) links.push({ href: "/dashboard/setup", label: t("setup") });
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return pathname === "/dashboard" || pathname.startsWith("/dashboard/games/");

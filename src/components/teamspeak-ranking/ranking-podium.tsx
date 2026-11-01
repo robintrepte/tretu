@@ -1,5 +1,9 @@
+"use client";
+
+import { useLocale, useTranslations } from "next-intl";
+
 import { RankDisplay } from "@/components/teamspeak-ranking/rank-display";
-import { formatDurationGerman } from "@/lib/teamspeak/format-duration";
+import { formatDuration } from "@/lib/teamspeak/format-duration";
 import { cn } from "@/lib/utils";
 
 type Entry = {
@@ -25,6 +29,8 @@ const rankLabels: Record<number, string> = {
 };
 
 export function RankingPodium({ entries }: { entries: Entry[] }) {
+  const t = useTranslations("ranking");
+  const locale = useLocale();
   const ordered = [...entries].sort((a, b) => a.rank - b.rank);
 
   return (
@@ -58,12 +64,12 @@ export function RankingPodium({ entries }: { entries: Entry[] }) {
             className="mt-3 justify-center"
           />
           <p className="mt-3 text-sm font-medium text-[var(--tretu-accent)]">
-            {formatDurationGerman(entry.onlineSeconds)}
+            {formatDuration(entry.onlineSeconds, locale)}
           </p>
           {entry.isOnline && (
             <span className="mt-2 inline-flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
               <span className="h-2 w-2 rounded-full bg-current" />
-              Online
+              {t("online")}
             </span>
           )}
         </article>

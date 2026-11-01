@@ -1,5 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Jost } from "next/font/google";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale, getTranslations } from "next-intl/server";
+import { resolveLocale } from "@/i18n/config";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { Header } from "@/components/header";
@@ -10,9 +13,8 @@ import {
   SITE_URL,
   SITE_NAME,
   SITE_NAME_FULL,
-  DEFAULT_DESCRIPTION,
   DEFAULT_OG_IMAGE,
-  LOCALE,
+  OG_LOCALE,
   SOCIAL_LINKS,
   DEFAULT_KEYWORDS,
 } from "@/lib/seo";
@@ -33,63 +35,77 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export const metadata: Metadata = {
-  metadataBase: new URL(SITE_URL),
-  title: {
-    default: SITE_NAME_FULL,
-    template: `%s | ${SITE_NAME}`,
-  },
-  description: DEFAULT_DESCRIPTION,
-  keywords: DEFAULT_KEYWORDS,
-  authors: [{ name: SITE_NAME_FULL, url: SITE_URL }],
-  creator: SITE_NAME_FULL,
-  publisher: SITE_NAME_FULL,
-  formatDetection: { email: false, address: false, telephone: false },
-  openGraph: {
-    type: "website",
-    locale: LOCALE,
-    url: SITE_URL,
-    siteName: SITE_NAME,
-    title: SITE_NAME_FULL,
-    description: DEFAULT_DESCRIPTION,
-    images: [{ url: DEFAULT_OG_IMAGE, width: 512, height: 512, alt: `${SITE_NAME} Logo` }],
-  },
-  twitter: {
-    card: "summary",
-    title: SITE_NAME_FULL,
-    description: DEFAULT_DESCRIPTION,
-    images: [DEFAULT_OG_IMAGE],
-  },
-  alternates: { canonical: "/" },
-  icons: { icon: "/logo.svg", apple: "/logo.svg" },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: { index: true, follow: true },
-  },
-  verification: {},
-  manifest: "/manifest.webmanifest",
-};
+/** Self-hosted Umami (cookie-free); only rendered when both env vars are set. */
+const UMAMI_SRC = process.env.NEXT_PUBLIC_UMAMI_SRC;
+const UMAMI_WEBSITE_ID = process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID;
 
-export default function RootLayout({
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("meta");
+  const locale = resolveLocale(await getLocale());
+  const description = t("defaultDescription");
+  return {
+    metadataBase: new URL(SITE_URL),
+    title: {
+      default: SITE_NAME_FULL,
+      template: `%s | ${SITE_NAME}`,
+    },
+    description,
+    keywords: DEFAULT_KEYWORDS,
+    authors: [{ name: SITE_NAME_FULL, url: SITE_URL }],
+    creator: SITE_NAME_FULL,
+    publisher: SITE_NAME_FULL,
+    formatDetection: { email: false, address: false, telephone: false },
+    openGraph: {
+      type: "website",
+      locale: OG_LOCALE[locale],
+      url: SITE_URL,
+      siteName: SITE_NAME,
+      title: SITE_NAME_FULL,
+      description,
+      images: [{ url: DEFAULT_OG_IMAGE, width: 512, height: 512, alt: `${SITE_NAME} Logo` }],
+    },
+    twitter: {
+      card: "summary",
+      title: SITE_NAME_FULL,
+      description,
+      images: [DEFAULT_OG_IMAGE],
+    },
+    alternates: { canonical: "/" },
+    icons: { icon: "/logo.svg", apple: "/logo.svg" },
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: { index: true, follow: true },
+    },
+    verification: {},
+    manifest: "/manifest.webmanifest",
+  };
+}
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = resolveLocale(await getLocale());
+  const t = await getTranslations("meta");
   return (
-    <html lang="de" className={jost.variable} suppressHydrationWarning>
+    <html lang={locale} className={jost.variable} suppressHydrationWarning>
       <body className="flex min-h-screen flex-col bg-background font-sans text-foreground antialiased">
         <HomeShaderFallback />
         <div id="home-shader-portal" className="fixed inset-0 -z-10 pointer-events-none" aria-hidden />
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <HomePageBodyClass />
-          <Header />
-          <main className="flex-1" id="main-content" aria-label="Hauptinhalt">
-            {children}
-          </main>
-          <Footer />
-          <Toaster richColors />
-        </ThemeProvider>
+        <NextIntlClientProvider>
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+            <HomePageBodyClass />
+            <Header />
+            <main className="flex-1" id="main-content" aria-label={t("mainContent")}>
+              {children}
+            </main>
+            <Footer />
+            <Toaster richColors />
+          </ThemeProvider>
+        </NextIntlClientProvider>
+        {UMAMI_SRC && UMAMI_WEBSITE_ID ? <script defer src={UMAMI_SRC} data-website-id={UMAMI_WEBSITE_ID} /> : null}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -101,8 +117,8 @@ export default function RootLayout({
                   "@id": `${SITE_URL}/#website`,
                   url: `${SITE_URL}/`,
                   name: SITE_NAME,
-                  description: DEFAULT_DESCRIPTION,
-                  inLanguage: "de",
+                  description: t("defaultDescription"),
+                  inLanguage: locale,
                   publisher: { "@id": `${SITE_URL}/#organization` },
                   potentialAction: {
                     "@type": "SearchAction",

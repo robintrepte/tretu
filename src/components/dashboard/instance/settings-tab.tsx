@@ -2,6 +2,7 @@
 
 import { Loader2, Save } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
@@ -21,17 +22,19 @@ import type { MinecraftSource } from "@/lib/games/minecraft-source";
 import type { HetznerOptions } from "@/lib/hetzner/types";
 
 function SaveButton({ onClick, saving, dirty, disabled }: { onClick: () => void; saving: boolean; dirty: boolean; disabled?: boolean }) {
+  const t = useTranslations("dashboard.common");
   return (
     <Button onClick={onClick} disabled={saving || !dirty || disabled} className="rounded-xl">
-      {saving ? <Loader2 className="animate-spin" /> : <Save />} Speichern
+      {saving ? <Loader2 className="animate-spin" /> : <Save />} {t("save")}
     </Button>
   );
 }
 
 function usePatch() {
+  const t = useTranslations("dashboard.settings");
   const { detail, refresh } = useInstance();
   const [saving, setSaving] = useState(false);
-  const save = async (json: Record<string, unknown>, message = "Gespeichert"): Promise<boolean> => {
+  const save = async (json: Record<string, unknown>, message = t("saved")): Promise<boolean> => {
     setSaving(true);
     try {
       const res = await dashboardApi<{ applyJobId: number | null; serverTypeChangedWhileRunning: boolean }>(
@@ -40,9 +43,9 @@ function usePatch() {
       );
       toast.success(
         res.applyJobId
-          ? `${message} – wird jetzt auf den laufenden Server angewendet (kurzer Neustart).`
+          ? t("savedApplying", { message })
           : res.serverTypeChangedWhileRunning
-            ? `${message} – der neue Servertyp gilt ab dem nächsten Ausschalten & Starten.`
+            ? t("savedNextStart", { message })
             : message
       );
       await refresh();
@@ -58,6 +61,8 @@ function usePatch() {
 }
 
 function GeneralSettings({ readOnly }: { readOnly: boolean }) {
+  const t = useTranslations("dashboard.settings");
+  const tDash = useTranslations("dashboard");
   const { detail } = useInstance();
   const { save, saving } = usePatch();
   const def = getGameDefinition(detail.gameType);
@@ -70,20 +75,23 @@ function GeneralSettings({ readOnly }: { readOnly: boolean }) {
   };
   const [form, setForm] = useState(initial);
   const dirty = JSON.stringify(form) !== JSON.stringify(initial);
-  const idleOptions = IDLE_OPTIONS.some((o) => o.value === form.idleMinutes)
-    ? IDLE_OPTIONS
-    : [...IDLE_OPTIONS, { value: form.idleMinutes, label: `Nach ${form.idleMinutes} Minuten ohne Spieler` }];
+  const idleOptions = [
+    ...IDLE_OPTIONS.map((value) => ({ value: value as string, label: tDash(`idle.${value}`) })),
+    ...((IDLE_OPTIONS as readonly string[]).includes(form.idleMinutes)
+      ? []
+      : [{ value: form.idleMinutes, label: tDash("idle.custom", { minutes: form.idleMinutes }) }]),
+  ];
 
   return (
     <Panel
-      title="Allgemein"
+      title={t("general")}
       actions={
         <SaveButton
           saving={saving}
           dirty={dirty}
           disabled={readOnly}
           onClick={() =>
-            save({
+            void save({
               ...form,
               idleMinutes: Number(form.idleMinutes),
               subdomain: detail.domain ? form.subdomain : undefined,
@@ -94,12 +102,12 @@ function GeneralSettings({ readOnly }: { readOnly: boolean }) {
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <FieldLabel htmlFor="name" label="Name" />
+          <FieldLabel htmlFor="name" label={t("name")} />
           <Input id="name" value={form.name} disabled={readOnly} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         </div>
         {detail.domain ? (
           <div className="space-y-2">
-            <FieldLabel htmlFor="subdomain" label="Adresse" />
+            <FieldLabel htmlFor="subdomain" label={t("address")} />
             <div className="flex items-center gap-1.5">
               <Input
                 id="subdomain"
@@ -114,8 +122,8 @@ function GeneralSettings({ readOnly }: { readOnly: boolean }) {
         ) : null}
         <div className="space-y-2">
           <FieldLabel
-            label="Automatisch ausschalten"
-            help={def?.features.playerCount ? undefined : "Dieses Spiel meldet keine Spielerzahl – Auto-Aus ist nicht möglich."}
+            label={t("idle")}
+            help={def?.features.playerCount ? undefined : t("idleUnavailable")}
           />
           <Select
             value={form.idleMinutes}
@@ -135,7 +143,7 @@ function GeneralSettings({ readOnly }: { readOnly: boolean }) {
           </Select>
         </div>
         <div className="space-y-2">
-          <FieldLabel htmlFor="retention" label="Backups behalten (Anzahl)" />
+          <FieldLabel htmlFor="retention" label={t("retention")} />
           <Input
             id="retention"
             type="number"
@@ -154,8 +162,8 @@ function GeneralSettings({ readOnly }: { readOnly: boolean }) {
             className="mt-0.5"
           />
           <span>
-            <span className="block text-sm font-medium">Beim Ausschalten automatisch ein Backup erstellen</span>
-            <span className="block text-xs text-muted-foreground">Ältere Backups werden entsprechend „Backups behalten“ gelöscht.</span>
+            <span className="block text-sm font-medium">{t("backupOnHibernate")}</span>
+            <span className="block text-xs text-muted-foreground">{t("backupOnHibernateHint")}</span>
           </span>
         </label>
       </div>
@@ -164,14 +172,15 @@ function GeneralSettings({ readOnly }: { readOnly: boolean }) {
 }
 
 function MinecraftSettings({ readOnly }: { readOnly: boolean }) {
+  const t = useTranslations("dashboard.settings");
   const { detail, curseforgeAvailable } = useInstance();
   const { save, saving } = usePatch();
   const [source, setSource] = useState<MinecraftSource>(detail.minecraft!);
   const dirty = JSON.stringify(source) !== JSON.stringify(detail.minecraft);
   return (
     <Panel
-      title="Minecraft-Version & Mods"
-      actions={<SaveButton saving={saving} dirty={dirty} disabled={readOnly} onClick={() => save({ minecraft: source })} />}
+      title={t("minecraft")}
+      actions={<SaveButton saving={saving} dirty={dirty} disabled={readOnly} onClick={() => void save({ minecraft: source })} />}
     >
       <MinecraftSourceEditor
         value={source}
@@ -185,6 +194,7 @@ function MinecraftSettings({ readOnly }: { readOnly: boolean }) {
 }
 
 function GameSettings({ readOnly }: { readOnly: boolean }) {
+  const t = useTranslations("dashboard.settings");
   const { detail } = useInstance();
   const { save, saving } = usePatch();
   const def = getGameDefinition(detail.gameType);
@@ -193,11 +203,12 @@ function GameSettings({ readOnly }: { readOnly: boolean }) {
   const dirty = JSON.stringify(values) !== JSON.stringify(detail.settings);
   return (
     <Panel
-      title="Spiel-Einstellungen"
-      description={detail.ip ? "Beim Speichern wird der Spielserver mit den neuen Einstellungen neu gestartet." : undefined}
-      actions={<SaveButton saving={saving} dirty={dirty} disabled={readOnly} onClick={() => save({ settings: values })} />}
+      title={t("game")}
+      description={detail.ip ? t("gameRestartHint") : undefined}
+      actions={<SaveButton saving={saving} dirty={dirty} disabled={readOnly} onClick={() => void save({ settings: values })} />}
     >
       <SettingsFields
+        gameId={def.id}
         fields={def.settings}
         values={values}
         disabled={readOnly}
@@ -208,6 +219,7 @@ function GameSettings({ readOnly }: { readOnly: boolean }) {
 }
 
 function HardwareSettings({ readOnly }: { readOnly: boolean }) {
+  const t = useTranslations("dashboard.settings");
   const { detail } = useInstance();
   const { save, saving } = usePatch();
   const def = getGameDefinition(detail.gameType);
@@ -228,19 +240,19 @@ function HardwareSettings({ readOnly }: { readOnly: boolean }) {
 
   return (
     <Panel
-      title="Leistung & Standort"
-      description="Ein anderer Servertyp wird beim nächsten Einschalten verwendet (bei laufendem Server: ausschalten & neu starten)."
-      actions={<SaveButton saving={saving} dirty={dirty} disabled={readOnly} onClick={() => save({ serverType, region })} />}
+      title={t("hardware")}
+      description={t("hardwareHint")}
+      actions={<SaveButton saving={saving} dirty={dirty} disabled={readOnly} onClick={() => void save({ serverType, region })} />}
     >
       {error ? <Hint tone="danger">{error}</Hint> : null}
       {!options ? (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" /> Lade Servertypen…
+          <Loader2 className="size-4 animate-spin" /> {t("loadingTypes")}
         </p>
       ) : (
         <div className="space-y-4">
           <div className="max-w-xs space-y-2">
-            <FieldLabel label="Standort" help={regionLocked ? "Fest, weil der Speicher dort liegt." : undefined} />
+            <FieldLabel label={t("location")} help={regionLocked ? t("locationLocked") : undefined} />
             <Select value={region} onValueChange={setRegion} disabled={readOnly || regionLocked}>
               <SelectTrigger>
                 <SelectValue />
@@ -282,6 +294,7 @@ function DangerRow({ title, description, action }: { title: string; description:
 }
 
 function DangerZone() {
+  const t = useTranslations("dashboard.settings");
   const { detail, can, runAction, confirm } = useInstance();
   const router = useRouter();
   const [size, setSize] = useState(String((detail.volume?.sizeGb ?? 0) + 10));
@@ -289,15 +302,11 @@ function DangerZone() {
   const busy = detail.state === "busy";
 
   return (
-    <Panel title="Speicher & Gefahrenzone" className="border-red-500/30">
+    <Panel title={t("danger")} className="border-red-500/30">
       <div className="divide-y divide-border/60">
         <DangerRow
-          title="Speicher vergrößern"
-          description={
-            detail.volume
-              ? `Aktuell ${detail.volume.sizeGb} GB. Vergrößern geht jederzeit (auch im laufenden Betrieb), verkleinern nicht.`
-              : "Der Speicher wird beim ersten Start angelegt."
-          }
+          title={t("resize")}
+          description={detail.volume ? t("resizeHint", { size: detail.volume.sizeGb }) : t("resizeNoVolume")}
           action={
             detail.volume ? (
               <div className="flex items-center gap-2">
@@ -310,47 +319,47 @@ function DangerZone() {
                     runAction("resizeVolume", {
                       payload: { sizeGb: Number(size) },
                       confirm: {
-                        title: `Speicher auf ${size} GB vergrößern?`,
-                        description: "Das lässt sich nicht rückgängig machen – Hetzner-Volumes können nicht verkleinert werden.",
-                        confirmLabel: "Vergrößern",
+                        title: t("resizeTitle", { size }),
+                        description: t("resizeText"),
+                        confirmLabel: t("resizeButton"),
                       },
                     })
                   }
                 >
-                  Vergrößern
+                  {t("resizeButton")}
                 </Button>
               </div>
             ) : null
           }
         />
         <DangerRow
-          title="Spieldaten zurücksetzen"
-          description="Löscht Welt, Mods & Konfiguration auf dem Speicher und startet frisch. Vorher wird automatisch ein Backup erstellt."
+          title={t("wipe")}
+          description={t("wipeHint")}
           action={
             <Button
               variant="outline"
               className="border-red-500/40 text-red-600 hover:bg-red-500/10 dark:text-red-400"
               disabled={busy || !hostUp || !can("instances:delete")}
-              title={!hostUp ? "Nur möglich, während der Server läuft" : undefined}
+              title={!hostUp ? t("onlyWhenRunning") : undefined}
               onClick={() =>
                 runAction("wipe", {
                   confirm: {
-                    title: "Spieldaten zurücksetzen?",
-                    description: "Alle Daten im Datenordner werden gelöscht (ein Backup wird vorher erstellt).",
-                    confirmLabel: "Zurücksetzen",
+                    title: t("wipeTitle"),
+                    description: t("wipeText"),
+                    confirmLabel: t("wipeButton"),
                     destructive: true,
                     typeToConfirm: detail.name,
                   },
                 })
               }
             >
-              Zurücksetzen
+              {t("wipeButton")}
             </Button>
           }
         />
         <DangerRow
-          title="Server endgültig löschen"
-          description="Löscht VM, Speicher inkl. aller Backups, Firewall und DNS-Eintrag. Das kann nicht rückgängig gemacht werden."
+          title={t("destroy")}
+          description={t("destroyHint")}
           action={
             <Button
               variant="destructive"
@@ -358,9 +367,9 @@ function DangerZone() {
               onClick={() =>
                 confirm(
                   {
-                    title: "Server endgültig löschen?",
-                    description: "Alle Welten und Backups gehen verloren. Lade vorher bei Bedarf ein Backup herunter.",
-                    confirmLabel: "Endgültig löschen",
+                    title: t("destroyTitle"),
+                    description: t("destroyText"),
+                    confirmLabel: t("destroyConfirm"),
                     destructive: true,
                     typeToConfirm: detail.name,
                   },
@@ -370,7 +379,7 @@ function DangerZone() {
                         method: "DELETE",
                         json: { confirm: detail.name },
                       });
-                      toast.success("Server wird gelöscht.");
+                      toast.success(t("destroying"));
                       router.push("/dashboard");
                     } catch (error) {
                       toast.error((error as Error).message);
@@ -379,7 +388,7 @@ function DangerZone() {
                 )
               }
             >
-              Löschen
+              {t("destroyButton")}
             </Button>
           }
         />
@@ -389,19 +398,20 @@ function DangerZone() {
 }
 
 export function SettingsTab() {
+  const t = useTranslations("dashboard.settings");
   const { detail, can } = useInstance();
   const readOnly = !can("instances:update");
   if (!detail.supported) {
     return (
       <div className="space-y-5">
-        <Hint tone="warning">Dieses Spiel wird nicht mehr unterstützt. Du kannst den Server nur noch löschen.</Hint>
+        <Hint tone="warning">{t("unsupported")}</Hint>
         <DangerZone />
       </div>
     );
   }
   return (
     <div className="space-y-5">
-      {readOnly ? <Hint>Du kannst die Einstellungen ansehen, aber nicht ändern.</Hint> : null}
+      {readOnly ? <Hint>{t("readOnly")}</Hint> : null}
       <GeneralSettings readOnly={readOnly} />
       {detail.gameType === "minecraft" && detail.minecraft ? <MinecraftSettings readOnly={readOnly} /> : null}
       <GameSettings readOnly={readOnly} />

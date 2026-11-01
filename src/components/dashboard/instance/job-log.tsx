@@ -1,10 +1,12 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 
 import { dashboardApi } from "@/lib/api/dashboard-client";
 
 export function JobLog({ instanceId, jobId, live }: { instanceId: number; jobId: number; live: boolean }) {
+  const t = useTranslations("dashboard.instance");
   const [log, setLog] = useState<string>("");
   const ref = useRef<HTMLPreElement>(null);
 
@@ -18,9 +20,9 @@ export function JobLog({ instanceId, jobId, live }: { instanceId: number; jobId:
         );
         if (cancelled) return;
         setLog(job.log);
-        if (live && (job.status === "running" || job.status === "queued")) timer = setTimeout(load, 2000);
+        if (live && (job.status === "running" || job.status === "queued")) timer = setTimeout(() => void load(), 2000);
       } catch {
-        if (!cancelled && live) timer = setTimeout(load, 4000);
+        if (!cancelled && live) timer = setTimeout(() => void load(), 4000);
       }
     };
     void load();
@@ -40,7 +42,7 @@ export function JobLog({ instanceId, jobId, live }: { instanceId: number; jobId:
       ref={ref}
       className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-zinc-950 p-3 font-mono text-[11px] leading-relaxed text-zinc-200"
     >
-      {log.trim() || "Noch keine Ausgabe…"}
+      {log.trim() || t("noOutput")}
     </pre>
   );
 }
