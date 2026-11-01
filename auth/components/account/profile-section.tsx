@@ -150,7 +150,7 @@ export function ProfileSection(props: Props) {
                 </>
               }
             >
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <Input id="username-input" autoCapitalize="none" spellCheck={false} maxLength={24} value={username} onChange={(e) => setUsername(e.target.value)} />
                 <Button type="submit" variant="secondary" loading={busy === "username"} disabled={username === props.username && !props.usernamePending}>
                   {tc("save")}
@@ -162,7 +162,7 @@ export function ProfileSection(props: Props) {
 
           <form onSubmit={onName} className="space-y-3">
             <Field label={tc("displayName")} htmlFor="display-name" hint={t("displayNameHint")}>
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <Input id="display-name" maxLength={64} value={name} onChange={(e) => setName(e.target.value)} />
                 <Button type="submit" variant="secondary" loading={busy === "name"} disabled={name.trim() === props.name}>
                   {tc("save")}
@@ -200,7 +200,7 @@ export function ProfileSection(props: Props) {
           )}
           <form onSubmit={onEmail} className="space-y-3">
             <Field label={t("newEmail")} htmlFor="new-email">
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <Input id="new-email" type="email" autoComplete="email" required value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
                 <Button type="submit" variant="secondary" loading={busy === "email"}>
                   {t("changeEmail")}

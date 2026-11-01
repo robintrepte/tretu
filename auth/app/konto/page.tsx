@@ -46,6 +46,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         </div>
 
         <div className="mb-6 space-y-3">
+          {params.verified === "1" && <Alert tone="success">{(await getTranslations("login"))("notices.verified")}</Alert>}
           {resume && tab === "sicherheit" && user.twoFactorEnabled && (
             <Alert tone="success">
               <Link href={resume as "/weiter"} className="font-medium underline">

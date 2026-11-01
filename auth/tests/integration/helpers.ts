@@ -88,7 +88,7 @@ export async function waitForMail(to: string, match: RegExp = /./, timeoutMs = 1
     }
     for (const file of files) {
       const mail = JSON.parse(await readFile(path.join(OUTBOX_DIR, file), "utf8")) as StoredMail
-      if (mail.to === to && match.test(mail.subject)) return mail
+      if (mail.to.toLowerCase() === to.toLowerCase() && match.test(mail.subject)) return mail
     }
     await new Promise((r) => setTimeout(r, 200))
   }
@@ -105,7 +105,7 @@ let counter = 0
 export function uniqueUser(prefix = "tester") {
   counter += 1
   const id = `${Date.now().toString(36)}${counter}`
-  return { username: `${prefix}_${id}`.slice(0, 24), email: `${prefix}.${id}@example.test`, password: "correct horse battery staple 42", name: `Test ${id}` }
+  return { username: `${prefix}_${id}`.slice(0, 24), email: `${prefix}.${id}@example.test`.toLowerCase(), password: "correct horse battery staple 42", name: `Test ${id}` }
 }
 
 /** Registers a user through the API and confirms the email by following the link from the outbox. */

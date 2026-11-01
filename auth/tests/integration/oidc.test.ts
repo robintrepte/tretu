@@ -234,7 +234,8 @@ describe("admin API (contract §2/§3)", () => {
   }
 
   it("links Minecraft and Steam, reports conflicts and returns the user shape", async () => {
-    const a = await registerVerifiedUser("links")
+    // Mixed case: the typed form of the username is kept (the unique key is lowercase).
+    const a = await registerVerifiedUser("Links")
     const b = await registerVerifiedUser("links")
     const uuid = "069A79F444E94726A5BEFCA90E38AAF5"
     expect((await signed("POST", "/api/v1/links", { sub: a.id, provider: "minecraft", providerAccountId: uuid, displayName: "Notch" })).status).toBe(200)

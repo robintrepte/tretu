@@ -183,9 +183,10 @@ const enabledSocialProviders = {
     discord: {
       clientId: env.DISCORD_CLIENT_ID!,
       clientSecret: env.DISCORD_CLIENT_SECRET!,
-      // The Discord handle seeds the Tretu username (made unique in the user create hook).
+      // The Discord handle seeds the Tretu username, made valid and unique in the user create hook. It goes in
+      // `displayUsername`: a `username` here would be rejected by the username plugin if taken or invalid.
       mapProfileToUser: (profile: { username?: string; global_name?: string | null }) => ({
-        username: profile.username,
+        displayUsername: profile.username,
         name: profile.global_name || profile.username,
       }),
     },
@@ -196,7 +197,7 @@ const enabledSocialProviders = {
       clientSecret: env.GOOGLE_CLIENT_SECRET!,
       prompt: "select_account" as const,
       mapProfileToUser: (profile: { given_name?: string; name?: string; email?: string }) => ({
-        username: profile.given_name || profile.name || profile.email,
+        displayUsername: profile.given_name || profile.name || profile.email,
       }),
     },
   }),
@@ -311,8 +312,11 @@ export const auth = betterAuth({
     user: {
       create: {
         before: async (data, context) => {
-          const seed = (typeof data.username === "string" && data.username) || data.name || data.email
-          const wanted = typeof data.username === "string" ? data.username.trim() : ""
+          // Plugin hooks run first: the username plugin has already lowercased `username` and kept the typed
+          // form in `displayUsername`. Provider sign-ups only bring a seed in `displayUsername` (see socialProviders).
+          const typed = (typeof data.displayUsername === "string" && data.displayUsername.trim()) || (typeof data.username === "string" && data.username.trim()) || ""
+          const seed = typed || data.name || data.email
+          const wanted = typed
           const chosen = isValidUsername(wanted) && !(await usernameTaken(normalizeUsername(wanted))) ? wanted : await pickUsername(seed, usernameTaken)
           const headers = context?.request?.headers ?? context?.headers
           return {
