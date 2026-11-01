@@ -46,9 +46,12 @@ export async function sendMail(mail: Mail): Promise<void> {
     await mkdir(env.MAIL_OUTBOX_DIR, { recursive: true })
     await writeFile(path.join(env.MAIL_OUTBOX_DIR, `${Date.now()}-${randomUUID()}.json`), JSON.stringify(mail))
   }
-  if (env.NODE_ENV !== "production" || !env.MAIL_OUTBOX_DIR) {
+  if (env.NODE_ENV !== "production") {
     // Development: no mail server, so the console is the inbox.
     console.info(`[mail] to=${mail.to} subject=${JSON.stringify(mail.subject)}\n${mail.text}\n`)
+  } else if (!env.MAIL_OUTBOX_DIR) {
+    // Production without SES: never print the mail (its links are login secrets), only that it was not sent.
+    console.error(`[mail] not sent, SES_REGION is not configured (subject ${JSON.stringify(mail.subject)})`)
   }
 }
 
