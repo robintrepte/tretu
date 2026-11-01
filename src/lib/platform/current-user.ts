@@ -1,15 +1,9 @@
+import { getCurrentUser } from "@/lib/auth/session";
+
 /**
  * The signed-in Tretu user for platform pages and `/api/v1/me/**` routes.
- *
- * TODO(integration): after merging the Better Auth branch, replace the body of `getPlatformUser`
- * with:
- *
- *   import { getCurrentUser } from "@/lib/auth/session";
- *   const user = await getCurrentUser();
- *   if (user?.tretuSub) return { sub: user.tretuSub, name: user.name, image: user.image ?? null };
- *   return devUser();   // keep the dev impersonation below for local testing
- *
- * and point PLATFORM_LOGIN_URL at the Tretu-Konto sign-in route.
+ * Platform features need a Tretu-Konto: a user who only signed in with Discord directly
+ * (no `tretuSub` yet) is treated as signed out here and asked to use the Tretu-Konto.
  */
 export type PlatformUser = { sub: string; name: string; image: string | null };
 
@@ -25,6 +19,8 @@ function devUser(): PlatformUser | null {
 }
 
 export async function getPlatformUser(): Promise<PlatformUser | null> {
+  const user = await getCurrentUser();
+  if (user?.tretuSub) return { sub: user.tretuSub, name: user.name, image: user.image ?? null };
   return devUser();
 }
 

@@ -22,7 +22,12 @@
     "dashboard": "Dashboard",
     "account": "My account",
     "signOut": "Sign out",
-    "signingOut": "Signing out…"
+    "signingOut": "Signing out…",
+    "profile": "Profile",
+    "notifications": "Notifications",
+    "friends": "Friends",
+    "wallet": "Wallet",
+    "credits": "{count, number} TC"
   },
   "footer": {
     "legal": "Legal",

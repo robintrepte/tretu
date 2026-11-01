@@ -245,7 +245,8 @@ export function AgbEn() {
           You give the consent and acknowledgement under (1) and (2) expressly before buying by ticking a box that is not
           pre-ticked, with the following text: “I expressly agree that you begin performing the contract before the end of the
           withdrawal period and credit the credits to my account immediately. I am aware that I thereby lose my right of
-          withdrawal.” Without this consent, we only credit the credits after the withdrawal period has expired.
+          withdrawal.” Because credits are added immediately after payment, a purchase is only possible with this consent. You
+          receive the contract confirmation, including your consent, by e-mail.
         </P>
         <Sub title="Model withdrawal form">
           <P>(Complete and return this form only if you wish to withdraw from the contract.)</P>

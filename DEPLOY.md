@@ -8,6 +8,9 @@ Production runs on the shared Hetzner server: PM2 behind nginx, one Postgres ser
 | `tretu-web` | Next.js (`next start`), hub + platform API | 3020 (127.0.0.1) |
 | `tretu-orchestrator` | game-server jobs and monitoring (`npm run worker:orchestrator`) | – |
 | `tretu-ts-rank` | TeamSpeak ranking worker (`npm run worker:ts-rank`) | – |
+| `tretu-platform-worker` | platform webhooks, jobs, presence expiry, badge sync (`npm run platform:worker`, see [docs/ecosystem/PLATFORM.md](docs/ecosystem/PLATFORM.md)) | – |
+
+The identity provider auth.tretu.de lives in [`auth/`](auth/) with its own PM2 processes (`tretu-auth`, `tretu-auth-events`) and its own [DEPLOY.md](auth/DEPLOY.md).
 
 Requirements: Node 22, Postgres 16+, nginx, certbot, PM2 (`npm i -g pm2`).
 

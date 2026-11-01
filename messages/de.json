@@ -22,7 +22,12 @@
     "dashboard": "Dashboard",
     "account": "Mein Konto",
     "signOut": "Abmelden",
-    "signingOut": "Wird abgemeldet…"
+    "signingOut": "Wird abgemeldet…",
+    "profile": "Profil",
+    "notifications": "Benachrichtigungen",
+    "friends": "Freunde",
+    "wallet": "Wallet",
+    "credits": "{count, number} TC"
   },
   "footer": {
     "legal": "Rechtliches",

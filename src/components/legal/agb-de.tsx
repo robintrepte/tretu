@@ -251,8 +251,8 @@ export function AgbDe() {
           Die Zustimmung und Bestätigung nach Nr. (1) und (2) erteilst du vor dem Kauf ausdrücklich, indem du ein nicht
           vorausgewähltes Kästchen mit folgendem Text markierst: „Ich stimme ausdrücklich zu, dass ihr vor Ablauf der
           Widerrufsfrist mit der Ausführung des Vertrags beginnt und mir die Credits sofort gutschreibt. Mir ist bekannt, dass ich
-          dadurch mein Widerrufsrecht verliere.“ Ohne diese Zustimmung schreiben wir die Credits erst nach Ablauf der Widerrufsfrist
-          gut.
+          dadurch mein Widerrufsrecht verliere.“ Weil wir Credits sofort nach der Zahlung gutschreiben, ist ein Kauf nur mit
+          dieser Zustimmung möglich. Die Bestätigung des Vertrags einschließlich deiner Zustimmung erhältst du per E-Mail.
         </P>
         <Sub title="Muster-Widerrufsformular">
           <P>(Wenn du den Vertrag widerrufen willst, dann fülle bitte dieses Formular aus und sende es zurück.)</P>

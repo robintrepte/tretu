@@ -93,3 +93,28 @@ test("user.deleted erases all platform data for the sub, keeps the ledger balanc
   assert.equal(await send("auth", envelope("auth", gone, "user.updated", { username: "back" })), 202);
   assert.equal((await platformDb.select().from(schema.platformUsers).where(eq(schema.platformUsers.sub, gone))).length, 0);
 });
+
+test("user.deleted with mergedInto moves wallet balance and stats to the surviving account", async () => {
+  const legacy = uuid();
+  const survivor = uuid();
+  await send("auth", envelope("auth", legacy, "user.created", { username: "oldsaga", name: "Old" }));
+  await send("auth", envelope("auth", survivor, "user.created", { username: "main", name: "Main" }));
+  await send("play", envelope("play", legacy, "game.finished", { game: "chess", result: "win" }));
+  await send("play", envelope("play", survivor, "game.finished", { game: "chess", result: "win" }));
+  await bookTransaction(platformDb, { sub: legacy, app: "saga", idempotencyKey: "m1", kind: "spend", amount: -100, reason: "x" });
+  const before = await bookTransaction(platformDb, { sub: survivor, app: "saga", idempotencyKey: "m2", kind: "spend", amount: -1, reason: "x" });
+  const legacyBalance = (await bookTransaction(platformDb, { sub: legacy, app: "saga", idempotencyKey: "m1", kind: "spend", amount: -100, reason: "x" })).balance;
+
+  const deletion = envelope("auth", legacy, "user.deleted", { mergedInto: survivor });
+  assert.equal(await send("auth", deletion), 202);
+  assert.equal(await send("auth", deletion), 202); // duplicate delivery is harmless
+
+  const after = await bookTransaction(platformDb, { sub: survivor, app: "saga", idempotencyKey: "m2", kind: "spend", amount: -1, reason: "x" });
+  assert.equal(after.duplicate, true);
+  const [account] = await platformDb.select().from(schema.platformWalletAccounts).where(eq(schema.platformWalletAccounts.sub, survivor));
+  assert.equal(account.balance, before.balance + legacyBalance);
+  const stats = await getStats(platformDb, survivor);
+  assert.equal(stats["play.chess.won"], 2);
+  const [{ total }] = (await platformDb.execute(sql`select coalesce(sum(amount),0)::int as total from platform_wallet_entries`)) as unknown as { total: number }[];
+  assert.equal(total, 0);
+});

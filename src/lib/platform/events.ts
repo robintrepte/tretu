@@ -3,7 +3,7 @@
  * XP, badges, credits and the user directory. Each event is stored and processed in one transaction,
  * so a failure rolls both back and the sender's retry is processed normally.
  */
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { platformEvents, platformUserAchievements, platformUserApps } from "@/db/platform-schema";
@@ -15,7 +15,7 @@ import { eraseUser } from "@/lib/platform/erasure";
 import { badRequest } from "@/lib/platform/errors";
 import { emitPlatformEvent } from "@/lib/platform/outbox";
 import { addToDailyCounter, addXp, incrementStat, lockProgress, settleProgress } from "@/lib/platform/progress";
-import { bookTransaction, PLATFORM_LEDGER_APP } from "@/lib/platform/wallet";
+import { bookTransaction, peekBalance, PLATFORM_LEDGER_APP } from "@/lib/platform/wallet";
 
 export const MAX_BATCH = 100;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -172,9 +172,49 @@ export async function ingestEvents(events: EventEnvelope[], now: Date = new Date
 
 type ProcessStatus = "processed" | "stored" | "ignored";
 
+/**
+ * A legacy account was merged into another Tretu-Konto (auth's claim flow sends
+ * `user.deleted` with `data.mergedInto`). Before the old sub is erased, its wallet balance and
+ * stats move to the surviving account. Idempotent: the bookings use deterministic keys, and the
+ * stats copy only runs while the old stats still exist (they are erased right after).
+ */
+async function carryOverMergedAccount(tx: Executor, from: string, into: string, now: Date): Promise<void> {
+  const balance = (await peekBalance(tx, from)) ?? 0;
+  if (balance > 0) {
+    await bookTransaction(tx, {
+      sub: from,
+      app: PLATFORM_LEDGER_APP,
+      idempotencyKey: `merge-out:${from}`,
+      kind: "adjust",
+      amount: -balance,
+      reason: "Konto zusammengeführt",
+      ref: into,
+      now,
+    });
+    await bookTransaction(tx, {
+      sub: into,
+      app: PLATFORM_LEDGER_APP,
+      idempotencyKey: `merge-in:${from}`,
+      kind: "migration",
+      amount: balance,
+      reason: "Guthaben aus zusammengeführtem Konto",
+      ref: from,
+      now,
+    });
+  }
+  await tx.execute(sql`
+    insert into platform_user_stats (sub, key, value, updated_at)
+    select ${into}, key, value, ${now.toISOString()}::timestamptz from platform_user_stats where sub = ${from} and key <> 'tretu.friends'
+    on conflict (sub, key) do update set value = platform_user_stats.value + excluded.value, updated_at = excluded.updated_at`);
+}
+
 async function processUserEvent(tx: Executor, event: EventEnvelope, now: Date): Promise<ProcessStatus> {
   const sub = event.sub as string;
   if (event.type === "user.deleted") {
+    const mergedInto = typeof event.data.mergedInto === "string" ? event.data.mergedInto : null;
+    if (mergedInto && mergedInto !== sub && !(await isErased(tx, mergedInto))) {
+      await carryOverMergedAccount(tx, sub, mergedInto, now);
+    }
     await eraseUser(tx, sub, now);
     return "processed";
   }

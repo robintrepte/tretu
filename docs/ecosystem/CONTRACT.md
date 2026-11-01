@@ -172,3 +172,24 @@ Notifications
 - Language: German default, English second. Locale cookie `NEXT_LOCALE` (`de`|`en`) in Next.js apps.
 - User menu in each app (own styling) shows: profile link (`https://tretu.de/u/<username>`), "Mein Konto" (`https://auth.tretu.de/konto`), notifications unread count linking to the centre, Tretu-Credits balance where relevant, logout (local + RP-initiated logout).
 - Analytics: include `<script defer src={NEXT_PUBLIC_UMAMI_SRC} data-website-id={NEXT_PUBLIC_UMAMI_WEBSITE_ID}>` only when both are set. No cookies, no consent banner needed.
+
+## 7. Clarifications from the first implementation (binding)
+
+- **Callback path in Better Auth apps.** Better Auth 1.7 handles generic OAuth providers at
+  `/api/auth/callback/<id>`. The registered redirect URI stays the contract path
+  `/api/auth/oauth2/callback/tretu`; each Better Auth app forwards it internally.
+- **Post-logout redirects.** auth.tretu.de allows each client's origin root (e.g. `https://saga.tretu.de/`)
+  unless `postLogoutRedirectUris` is set in `TRETU_OAUTH_CLIENTS_JSON`.
+- **Client authentication.** The token endpoint accepts `client_secret_basic` and `client_secret_post`.
+- **CORS.** Token, userinfo, revocation and JWKS endpoints send CORS headers for the https origins of
+  public clients (Hollowmere's web build), never with credentials. Override with `TRETU_CORS_ORIGINS`.
+- **Wallet amounts.** `spend` must be negative; `adjust` may be either sign; every other kind is positive.
+  Idempotency keys are unique per calling app; reusing one for a different sub returns
+  `409 idempotency_conflict`. History may also show the platform's own kinds `welcome`, `daily`, `reward`.
+- **Stat prefixes.** `mc-dashboard` may also send keys starting with `minecraft.`.
+- **Merged accounts.** `user.deleted` from auth may carry `{"mergedInto":"<sub>"}` when a legacy account was
+  joined into another Tretu-Konto; the platform moves that wallet balance and those stats to `mergedInto`
+  before erasing the old sub. Apps treat it like any other deletion.
+- **Unknown subs.** Read-only platform routes answer `404 user_not_found` when auth cannot confirm a sub.
+- **Hollowmere** sends events only for players signed in with a Tretu-Konto; its `/api/health` is served by the
+  `hollowmere-mcp` process (PM2, port 8787), proxied by nginx.

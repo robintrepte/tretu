@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth"
+import { preflight, withCors } from "@/lib/oidc/cors"
 import { fixHostCookie, postToBasic } from "@/lib/oidc/http"
 
 async function normalizeRequest(request: Request): Promise<Request> {
@@ -23,8 +24,9 @@ function fixCookies(response: Response): Response {
 }
 
 async function handler(request: Request) {
-  return fixCookies(await auth.handler(await normalizeRequest(request)))
+  return withCors(request, fixCookies(await auth.handler(await normalizeRequest(request))))
 }
 
 export const GET = handler
 export const POST = handler
+export const OPTIONS = preflight

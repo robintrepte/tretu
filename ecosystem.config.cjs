@@ -52,5 +52,21 @@ module.exports = {
       max_memory_restart: "400M",
       time: true,
     },
+    {
+      // Tretu platform: webhook delivery, jobs (push, badge sync), presence expiry, housekeeping.
+      // Idles harmlessly while TRETU_APPS_JSON is not configured.
+      name: "tretu-platform-worker",
+      cwd: __dirname,
+      script: "scripts/platform-worker.ts",
+      interpreter: "node",
+      node_args: "--import tsx --import ./src/lib/env/load-local-env.ts",
+      instances: 1,
+      exec_mode: "fork",
+      env: { NODE_ENV: "production" },
+      kill_timeout: 15_000,
+      exp_backoff_restart_delay: 5_000,
+      max_memory_restart: "400M",
+      time: true,
+    },
   ],
 };
