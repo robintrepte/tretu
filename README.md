@@ -194,6 +194,15 @@ as before.
 
 ---
 
+## Tretu-Konto (`auth/`)
+
+`auth/` is a separate, self-contained Next.js app: **auth.tretu.de**, the OpenID Connect provider behind the
+Tretu account (PM2 `tretu-auth`, port 3021, database `tretu_auth`). It has its own `package.json`, tests and
+deploy files and will move to its own repository (`git subtree split --prefix auth`). See
+[auth/README.md](auth/README.md) and [auth/DEPLOY.md](auth/DEPLOY.md).
+
+---
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
