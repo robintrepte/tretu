@@ -20,7 +20,12 @@
     "worker:orchestrator": "node --import tsx --import ./src/lib/env/load-local-env.ts ./scripts/orchestrator.ts",
     "worker:ts-rank": "node --import tsx --import ./src/lib/env/load-local-env.ts ./scripts/ts-rank-worker.ts",
     "ts:diagnose": "node --import tsx --import ./src/lib/env/load-local-env.ts ./scripts/ts-rank-diagnose.ts",
-    "ts:query-probe": "node --import tsx --import ./src/lib/env/load-local-env.ts ./scripts/ts-query-probe.ts"
+    "ts:query-probe": "node --import tsx --import ./src/lib/env/load-local-env.ts ./scripts/ts-query-probe.ts",
+    "test:platform": "tsx --test --test-concurrency=1 'tests/platform/*.spec.ts'",
+    "platform:db:push": "drizzle-kit push --config drizzle.platform.config.ts",
+    "platform:worker": "node --import tsx --import ./src/lib/env/load-local-env.ts ./scripts/platform-worker.ts",
+    "platform:seed-dev": "node --import tsx --import ./src/lib/env/load-local-env.ts ./scripts/platform-seed-dev.ts",
+    "platform:vapid-keys": "node --import tsx ./scripts/platform-vapid-keys.ts"
   },
   "dependencies": {
     "better-auth": "^1.7.15",
@@ -41,6 +46,7 @@
     "sonner": "^2.0.8",
     "ssh2": "^1.17.0",
     "tailwind-merge": "^3.7.0",
+    "web-push": "^3.6.7",
     "zod": "^4.6.7"
   },
   "devDependencies": {
@@ -49,6 +55,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/ssh2": "^1.15.6",
+    "@types/web-push": "^3.6.4",
     "drizzle-kit": "^0.31.11",
     "eslint": "^9.39.5",
     "eslint-config-next": "16.4.3",
