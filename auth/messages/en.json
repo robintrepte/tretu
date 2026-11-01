@@ -295,7 +295,20 @@
     "legacy_claimed": "Old account connected",
     "legacy_claim_failed": "Connecting an old account failed",
     "roles_changed": "Roles changed",
-    "via": "via {method}"
+    "via": "via {method}",
+    "methods": {
+      "password": "password",
+      "passkey": "passkey",
+      "magic-link": "sign-in link",
+      "email-link": "email link",
+      "2fa": "two-step code",
+      "2fa-backup-code": "backup code",
+      "discord": "Discord",
+      "google": "Google",
+      "apple": "Apple",
+      "oauth": "Discord/Google",
+      "other": "other"
+    }
   },
   "connections": {
     "title": "Connected accounts",

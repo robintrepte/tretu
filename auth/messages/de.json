@@ -295,7 +295,20 @@
     "legacy_claimed": "Altes Konto verbunden",
     "legacy_claim_failed": "Verbinden eines alten Kontos fehlgeschlagen",
     "roles_changed": "Rollen geändert",
-    "via": "über {method}"
+    "via": "über {method}",
+    "methods": {
+      "password": "Passwort",
+      "passkey": "Passkey",
+      "magic-link": "Anmeldelink",
+      "email-link": "E-Mail-Link",
+      "2fa": "Zwei-Faktor-Code",
+      "2fa-backup-code": "Backup-Code",
+      "discord": "Discord",
+      "google": "Google",
+      "apple": "Apple",
+      "oauth": "Discord/Google",
+      "other": "Sonstiges"
+    }
   },
   "connections": {
     "title": "Verknüpfte Konten",

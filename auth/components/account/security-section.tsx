@@ -443,7 +443,7 @@ function ActivityCard({ activity }: { activity: Props["activity"] }) {
                 <div className="min-w-0">
                   <div className="font-medium">
                     {ta.has(a.event.replace(/\./g, "_") as "login") ? ta(a.event.replace(/\./g, "_") as "login") : a.event}
-                    {method && <span className="font-normal text-muted-foreground"> · {ta("via", { method })}</span>}
+                    {method && <span className="font-normal text-muted-foreground"> · {ta("via", { method: ta.has(`methods.${method}` as "via") ? ta(`methods.${method}` as "via") : method })}</span>}
                     {!a.success && <span className="font-normal text-danger"> · {t("failed")}</span>}
                   </div>
                   <div className="text-muted-foreground">
