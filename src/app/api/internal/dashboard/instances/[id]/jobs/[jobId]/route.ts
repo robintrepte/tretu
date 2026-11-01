@@ -1,5 +1,6 @@
 import { parseId, requirePermission } from "@/lib/api/guard";
-import { fail, ok } from "@/lib/api/respond";
+import { ok } from "@/lib/api/respond";
+import { failKey } from "@/lib/api/errors";
 import { getJobLog } from "@/lib/dashboard/view";
 
 export const dynamic = "force-dynamic";
@@ -10,8 +11,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const resolved = await params;
   const id = parseId(resolved.id);
   const jobId = parseId(resolved.jobId);
-  if (!id || !jobId) return fail("Ungültige ID", 400);
-  const job = getJobLog(jobId, id);
-  if (!job) return fail("Job nicht gefunden.", 404);
+  if (!id || !jobId) return failKey("invalidId", 400);
+  const job = await getJobLog(jobId, id);
+  if (!job) return failKey("jobNotFound", 404);
   return ok(job);
 }

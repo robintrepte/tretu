@@ -5,7 +5,8 @@ import type { ReadableStream as WebReadableStream } from "node:stream/web";
 import type { FileEntryWithStats, SFTPWrapper } from "ssh2";
 
 import { parseId, readJson, requirePermission } from "@/lib/api/guard";
-import { fail, ok } from "@/lib/api/respond";
+import { ok } from "@/lib/api/respond";
+import { failFromError, failKey } from "@/lib/api/errors";
 import {
   HostAccessError,
   relativeDataPath,
@@ -26,10 +27,10 @@ function sftpCall<T>(fn: (cb: (err: Error | null | undefined, result?: T) => voi
 }
 
 function errorResponse(error: unknown) {
-  if (error instanceof HostAccessError) return fail(error.message, error.status);
+  if (error instanceof HostAccessError) return failFromError(error);
   const message = (error as Error).message ?? "Unbekannter Fehler";
-  if (/No such file/i.test(message)) return fail("Datei oder Ordner nicht gefunden.", 404);
-  return fail(`Dateizugriff fehlgeschlagen: ${message}`, 502);
+  if (/No such file/i.test(message)) return failKey("fileNotFound", 404);
+  return failFromError(error, { wrapKey: "fileAccessFailed" });
 }
 
 /** Give new files the owner of the data directory so the game (often uid 1000) can use them. */
@@ -43,10 +44,10 @@ export async function GET(request: Request, { params }: Params) {
   const guard = await requirePermission(op === "list" ? "dashboard:view" : "instances:files");
   if (guard.error) return guard.error;
   const id = parseId((await params).id);
-  if (!id) return fail("Ungültige ID", 400);
+  if (!id) return failKey("invalidId", 400);
 
   try {
-    const { ip } = requireRunningHost(id);
+    const { ip } = await requireRunningHost(id);
     const target = resolveDataPath(url.searchParams.get("path"));
 
     if (op === "download") {
@@ -64,9 +65,9 @@ export async function GET(request: Request, { params }: Params) {
     return await withSftp(ip, async (sftp: SFTPWrapper) => {
       if (op === "read") {
         const stats = await sftpCall<{ size: number }>((cb) => sftp.stat(target, cb));
-        if (stats.size > MAX_EDIT_BYTES) return fail("Datei ist zu groß für den Editor – bitte herunterladen.", 413);
+        if (stats.size > MAX_EDIT_BYTES) return failKey("fileTooLarge", 413);
         const content = await sftpCall<Buffer>((cb) => sftp.readFile(target, cb));
-        if (content.includes(0)) return fail("Binärdatei – bitte herunterladen statt bearbeiten.", 415);
+        if (content.includes(0)) return failKey("binaryFile", 415);
         return ok({ path: relativeDataPath(target), content: content.toString("utf8") });
       }
 
@@ -91,13 +92,13 @@ export async function PUT(request: Request, { params }: Params) {
   const guard = await requirePermission("instances:files");
   if (guard.error) return guard.error;
   const id = parseId((await params).id);
-  if (!id) return fail("Ungültige ID", 400);
-  if (!request.body) return fail("Keine Datei übertragen.", 400);
+  if (!id) return failKey("invalidId", 400);
+  if (!request.body) return failKey("noFile", 400);
 
   try {
-    const { ip } = requireRunningHost(id);
+    const { ip } = await requireRunningHost(id);
     const target = resolveDataPath(new URL(request.url).searchParams.get("path"));
-    if (target === HOST_DATA) return fail("Ungültiger Dateiname.", 400);
+    if (target === HOST_DATA) return failKey("invalidFileName", 400);
     await runRemote(ip, `mkdir -p ${shq(path.posix.dirname(target))}`, "mkdir");
     await writeRemoteStream(ip, target, Readable.fromWeb(request.body as unknown as WebReadableStream));
     await fixOwnership(ip, target);
@@ -111,17 +112,17 @@ export async function POST(request: Request, { params }: Params) {
   const guard = await requirePermission("instances:files");
   if (guard.error) return guard.error;
   const id = parseId((await params).id);
-  if (!id) return fail("Ungültige ID", 400);
+  if (!id) return failKey("invalidId", 400);
   const body = await readJson(request);
 
   try {
-    const { ip } = requireRunningHost(id);
+    const { ip } = await requireRunningHost(id);
     const target = resolveDataPath(String(body.path ?? ""));
 
     switch (body.op) {
       case "write": {
         const content = String(body.content ?? "");
-        if (Buffer.byteLength(content) > MAX_EDIT_BYTES) return fail("Inhalt ist zu groß.", 413);
+        if (Buffer.byteLength(content) > MAX_EDIT_BYTES) return failKey("contentTooLarge", 413);
         await withSftp(ip, (sftp) => sftpCall<void>((cb) => sftp.writeFile(target, content, cb)));
         await fixOwnership(ip, target);
         break;
@@ -132,16 +133,16 @@ export async function POST(request: Request, { params }: Params) {
         break;
       case "rename": {
         const to = resolveDataPath(String(body.to ?? ""));
-        if (target === HOST_DATA || to === HOST_DATA) return fail("Ungültiger Pfad.", 400);
+        if (target === HOST_DATA || to === HOST_DATA) return failKey("invalidPath", 400);
         await runRemote(ip, `mv -n ${shq(target)} ${shq(to)}`, "Umbenennen");
         break;
       }
       case "delete":
-        if (target === HOST_DATA) return fail("Der Hauptordner kann nicht gelöscht werden.", 400);
+        if (target === HOST_DATA) return failKey("rootDelete", 400);
         await runRemote(ip, `rm -rf -- ${shq(target)}`, "Löschen");
         break;
       default:
-        return fail("Unbekannte Dateioperation.", 400);
+        return failKey("unknownFileOp", 400);
     }
     return ok({ done: true });
   } catch (error) {

@@ -1,5 +1,6 @@
 import { requirePermission } from "@/lib/api/guard";
-import { fail, ok } from "@/lib/api/respond";
+import { ok } from "@/lib/api/respond";
+import { failFromError, failKey } from "@/lib/api/errors";
 import { modrinthProjectKind, type MinecraftLoader } from "@/lib/games/minecraft-source";
 import { searchProjects } from "@/lib/minecraft/modrinth";
 
@@ -12,7 +13,7 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const kind = modrinthProjectKind((searchParams.get("loader") ?? "") as MinecraftLoader);
-  if (!kind) return fail("Für diesen Server-Typ gibt es keine Mods/Plugins.", 400);
+  if (!kind) return failKey("noProjects", 400);
 
   try {
     const hits = await searchProjects({
@@ -23,6 +24,6 @@ export async function GET(request: Request) {
     });
     return ok({ hits, kind: kind.type });
   } catch (e) {
-    return fail(e instanceof Error ? e.message : "Suche fehlgeschlagen.", 502);
+    return failFromError(e, { wrapKey: "searchFailed" });
   }
 }

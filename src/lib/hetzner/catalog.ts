@@ -42,11 +42,11 @@ async function fetchOptions(): Promise<HetznerOptions> {
 }
 
 export async function getHetznerOptions(opts?: { refresh?: boolean }): Promise<HetznerOptions> {
-  const cached = getJsonSetting<Cached>(CACHE_KEY);
+  const cached = await getJsonSetting<Cached>(CACHE_KEY);
   if (!opts?.refresh && cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) return cached.options;
   try {
     const options = await fetchOptions();
-    setJsonSetting(CACHE_KEY, { fetchedAt: Date.now(), options } satisfies Cached);
+    await setJsonSetting(CACHE_KEY, { fetchedAt: Date.now(), options } satisfies Cached);
     return options;
   } catch (error) {
     if (cached) return cached.options;

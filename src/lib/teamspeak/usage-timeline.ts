@@ -25,16 +25,25 @@ export function berlinBucketKey(date: Date, granularity: UsageGranularity): stri
   return `${year}-${month}-${day}T${hour}:00:00`;
 }
 
-export function formatBerlinBucketLabel(bucket: string, granularity: UsageGranularity): string {
+export function formatBerlinBucketLabel(
+  bucket: string,
+  granularity: UsageGranularity,
+  intlLocale: string = "de-DE"
+): string {
   const [datePart, timePart = "00:00:00"] = bucket.split("T");
   const [year, month, day] = datePart.split("-").map(Number);
   if (granularity === "day") {
-    return `${String(day).padStart(2, "0")}.${String(month).padStart(2, "0")}.`;
+    if (intlLocale.startsWith("de")) return `${String(day).padStart(2, "0")}.${String(month).padStart(2, "0")}.`;
+    return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString(intlLocale, {
+      day: "2-digit",
+      month: "short",
+      timeZone: "UTC",
+    });
   }
 
   const hour = Number(timePart.slice(0, 2));
   const wallClock = new Date(Date.UTC(year, month - 1, day, hour, 0));
-  return wallClock.toLocaleString("de-DE", {
+  return wallClock.toLocaleString(intlLocale, {
     weekday: "short",
     hour: "2-digit",
     minute: "2-digit",

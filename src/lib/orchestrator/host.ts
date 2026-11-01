@@ -17,7 +17,7 @@ import {
 import { hetznerClient, type FirewallRule } from "@/lib/hetzner/client";
 import type { JobContext } from "@/lib/orchestrator/jobs";
 import { runRemote, shq, uploadFile, waitForSsh } from "@/lib/orchestrator/ssh";
-import { getCloudflareConfig, getSshCredentials } from "@/lib/settings/store";
+import { getCloudflareConfig, getCurseForgeApiKey, getSshCredentials, type CloudflareConfig } from "@/lib/settings/store";
 
 export type InstanceRow = typeof gameInstances.$inferSelect;
 export type ServerRow = typeof infraServers.$inferSelect;
@@ -25,43 +25,48 @@ export type VolumeRow = typeof infraVolumes.$inferSelect;
 
 const labels = (instance: InstanceRow) => ({ managed_by: "tretu", tretu_instance: String(instance.id) });
 
-export function getActiveServer(instanceId: number): ServerRow | undefined {
-  return db
+export async function getActiveServer(instanceId: number): Promise<ServerRow | undefined> {
+  const [row] = await db
     .select()
     .from(infraServers)
     .where(and(eq(infraServers.instanceId, instanceId), isNull(infraServers.deletedAt)))
     .orderBy(desc(infraServers.createdAt))
-    .get();
+    .limit(1);
+  return row;
 }
 
-export function getVolume(instanceId: number): VolumeRow | undefined {
-  return db
+export async function getVolume(instanceId: number): Promise<VolumeRow | undefined> {
+  const [row] = await db
     .select()
     .from(infraVolumes)
     .where(eq(infraVolumes.instanceId, instanceId))
     .orderBy(desc(infraVolumes.createdAt))
-    .get();
+    .limit(1);
+  return row;
 }
 
-export function reloadInstance(instanceId: number): InstanceRow {
-  const instance = db.select().from(gameInstances).where(eq(gameInstances.id, instanceId)).get();
+export async function reloadInstance(instanceId: number): Promise<InstanceRow> {
+  const [instance] = await db.select().from(gameInstances).where(eq(gameInstances.id, instanceId)).limit(1);
   if (!instance) throw new Error("Instanz nicht gefunden.");
   return instance;
 }
 
 /** Address players connect to (subdomain when Cloudflare is configured, otherwise the IP). */
-export function instanceHostname(instance: InstanceRow): string | null {
-  const cf = getCloudflareConfig();
+export function hostnameFor(instance: Pick<InstanceRow, "subdomain">, cf: CloudflareConfig | null): string | null {
   if (!cf || !instance.subdomain) return null;
   return `${instance.subdomain}.${cf.domain}`;
 }
 
+export async function instanceHostname(instance: InstanceRow): Promise<string | null> {
+  return hostnameFor(instance, await getCloudflareConfig());
+}
+
 export async function ensureVolume(instance: InstanceRow, ctx: JobContext): Promise<VolumeRow> {
-  const existing = getVolume(instance.id);
+  const existing = await getVolume(instance.id);
   if (existing) {
     if (!existing.linuxDevice) {
       const remote = await hetznerClient.getVolume(existing.hetznerVolumeId);
-      db.update(infraVolumes).set({ linuxDevice: remote.linux_device }).where(eq(infraVolumes.id, existing.id)).run();
+      await db.update(infraVolumes).set({ linuxDevice: remote.linux_device }).where(eq(infraVolumes.id, existing.id));
       return { ...existing, linuxDevice: remote.linux_device };
     }
     return existing;
@@ -78,7 +83,8 @@ export async function ensureVolume(instance: InstanceRow, ctx: JobContext): Prom
     location: instance.region,
     labels: labels(instance),
   });
-  db.insert(infraVolumes)
+  const [created] = await db
+    .insert(infraVolumes)
     .values({
       instanceId: instance.id,
       hetznerVolumeId: String(volume.id),
@@ -87,9 +93,9 @@ export async function ensureVolume(instance: InstanceRow, ctx: JobContext): Prom
       sizeGb,
       status: "available",
     })
-    .run();
+    .returning();
   ctx.log(`Volume ${volume.id} erstellt.`);
-  return getVolume(instance.id)!;
+  return created!;
 }
 
 function firewallRules(gameType: string): FirewallRule[] {
@@ -122,10 +128,10 @@ export async function ensureFirewall(instance: InstanceRow, ctx: JobContext): Pr
   }
   ctx.step("Firewall anlegen");
   const firewall = await hetznerClient.createFirewall(`tretu-${instance.slug}-${Date.now().toString(36)}`, rules, labels(instance));
-  db.update(gameInstances)
+  await db
+    .update(gameInstances)
     .set({ hetznerFirewallId: String(firewall.id) })
-    .where(eq(gameInstances.id, instance.id))
-    .run();
+    .where(eq(gameInstances.id, instance.id));
   return firewall.id;
 }
 
@@ -177,12 +183,12 @@ echo "Host bereit."
 }
 
 export async function syncDns(instance: InstanceRow, ip: string, ctx: JobContext) {
-  const cf = getCloudflareConfig();
-  const fqdn = instanceHostname(instance);
+  const cf = await getCloudflareConfig();
+  const fqdn = hostnameFor(instance, cf);
   if (!cf?.zoneId || !fqdn) return;
   try {
     const recordId = await cloudflareClient.upsertARecord(cf.token, cf.zoneId, fqdn, ip, instance.dnsRecordId);
-    db.update(gameInstances).set({ dnsRecordId: recordId }).where(eq(gameInstances.id, instance.id)).run();
+    await db.update(gameInstances).set({ dnsRecordId: recordId }).where(eq(gameInstances.id, instance.id));
     ctx.log(`DNS: ${fqdn} → ${ip}`);
   } catch (error) {
     // DNS is a convenience; the server stays reachable via IP.
@@ -191,11 +197,11 @@ export async function syncDns(instance: InstanceRow, ip: string, ctx: JobContext
 }
 
 export async function removeDns(instance: InstanceRow, ctx: JobContext) {
-  const cf = getCloudflareConfig();
+  const cf = await getCloudflareConfig();
   if (!cf?.zoneId || !instance.dnsRecordId) return;
   try {
     await cloudflareClient.deleteRecord(cf.token, cf.zoneId, instance.dnsRecordId);
-    db.update(gameInstances).set({ dnsRecordId: null }).where(eq(gameInstances.id, instance.id)).run();
+    await db.update(gameInstances).set({ dnsRecordId: null }).where(eq(gameInstances.id, instance.id));
   } catch (error) {
     ctx.log(`⚠ DNS-Eintrag konnte nicht entfernt werden: ${(error as Error).message}`);
   }
@@ -204,16 +210,16 @@ export async function removeDns(instance: InstanceRow, ctx: JobContext) {
 /** Makes sure a VM with the volume mounted and Docker installed is running; returns its IP. */
 export async function ensureHost(instance: InstanceRow, ctx: JobContext): Promise<{ ip: string; server: ServerRow }> {
   const volume = await ensureVolume(instance, ctx);
-  let server = getActiveServer(instance.id);
+  let server = await getActiveServer(instance.id);
 
   if (server) {
     const remote = await hetznerClient.getServer(server.hetznerServerId);
     if (!remote) {
       ctx.log("Die bisherige VM existiert bei Hetzner nicht mehr – erstelle eine neue.");
-      db.update(infraServers)
+      await db
+        .update(infraServers)
         .set({ deletedAt: new Date(), status: "deleted" })
-        .where(eq(infraServers.id, server.id))
-        .run();
+        .where(eq(infraServers.id, server.id));
       server = undefined;
     } else if (remote.status === "off") {
       ctx.step("VM einschalten");
@@ -222,9 +228,9 @@ export async function ensureHost(instance: InstanceRow, ctx: JobContext): Promis
   }
 
   if (!server) {
-    const ssh = getSshCredentials();
+    const ssh = await getSshCredentials();
     if (!ssh?.hetznerKeyId) throw new Error("SSH-Schlüssel ist nicht bei Hetzner hinterlegt – Einrichtung abschließen.");
-    const firewallId = await ensureFirewall(reloadInstance(instance.id), ctx);
+    const firewallId = await ensureFirewall(await reloadInstance(instance.id), ctx);
 
     ctx.step(`VM erstellen (${instance.activeServerType}, ${instance.region})`);
     const { server: created } = await hetznerClient.createServer({
@@ -237,7 +243,7 @@ export async function ensureHost(instance: InstanceRow, ctx: JobContext): Promis
       firewallIds: [firewallId],
       labels: labels(instance),
     });
-    const res = db
+    const [inserted] = await db
       .insert(infraServers)
       .values({
         instanceId: instance.id,
@@ -246,10 +252,10 @@ export async function ensureHost(instance: InstanceRow, ctx: JobContext): Promis
         ipV4: created.public_net?.ipv4?.ip ?? null,
         status: "provisioning",
       })
-      .run();
-    server = db.select().from(infraServers).where(eq(infraServers.id, Number(res.lastInsertRowid))).get()!;
-    db.update(infraVolumes).set({ status: "attached" }).where(eq(infraVolumes.id, volume.id)).run();
-    db.update(gameInstances).set({ lastActivityAt: new Date() }).where(eq(gameInstances.id, instance.id)).run();
+      .returning();
+    server = inserted!;
+    await db.update(infraVolumes).set({ status: "attached" }).where(eq(infraVolumes.id, volume.id));
+    await db.update(gameInstances).set({ lastActivityAt: new Date() }).where(eq(gameInstances.id, instance.id));
     ctx.log(`VM ${created.id} angelegt.`);
   }
 
@@ -257,31 +263,37 @@ export async function ensureHost(instance: InstanceRow, ctx: JobContext): Promis
   const running = await hetznerClient.waitForServerRunning(server.hetznerServerId);
   const ip = running.public_net.ipv4!.ip;
   if (server.ipV4 !== ip) {
-    db.update(infraServers).set({ ipV4: ip }).where(eq(infraServers.id, server.id)).run();
+    await db.update(infraServers).set({ ipV4: ip }).where(eq(infraServers.id, server.id));
   }
 
-  await syncDns(reloadInstance(instance.id), ip, ctx);
+  await syncDns(await reloadInstance(instance.id), ip, ctx);
 
   ctx.step("SSH-Verbindung aufbauen");
   await waitForSsh(ip);
 
   ctx.step("Host vorbereiten (Docker, Speicher)");
-  await runRemote(ip, bootstrapScript(instance, getVolume(instance.id)!.linuxDevice!), "Host-Vorbereitung", {
+  await runRemote(ip, bootstrapScript(instance, (await getVolume(instance.id))!.linuxDevice!), "Host-Vorbereitung", {
     timeoutMs: 600_000,
     onOutput: ctx.output,
   });
-  db.update(infraServers).set({ status: "running" }).where(eq(infraServers.id, server.id)).run();
+  await db.update(infraServers).set({ status: "running" }).where(eq(infraServers.id, server.id));
 
-  return { ip, server: getActiveServer(instance.id)! };
+  return { ip, server: (await getActiveServer(instance.id))! };
 }
 
 /** Writes env/run script for the current settings and (re)creates the game container. */
 export async function deployContainer(instance: InstanceRow, ip: string, ctx: JobContext) {
-  const server = getActiveServer(instance.id);
+  const server = await getActiveServer(instance.id);
   const remote = server ? await hetznerClient.getServer(server.hetznerServerId) : null;
   const memoryGb = remote?.server_type.memory ?? 4;
   const profile = readProfile(instance.gameType, instance.configProfile);
-  const spec = buildContainerSpec({ gameType: instance.gameType, name: instance.name, profile, memoryGb });
+  const spec = buildContainerSpec({
+    gameType: instance.gameType,
+    name: instance.name,
+    profile,
+    memoryGb,
+    curseforgeApiKey: await getCurseForgeApiKey(),
+  });
   const files = renderRuntimeFiles(spec);
 
   ctx.step("Konfiguration schreiben");
@@ -317,16 +329,16 @@ export async function stopContainer(ip: string, ctx: JobContext) {
 
 /** Deletes the VM (the volume with all data stays). */
 export async function destroyHost(instance: InstanceRow, ctx: JobContext) {
-  const server = getActiveServer(instance.id);
+  const server = await getActiveServer(instance.id);
   if (server) {
     ctx.step("VM löschen");
     await hetznerClient.deleteServer(server.hetznerServerId);
-    db.update(infraServers)
+    await db
+      .update(infraServers)
       .set({ deletedAt: new Date(), status: "deleted" })
-      .where(eq(infraServers.id, server.id))
-      .run();
+      .where(eq(infraServers.id, server.id));
   }
-  const volume = getVolume(instance.id);
-  if (volume) db.update(infraVolumes).set({ status: "available" }).where(eq(infraVolumes.id, volume.id)).run();
-  await removeDns(reloadInstance(instance.id), ctx);
+  const volume = await getVolume(instance.id);
+  if (volume) await db.update(infraVolumes).set({ status: "available" }).where(eq(infraVolumes.id, volume.id));
+  await removeDns(await reloadInstance(instance.id), ctx);
 }

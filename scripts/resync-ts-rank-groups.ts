@@ -1,6 +1,6 @@
 import { and, eq, gt } from "drizzle-orm";
 
-import { db } from "@/db";
+import { closeDb, db } from "@/db";
 import { tsUsers } from "@/db/schema";
 import { getTsRankConfig } from "@/lib/env/server";
 import {
@@ -95,7 +95,9 @@ async function main() {
   console.log(JSON.stringify({ synced, failed, total: users.length }, null, 2));
 }
 
-void main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+void main()
+  .catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  })
+  .finally(() => void closeDb());

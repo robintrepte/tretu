@@ -1,4 +1,5 @@
 import { getCurseForgeApiKey } from "@/lib/settings/store";
+import { LocalizedError } from "@/lib/i18n/errors";
 
 const API = "https://api.curseforge.com/v1";
 const GAME_ID_MINECRAFT = 432;
@@ -27,9 +28,9 @@ type CfFilesResponse = {
 };
 
 async function cffetch<T>(path: string): Promise<T> {
-  const apiKey = getCurseForgeApiKey();
+  const apiKey = await getCurseForgeApiKey();
   if (!apiKey) {
-    throw new Error("Für CurseForge fehlt der API-Key – bitte unter „Einrichtung“ hinterlegen.");
+    throw new LocalizedError("curseforgeKeyMissing");
   }
   const response = await fetch(`${API}${path}`, {
     cache: "no-store",

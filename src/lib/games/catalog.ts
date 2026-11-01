@@ -339,13 +339,22 @@ export function splitList(value: unknown): string[] {
  * Validates and normalises settings against the catalog. Unknown keys are dropped;
  * missing keys fall back to `previous`, then to the field default.
  */
+export type SettingIssue =
+  | { code: "range"; field: string; min: number; max: number }
+  | { code: "select"; field: string }
+  | { code: "maxLength"; field: string; max: number }
+  | { code: "minLength"; field: string; min: number }
+  | { code: "required"; field: string }
+  | { code: "valheimPassword"; field: string };
+
 export function normalizeSettings(
   def: GameDefinition,
   input: Record<string, unknown>,
   previous: SettingValues = {}
-): { values: SettingValues; errors: string[] } {
+): { values: SettingValues; errors: string[]; issues: SettingIssue[] } {
   const values: SettingValues = {};
   const errors: string[] = [];
+  const issues: SettingIssue[] = [];
 
   for (const field of def.settings) {
     const raw = input[field.key] ?? previous[field.key] ?? field.default;
@@ -354,6 +363,7 @@ export function normalizeSettings(
         const n = Number(raw);
         if (!Number.isFinite(n) || n < field.min || n > field.max) {
           errors.push(`${field.label}: Zahl zwischen ${field.min} und ${field.max} erwartet.`);
+          issues.push({ code: "range", field: field.key, min: field.min, max: field.max });
           values[field.key] = field.default;
         } else values[field.key] = Math.round(n);
         break;
@@ -363,7 +373,10 @@ export function normalizeSettings(
         break;
       case "select": {
         const v = String(raw);
-        if (!field.options.some((o) => o.value === v)) errors.push(`${field.label}: ungültige Auswahl.`);
+        if (!field.options.some((o) => o.value === v)) {
+          errors.push(`${field.label}: ungültige Auswahl.`);
+          issues.push({ code: "select", field: field.key });
+        }
         values[field.key] = field.options.some((o) => o.value === v) ? v : field.default;
         break;
       }
@@ -376,16 +389,21 @@ export function normalizeSettings(
         const v = String(raw).replace(/[\r\n]/g, " ").trim();
         if (field.type === "text" && field.maxLength && v.length > field.maxLength) {
           errors.push(`${field.label}: höchstens ${field.maxLength} Zeichen.`);
+          issues.push({ code: "maxLength", field: field.key, max: field.maxLength });
         }
         if (field.type === "password" && v && field.minLength && v.length < field.minLength) {
           errors.push(`${field.label}: mindestens ${field.minLength} Zeichen.`);
+          issues.push({ code: "minLength", field: field.key, min: field.minLength });
         }
         const generated = field.type === "password" && field.generate;
-        if (field.required && !v && !generated) errors.push(`${field.label} ist erforderlich.`);
+        if (field.required && !v && !generated) {
+          errors.push(`${field.label} ist erforderlich.`);
+          issues.push({ code: "required", field: field.key });
+        }
         values[field.key] = v;
         break;
       }
     }
   }
-  return { values, errors };
+  return { values, errors, issues };
 }

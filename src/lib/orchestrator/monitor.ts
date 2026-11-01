@@ -33,18 +33,17 @@ function deriveGameStatus(instance: InstanceRow, probe: ProbeResult): GameStatus
   return "crashed";
 }
 
-function hasRunningJob(instanceId: number) {
-  return Boolean(
-    db
-      .select({ id: actionJobs.id })
-      .from(actionJobs)
-      .where(and(eq(actionJobs.instanceId, instanceId), eq(actionJobs.status, "running")))
-      .get()
-  );
+async function hasRunningJob(instanceId: number): Promise<boolean> {
+  const [row] = await db
+    .select({ id: actionJobs.id })
+    .from(actionJobs)
+    .where(and(eq(actionJobs.instanceId, instanceId), eq(actionJobs.status, "running")))
+    .limit(1);
+  return Boolean(row);
 }
 
 async function checkInstance(instance: InstanceRow, server: ServerRow) {
-  if (!server.ipV4 || server.status !== "running" || hasRunningJob(instance.id)) return;
+  if (!server.ipV4 || server.status !== "running" || (await hasRunningJob(instance.id))) return;
   const profile = readProfile(instance.gameType, instance.configProfile);
 
   let probe: ProbeResult | null = null;
@@ -60,21 +59,19 @@ async function checkInstance(instance: InstanceRow, server: ServerRow) {
   }
 
   const gameStatus: GameStatus = probe ? deriveGameStatus(instance, probe) : "unreachable";
-  db.insert(instanceStatusSnapshots)
-    .values({
-      instanceId: instance.id,
-      infraStatus: probe ? "running" : "unreachable",
-      gameStatus,
-      playerCount: probe?.players ?? null,
-      maxPlayers: probe?.maxPlayers ?? null,
-      lastHeartbeatAt: new Date(),
-      rawJson: probe ?? {},
-    })
-    .run();
+  await db.insert(instanceStatusSnapshots).values({
+    instanceId: instance.id,
+    infraStatus: probe ? "running" : "unreachable",
+    gameStatus,
+    playerCount: probe?.players ?? null,
+    maxPlayers: probe?.maxPlayers ?? null,
+    lastHeartbeatAt: new Date(),
+    rawJson: probe ?? {},
+  });
 
   const now = Date.now();
   if (probe?.players) {
-    db.update(gameInstances).set({ lastActivityAt: new Date() }).where(eq(gameInstances.id, instance.id)).run();
+    await db.update(gameInstances).set({ lastActivityAt: new Date() }).where(eq(gameInstances.id, instance.id));
     return;
   }
 
@@ -91,10 +88,10 @@ async function checkInstance(instance: InstanceRow, server: ServerRow) {
   const since = Math.max(instance.lastActivityAt?.getTime() ?? 0, server.createdAt.getTime());
   if (now - since < idleMinutes * 60_000) return;
 
-  const { deduplicated } = enqueueJob({
+  const { deduplicated } = await enqueueJob({
     instanceId: instance.id,
     actionType: "hibernate",
-    userId: systemUserId(),
+    userId: await systemUserId(),
     payload: { reason: "idle" },
     idempotencyKey: `idle-hibernate-${server.id}`,
   });
@@ -106,11 +103,14 @@ async function checkDrift(servers: Array<{ instance: InstanceRow; server: Server
   if (Date.now() - lastDriftCheck < DRIFT_CHECK_INTERVAL_MS) return;
   lastDriftCheck = Date.now();
   for (const { instance, server } of servers) {
-    if (hasRunningJob(instance.id)) continue;
+    if (await hasRunningJob(instance.id)) continue;
     try {
       const remote = await hetznerClient.getServer(server.hetznerServerId);
       if (!remote) {
-        db.update(infraServers).set({ deletedAt: new Date(), status: "deleted" }).where(eq(infraServers.id, server.id)).run();
+        await db
+          .update(infraServers)
+          .set({ deletedAt: new Date(), status: "deleted" })
+          .where(eq(infraServers.id, server.id));
         log("warn", "monitor.server_vanished", { instanceId: instance.id, serverId: server.hetznerServerId });
       }
     } catch (error) {
@@ -121,15 +121,15 @@ async function checkDrift(servers: Array<{ instance: InstanceRow; server: Server
 }
 
 export async function runMonitorTick() {
-  const instances = db.select().from(gameInstances).where(isNull(gameInstances.archivedAt)).all();
-  const withServers = instances
-    .map((instance) => ({ instance, server: getActiveServer(instance.id) }))
-    .filter((x): x is { instance: InstanceRow; server: ServerRow } => Boolean(x.server));
+  const instances = await db.select().from(gameInstances).where(isNull(gameInstances.archivedAt));
+  const withServers = (
+    await Promise.all(instances.map(async (instance) => ({ instance, server: await getActiveServer(instance.id) })))
+  ).filter((x): x is { instance: InstanceRow; server: ServerRow } => Boolean(x.server));
 
   await Promise.allSettled(withServers.map(({ instance, server }) => checkInstance(instance, server)));
   await checkDrift(withServers);
 
-  db.delete(instanceStatusSnapshots)
-    .where(lt(instanceStatusSnapshots.createdAt, new Date(Date.now() - SNAPSHOT_RETENTION_MS)))
-    .run();
+  await db
+    .delete(instanceStatusSnapshots)
+    .where(lt(instanceStatusSnapshots.createdAt, new Date(Date.now() - SNAPSHOT_RETENTION_MS)));
 }

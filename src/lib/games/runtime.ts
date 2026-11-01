@@ -3,7 +3,6 @@ import { isModpackLoader, javaImageTag } from "@/lib/games/minecraft-source";
 import type { InstanceProfile } from "@/lib/games/profile";
 import { queryA2SInfo } from "@/lib/games/query/a2s";
 import { sourceRconCommand } from "@/lib/games/query/rcon";
-import { getCurseForgeApiKey } from "@/lib/settings/store";
 
 /** Mount point of the instance volume on the game host. */
 export const HOST_ROOT = "/srv/game";
@@ -32,6 +31,8 @@ type RuntimeInput = {
   profile: InstanceProfile;
   /** RAM of the Hetzner server type. */
   memoryGb: number;
+  /** CurseForge API key (settings or env), needed for CurseForge modpacks. */
+  curseforgeApiKey?: string;
 };
 
 const TZ = "Europe/Berlin";
@@ -43,7 +44,7 @@ function heapGb(memoryGb: number) {
   return Math.max(1, memoryGb - (memoryGb <= 8 ? 1.5 : 2.5));
 }
 
-function minecraftSpec({ profile, memoryGb }: RuntimeInput): ContainerSpec {
+function minecraftSpec({ profile, memoryGb, curseforgeApiKey }: RuntimeInput): ContainerSpec {
   const s = profile.settings;
   const source = profile.minecraft;
   if (!source) throw new Error("Minecraft-Konfiguration fehlt.");
@@ -83,7 +84,7 @@ function minecraftSpec({ profile, memoryGb }: RuntimeInput): ContainerSpec {
       env.MODRINTH_VERSION = source.modpack?.versionId ?? "";
       break;
     case "curseforge": {
-      const apiKey = getCurseForgeApiKey();
+      const apiKey = curseforgeApiKey ?? "";
       if (!apiKey) throw new Error("Für CurseForge-Modpacks fehlt der CurseForge-API-Key (Einrichtung).");
       env.TYPE = "AUTO_CURSEFORGE";
       env.CF_API_KEY = apiKey;

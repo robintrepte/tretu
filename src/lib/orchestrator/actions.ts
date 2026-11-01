@@ -20,16 +20,16 @@ import { executeRemoteCommand, runRemote, shq } from "@/lib/orchestrator/ssh";
 
 type Payload = Record<string, unknown>;
 
-function setInstance(instanceId: number, values: Partial<typeof gameInstances.$inferInsert>) {
-  db.update(gameInstances)
+async function setInstance(instanceId: number, values: Partial<typeof gameInstances.$inferInsert>) {
+  await db
+    .update(gameInstances)
     .set({ ...values, updatedAt: new Date() })
-    .where(eq(gameInstances.id, instanceId))
-    .run();
+    .where(eq(gameInstances.id, instanceId));
 }
 
 /** IP of the running VM, or an error explaining that the server has to be started first. */
-function requireHostIp(instance: InstanceRow, what: string): string {
-  const server = getActiveServer(instance.id);
+async function requireHostIp(instance: InstanceRow, what: string): Promise<string> {
+  const server = await getActiveServer(instance.id);
   if (!server?.ipV4) throw new Error(`${what} geht nur, während der Server eingeschaltet ist. Bitte zuerst starten.`);
   return server.ipV4;
 }
@@ -40,54 +40,54 @@ async function containerExists(ip: string) {
 }
 
 async function start(instance: InstanceRow, ctx: JobContext) {
-  setInstance(instance.id, { desiredState: "running", lastActivityAt: new Date() });
+  await setInstance(instance.id, { desiredState: "running", lastActivityAt: new Date() });
   const { ip } = await ensureHost(instance, ctx);
   await reconcileBackups(instance, ip, ctx);
-  await deployContainer(reloadInstance(instance.id), ip, ctx);
-  setInstance(instance.id, { lastActivityAt: new Date() });
+  await deployContainer(await reloadInstance(instance.id), ip, ctx);
+  await setInstance(instance.id, { lastActivityAt: new Date() });
 }
 
 /** Aligns the backup list with the files actually present on the volume. */
 async function reconcileBackups(instance: InstanceRow, ip: string, ctx: JobContext) {
   const out = await runRemote(ip, `ls -1 ${HOST_BACKUPS} 2>/dev/null | grep '\\.tar\\.gz$' || true`, "Backups prüfen");
   const files = new Set(out.split("\n").map((l) => l.trim()).filter(Boolean));
-  const rows = db.select().from(gameBackups).where(eq(gameBackups.instanceId, instance.id)).all();
+  const rows = await db.select().from(gameBackups).where(eq(gameBackups.instanceId, instance.id));
   const known = new Set(rows.map((r) => r.fileName));
 
   for (const row of rows) {
-    if (!files.has(row.fileName)) db.delete(gameBackups).where(eq(gameBackups.id, row.id)).run();
+    if (!files.has(row.fileName)) await db.delete(gameBackups).where(eq(gameBackups.id, row.id));
   }
   const unknown = [...files].filter((f) => !known.has(f));
-  for (const fileName of unknown) {
-    db.insert(gameBackups).values({ instanceId: instance.id, fileName, kind: "gefunden" }).run();
+  if (unknown.length) {
+    await db.insert(gameBackups).values(unknown.map((fileName) => ({ instanceId: instance.id, fileName, kind: "gefunden" })));
   }
   if (unknown.length) ctx.log(`${unknown.length} Backup-Datei(en) auf dem Speicher gefunden und übernommen.`);
 }
 
 async function stop(instance: InstanceRow, ctx: JobContext) {
-  const ip = requireHostIp(instance, "Stoppen");
+  const ip = await requireHostIp(instance, "Stoppen");
   await stopContainer(ip, ctx);
 }
 
 async function restart(instance: InstanceRow, ctx: JobContext) {
-  const ip = requireHostIp(instance, "Neustarten");
+  const ip = await requireHostIp(instance, "Neustarten");
   if (!(await containerExists(ip))) {
     await deployContainer(instance, ip, ctx);
     return;
   }
   ctx.step("Spielserver neu starten");
   await runRemote(ip, `docker restart -t 120 ${CONTAINER_NAME}`, "docker restart", { timeoutMs: 240_000 });
-  setInstance(instance.id, { lastActivityAt: new Date() });
+  await setInstance(instance.id, { lastActivityAt: new Date() });
 }
 
 async function apply(instance: InstanceRow, ctx: JobContext) {
-  const server = getActiveServer(instance.id);
+  const server = await getActiveServer(instance.id);
   if (!server?.ipV4) {
     ctx.log("Server ist aus – die Einstellungen werden beim nächsten Start übernommen.");
     return;
   }
   const { ip } = await ensureHost(instance, ctx);
-  await deployContainer(reloadInstance(instance.id), ip, ctx);
+  await deployContainer(await reloadInstance(instance.id), ip, ctx);
 }
 
 function backupFileName(kind: string) {
@@ -106,48 +106,46 @@ export async function createBackup(instance: InstanceRow, ip: string, kind: stri
 
   const out = await runRemote(ip, script, "Backup", { timeoutMs: 3_600_000 });
   const size = Number(out.trim().split("\n").pop());
-  db.insert(gameBackups)
-    .values({
-      instanceId: instance.id,
-      fileName,
-      sizeBytes: Number.isFinite(size) ? size : null,
-      kind,
-      createdByUserId: ctx.userId,
-    })
-    .run();
+  await db.insert(gameBackups).values({
+    instanceId: instance.id,
+    fileName,
+    sizeBytes: Number.isFinite(size) ? size : null,
+    kind,
+    createdByUserId: ctx.userId,
+  });
   ctx.log(`Backup ${fileName} (${Number.isFinite(size) ? `${(size / 1024 / 1024).toFixed(1)} MB` : "?"}) erstellt.`);
-  await pruneBackups(reloadInstance(instance.id), ip, ctx);
+  await pruneBackups(await reloadInstance(instance.id), ip, ctx);
 }
 
 async function pruneBackups(instance: InstanceRow, ip: string, ctx: JobContext) {
   const keep = Math.max(1, instance.backupRetention);
-  const all = db
+  const all = await db
     .select()
     .from(gameBackups)
     .where(eq(gameBackups.instanceId, instance.id))
-    .orderBy(desc(gameBackups.createdAt))
-    .all();
+    .orderBy(desc(gameBackups.createdAt), desc(gameBackups.id));
   for (const old of all.slice(keep)) {
     await runRemote(ip, `rm -f ${HOST_BACKUPS}/${shq(old.fileName)}`, "Altes Backup löschen");
-    db.delete(gameBackups).where(eq(gameBackups.id, old.id)).run();
+    await db.delete(gameBackups).where(eq(gameBackups.id, old.id));
     ctx.log(`Altes Backup ${old.fileName} entfernt (behalte ${keep}).`);
   }
 }
 
-function backupRow(instanceId: number, payload: Payload) {
+async function backupRow(instanceId: number, payload: Payload) {
   const backupId = Number(payload.backupId);
-  const row = db
+  if (!Number.isInteger(backupId) || backupId <= 0) throw new Error("Backup nicht gefunden.");
+  const [row] = await db
     .select()
     .from(gameBackups)
     .where(and(eq(gameBackups.id, backupId), eq(gameBackups.instanceId, instanceId)))
-    .get();
+    .limit(1);
   if (!row) throw new Error("Backup nicht gefunden.");
   return row;
 }
 
 async function restore(instance: InstanceRow, payload: Payload, ctx: JobContext) {
-  const ip = requireHostIp(instance, "Wiederherstellen");
-  const backup = backupRow(instance.id, payload);
+  const ip = await requireHostIp(instance, "Wiederherstellen");
+  const backup = await backupRow(instance.id, payload);
   await stopContainer(ip, ctx);
 
   ctx.step(`Backup ${backup.fileName} einspielen`);
@@ -158,15 +156,15 @@ async function restore(instance: InstanceRow, payload: Payload, ctx: JobContext)
 }
 
 async function deleteBackup(instance: InstanceRow, payload: Payload, ctx: JobContext) {
-  const backup = backupRow(instance.id, payload);
-  const ip = requireHostIp(instance, "Backups löschen");
+  const backup = await backupRow(instance.id, payload);
+  const ip = await requireHostIp(instance, "Backups löschen");
   ctx.step(`Backup ${backup.fileName} löschen`);
   await runRemote(ip, `rm -f ${HOST_BACKUPS}/${shq(backup.fileName)}`, "Backup löschen");
-  db.delete(gameBackups).where(eq(gameBackups.id, backup.id)).run();
+  await db.delete(gameBackups).where(eq(gameBackups.id, backup.id));
 }
 
 async function resizeVolume(instance: InstanceRow, payload: Payload, ctx: JobContext) {
-  const volume = getVolume(instance.id);
+  const volume = await getVolume(instance.id);
   if (!volume) throw new Error("Es gibt noch keinen Speicher – starte den Server einmal.");
   const sizeGb = Math.round(Number(payload.sizeGb));
   if (!Number.isFinite(sizeGb) || sizeGb <= volume.sizeGb) {
@@ -174,9 +172,9 @@ async function resizeVolume(instance: InstanceRow, payload: Payload, ctx: JobCon
   }
   ctx.step(`Speicher auf ${sizeGb} GB vergrößern`);
   await hetznerClient.resizeVolume(volume.hetznerVolumeId, sizeGb);
-  db.update(infraVolumes).set({ sizeGb }).where(eq(infraVolumes.id, volume.id)).run();
+  await db.update(infraVolumes).set({ sizeGb }).where(eq(infraVolumes.id, volume.id));
 
-  const server = getActiveServer(instance.id);
+  const server = await getActiveServer(instance.id);
   if (server?.ipV4 && volume.linuxDevice) {
     ctx.step("Dateisystem erweitern");
     await runRemote(server.ipV4, `resize2fs ${shq(volume.linuxDevice)}`, "resize2fs", { timeoutMs: 600_000 });
@@ -184,7 +182,7 @@ async function resizeVolume(instance: InstanceRow, payload: Payload, ctx: JobCon
 }
 
 async function wipe(instance: InstanceRow, ctx: JobContext) {
-  const ip = requireHostIp(instance, "Zurücksetzen");
+  const ip = await requireHostIp(instance, "Zurücksetzen");
   if (await containerExists(ip)) await createBackup(instance, ip, "vor-reset", ctx);
   await stopContainer(ip, ctx);
   ctx.step("Spieldaten löschen");
@@ -193,8 +191,8 @@ async function wipe(instance: InstanceRow, ctx: JobContext) {
 }
 
 async function hibernate(instance: InstanceRow, payload: Payload, ctx: JobContext) {
-  setInstance(instance.id, { desiredState: "offline" });
-  const server = getActiveServer(instance.id);
+  await setInstance(instance.id, { desiredState: "offline" });
+  const server = await getActiveServer(instance.id);
   if (server?.ipV4) {
     const reachable = await executeRemoteCommand(server.ipV4, "true", { timeoutMs: 20_000 }).then(
       () => true,
@@ -221,10 +219,10 @@ async function hibernate(instance: InstanceRow, payload: Payload, ctx: JobContex
 }
 
 async function destroy(instance: InstanceRow, ctx: JobContext) {
-  cancelQueuedJobs(instance.id, ctx.jobId);
+  await cancelQueuedJobs(instance.id, ctx.jobId);
   await destroyHost(instance, ctx);
 
-  const volume = getVolume(instance.id);
+  const volume = await getVolume(instance.id);
   if (volume) {
     ctx.step("Speicher (Volume) löschen");
     try {
@@ -234,10 +232,10 @@ async function destroy(instance: InstanceRow, ctx: JobContext) {
     } catch (error) {
       if (!/404|not_found/.test((error as Error).message)) throw error;
     }
-    db.update(infraVolumes).set({ status: "deleted" }).where(eq(infraVolumes.id, volume.id)).run();
+    await db.update(infraVolumes).set({ status: "deleted" }).where(eq(infraVolumes.id, volume.id));
   }
 
-  const fresh = reloadInstance(instance.id);
+  const fresh = await reloadInstance(instance.id);
   if (fresh.hetznerFirewallId) {
     ctx.step("Firewall löschen");
     await hetznerClient.deleteFirewall(fresh.hetznerFirewallId).catch((error: Error) => {
@@ -245,7 +243,7 @@ async function destroy(instance: InstanceRow, ctx: JobContext) {
     });
   }
 
-  setInstance(instance.id, {
+  await setInstance(instance.id, {
     archivedAt: new Date(),
     desiredState: "offline",
     hetznerFirewallId: null,
@@ -269,7 +267,7 @@ export async function runAction(instance: InstanceRow, actionType: string, paylo
     case "deleteHost":
       return hibernate(instance, payload, ctx);
     case "backup":
-      return createBackup(instance, requireHostIp(instance, "Ein Backup"), "manuell", ctx);
+      return createBackup(instance, await requireHostIp(instance, "Ein Backup"), "manuell", ctx);
     case "restore":
       return restore(instance, payload, ctx);
     case "deleteBackup":

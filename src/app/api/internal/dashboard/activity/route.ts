@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const guard = await requirePermission("roles:manage");
   if (guard.error) return guard.error;
-  const jobs = db
+  const jobs = await db
     .select({
       id: actionJobs.id,
       instanceId: actionJobs.instanceId,
@@ -21,8 +21,7 @@ export async function GET() {
     })
     .from(actionJobs)
     .orderBy(desc(actionJobs.createdAt))
-    .limit(100)
-    .all();
-  const events = db.select().from(auditEvents).orderBy(desc(auditEvents.createdAt)).limit(100).all();
+    .limit(100);
+  const events = await db.select().from(auditEvents).orderBy(desc(auditEvents.createdAt)).limit(100);
   return ok({ jobs, events });
 }

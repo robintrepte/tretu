@@ -111,15 +111,29 @@ export function normalizeMinecraftSource(raw: unknown): MinecraftSource {
   };
 }
 
-export function validateMinecraftSource(source: MinecraftSource): string[] {
-  const errors: string[] = [];
+export type MinecraftSourceIssue = "modpackRequired" | "invalidVersion" | "tooManyProjects";
+
+const MINECRAFT_ISSUE_TEXT: Record<MinecraftSourceIssue, string> = {
+  modpackRequired: "Bitte ein Modpack und eine Version wählen.",
+  invalidVersion: "Ungültige Minecraft-Version.",
+  tooManyProjects: "Höchstens 100 zusätzliche Mods/Plugins.",
+};
+
+/** Machine-readable problems with a Minecraft source (translated by the API). */
+export function validateMinecraftSourceIssues(source: MinecraftSource): MinecraftSourceIssue[] {
+  const issues: MinecraftSourceIssue[] = [];
   if (isModpackLoader(source.loader)) {
-    if (!source.modpack?.projectId || !source.modpack.versionId) errors.push("Bitte ein Modpack und eine Version wählen.");
+    if (!source.modpack?.projectId || !source.modpack.versionId) issues.push("modpackRequired");
   } else if (!/^(LATEST|[0-9][0-9a-z.\-]*)$/i.test(source.version)) {
-    errors.push("Ungültige Minecraft-Version.");
+    issues.push("invalidVersion");
   }
-  if (source.extraProjects.length > 100) errors.push("Höchstens 100 zusätzliche Mods/Plugins.");
-  return errors;
+  if (source.extraProjects.length > 100) issues.push("tooManyProjects");
+  return issues;
+}
+
+/** German messages for the issues above. */
+export function validateMinecraftSource(source: MinecraftSource): string[] {
+  return validateMinecraftSourceIssues(source).map((issue) => MINECRAFT_ISSUE_TEXT[issue]);
 }
 
 /**

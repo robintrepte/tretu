@@ -26,8 +26,8 @@ export const SETTING_KEYS = {
 
 type SettingKey = (typeof SETTING_KEYS)[keyof typeof SETTING_KEYS] | `cache.${string}` | `worker.${string}`;
 
-export function getSetting(key: SettingKey): string | null {
-  const row = db.select().from(dashboardSettings).where(eq(dashboardSettings.key, key)).get();
+export async function getSetting(key: SettingKey): Promise<string | null> {
+  const [row] = await db.select().from(dashboardSettings).where(eq(dashboardSettings.key, key)).limit(1);
   if (!row) return null;
   if (!row.encrypted) return row.value;
   try {
@@ -41,24 +41,24 @@ export function getSetting(key: SettingKey): string | null {
   }
 }
 
-export function setSetting(key: SettingKey, value: string | null, opts?: { secret?: boolean }): void {
+export async function setSetting(key: SettingKey, value: string | null, opts?: { secret?: boolean }): Promise<void> {
   if (value === null || value === "") {
-    db.delete(dashboardSettings).where(eq(dashboardSettings.key, key)).run();
+    await db.delete(dashboardSettings).where(eq(dashboardSettings.key, key));
     return;
   }
   const secret = Boolean(opts?.secret);
   const stored = secret ? encryptSecret(value) : value;
-  db.insert(dashboardSettings)
+  await db
+    .insert(dashboardSettings)
     .values({ key, value: stored, encrypted: secret, updatedAt: new Date() })
     .onConflictDoUpdate({
       target: dashboardSettings.key,
       set: { value: stored, encrypted: secret, updatedAt: new Date() },
-    })
-    .run();
+    });
 }
 
-export function getJsonSetting<T>(key: SettingKey): T | null {
-  const raw = getSetting(key);
+export async function getJsonSetting<T>(key: SettingKey): Promise<T | null> {
+  const raw = await getSetting(key);
   if (!raw) return null;
   try {
     return JSON.parse(raw) as T;
@@ -67,39 +67,39 @@ export function getJsonSetting<T>(key: SettingKey): T | null {
   }
 }
 
-export function setJsonSetting(key: SettingKey, value: unknown): void {
-  setSetting(key, JSON.stringify(value));
+export async function setJsonSetting(key: SettingKey, value: unknown): Promise<void> {
+  await setSetting(key, JSON.stringify(value));
 }
 
-export function getHetznerToken(): string {
-  return getSetting(SETTING_KEYS.hetznerToken) ?? HETZNER_API_TOKEN;
+export async function getHetznerToken(): Promise<string> {
+  return (await getSetting(SETTING_KEYS.hetznerToken)) ?? HETZNER_API_TOKEN;
 }
 
-export function getDefaultLocation(): string {
-  return getSetting(SETTING_KEYS.hetznerLocation) ?? HETZNER_DEFAULT_REGION;
+export async function getDefaultLocation(): Promise<string> {
+  return (await getSetting(SETTING_KEYS.hetznerLocation)) ?? HETZNER_DEFAULT_REGION;
 }
 
-export function getCurseForgeApiKey(): string {
-  return getSetting(SETTING_KEYS.curseforgeApiKey) ?? CURSEFORGE_API_KEY;
+export async function getCurseForgeApiKey(): Promise<string> {
+  return (await getSetting(SETTING_KEYS.curseforgeApiKey)) ?? CURSEFORGE_API_KEY;
 }
 
 export type CloudflareConfig = { token: string; zoneId: string; domain: string };
 
-export function getCloudflareConfig(): CloudflareConfig | null {
-  const token = getSetting(SETTING_KEYS.cloudflareToken) ?? CLOUDFLARE_API_TOKEN;
-  const domain = getSetting(SETTING_KEYS.cloudflareDomain) ?? CLOUDFLARE_DOMAIN;
-  const zoneId = getSetting(SETTING_KEYS.cloudflareZoneId) ?? "";
+export async function getCloudflareConfig(): Promise<CloudflareConfig | null> {
+  const token = (await getSetting(SETTING_KEYS.cloudflareToken)) ?? CLOUDFLARE_API_TOKEN;
+  const domain = (await getSetting(SETTING_KEYS.cloudflareDomain)) ?? CLOUDFLARE_DOMAIN;
+  const zoneId = (await getSetting(SETTING_KEYS.cloudflareZoneId)) ?? "";
   if (!token || !domain) return null;
   return { token, domain, zoneId };
 }
 
 export type SshCredentials = { privateKey: string; publicKey: string; hetznerKeyId: number | null };
 
-export function getSshCredentials(): SshCredentials | null {
-  const privateKey = getSetting(SETTING_KEYS.sshPrivateKey);
-  const publicKey = getSetting(SETTING_KEYS.sshPublicKey);
+export async function getSshCredentials(): Promise<SshCredentials | null> {
+  const privateKey = await getSetting(SETTING_KEYS.sshPrivateKey);
+  const publicKey = await getSetting(SETTING_KEYS.sshPublicKey);
   if (!privateKey || !publicKey) return null;
-  const id = Number(getSetting(SETTING_KEYS.hetznerSshKeyId));
+  const id = Number(await getSetting(SETTING_KEYS.hetznerSshKeyId));
   return { privateKey, publicKey, hetznerKeyId: Number.isFinite(id) && id > 0 ? id : null };
 }
 
@@ -112,15 +112,33 @@ export type SetupStatus = {
   ready: boolean;
 };
 
-export function getSetupStatus(): SetupStatus {
-  const hetzner = Boolean(getHetznerToken());
-  const ssh = getSshCredentials();
+export async function getSetupStatus(): Promise<SetupStatus> {
+  const hetzner = Boolean(await getHetznerToken());
+  const ssh = await getSshCredentials();
   const sshKey = Boolean(ssh?.hetznerKeyId);
   return {
     hetzner,
     sshKey,
-    cloudflare: Boolean(getCloudflareConfig()?.zoneId),
-    curseforge: Boolean(getCurseForgeApiKey()),
+    cloudflare: Boolean((await getCloudflareConfig())?.zoneId),
+    curseforge: Boolean(await getCurseForgeApiKey()),
     ready: hetzner && sshKey,
   };
+}
+
+export type SetupSnapshot = {
+  status: SetupStatus;
+  defaultLocation: string;
+  cloudflareDomain: string | null;
+  sshPublicKey: string | null;
+};
+
+/** Everything the setup page shows (no secrets). */
+export async function getSetupSnapshot(): Promise<SetupSnapshot> {
+  const [status, defaultLocation, cf, ssh] = await Promise.all([
+    getSetupStatus(),
+    getDefaultLocation(),
+    getCloudflareConfig(),
+    getSshCredentials(),
+  ]);
+  return { status, defaultLocation, cloudflareDomain: cf?.domain ?? null, sshPublicKey: ssh?.publicKey ?? null };
 }

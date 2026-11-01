@@ -13,8 +13,8 @@ export type SSHResult = {
 
 const MAX_OUTPUT = 2 * 1024 * 1024;
 
-function connectConfig(host: string): ConnectConfig {
-  const creds = getSshCredentials();
+async function connectConfig(host: string): Promise<ConnectConfig> {
+  const creds = await getSshCredentials();
   if (!creds) throw new Error("Kein SSH-Schlüssel vorhanden – bitte die Einrichtung im Dashboard abschließen.");
   return {
     host,
@@ -26,10 +26,11 @@ function connectConfig(host: string): ConnectConfig {
   };
 }
 
-function connect(host: string): Promise<Client> {
+async function connect(host: string): Promise<Client> {
+  const config = await connectConfig(host);
   return new Promise((resolve, reject) => {
     const conn = new Client();
-    conn.once("ready", () => resolve(conn)).once("error", reject).connect(connectConfig(host));
+    conn.once("ready", () => resolve(conn)).once("error", reject).connect(config);
   });
 }
 
