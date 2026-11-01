@@ -1,3 +1,7 @@
+"use client";
+
+import { useTranslations } from "next-intl";
+
 import { STATE_PRESENTATION, type OverallState, type Tone } from "@/lib/dashboard/status";
 import { cn } from "@/lib/utils";
 
@@ -19,19 +23,20 @@ export function StateBadge({
   label?: string;
   className?: string;
 }) {
+  const t = useTranslations("dashboard.state");
   const p = STATE_PRESENTATION[state];
   const tone = TONE_CLASSES[p.tone];
   const pulsing = state === "busy" || state === "starting" || state === "online";
   return (
     <span
-      title={p.hint}
+      title={t(`${state}.hint`)}
       className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium", tone.badge, className)}
     >
       <span className="relative flex size-2">
         {pulsing ? <span className={cn("absolute inline-flex h-full w-full animate-ping rounded-full opacity-60", tone.dot)} /> : null}
         <span className={cn("relative inline-flex size-2 rounded-full", tone.dot)} />
       </span>
-      {label ?? p.label}
+      {label ?? t(`${state}.label`)}
     </span>
   );
 }

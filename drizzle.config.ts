@@ -1,20 +1,12 @@
-import path from "node:path";
-
-import "./src/lib/env/load-local-env.ts";
+import "./src/lib/env/load-local-env";
 import { defineConfig } from "drizzle-kit";
 
-const raw = process.env.SQLITE_DATABASE_PATH ?? "local.sqlite";
-const sqliteUrl = path.isAbsolute(raw)
-  ? raw
-  : raw.startsWith("./") || raw.startsWith("../")
-    ? raw
-    : `./${raw}`;
-
 export default defineConfig({
-  schema: "./src/db/schema.ts",
+  // Every `src/db/*schema.ts` file (core schema and, once merged, the platform schema).
+  schema: "./src/db/*schema.ts",
   out: "./drizzle",
-  dialect: "sqlite",
+  dialect: "postgresql",
   dbCredentials: {
-    url: sqliteUrl,
+    url: process.env.DATABASE_URL ?? "postgres://postgres@localhost:5432/tretu_web",
   },
 });

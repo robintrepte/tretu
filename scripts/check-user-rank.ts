@@ -1,13 +1,13 @@
-import { like } from "drizzle-orm";
-import { db } from "@/db";
-import { tsRankTiers, tsUsers } from "@/db/schema";
+import { ilike } from "drizzle-orm";
+import { closeDb, db } from "@/db";
+import { tsUsers } from "@/db/schema";
 
 async function main() {
 const nick = process.argv[2] ?? "Chris";
 const rows = await db
   .select()
   .from(tsUsers)
-  .where(like(tsUsers.nickname, `%${nick}%`))
+  .where(ilike(tsUsers.nickname, `%${nick}%`))
   .limit(5);
 
 for (const r of rows) {
@@ -26,4 +26,4 @@ for (const r of rows) {
 }
 }
 
-void main();
+void main().finally(() => void closeDb());

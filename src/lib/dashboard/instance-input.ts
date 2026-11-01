@@ -4,19 +4,43 @@ import { and, eq, isNull, ne } from "drizzle-orm";
 
 import { db } from "@/db";
 import { gameInstances } from "@/db/schema";
-import { getGameDefinition, normalizeSettings, type GameDefinition, type SettingValues } from "@/lib/games/catalog";
+import {
+  getGameDefinition,
+  normalizeSettings,
+  type GameDefinition,
+  type SettingIssue,
+  type SettingValues,
+} from "@/lib/games/catalog";
 import {
   normalizeMinecraftSource,
-  validateMinecraftSource,
+  validateMinecraftSourceIssues,
   type MinecraftSource,
 } from "@/lib/games/minecraft-source";
 import type { InstanceProfile } from "@/lib/games/profile";
 import { getHetznerOptions } from "@/lib/hetzner/catalog";
 import { getCloudflareConfig } from "@/lib/settings/store";
+import { LocalizedError, type MessageValues } from "@/lib/i18n/errors";
 
-export class InputError extends Error {}
+/** Invalid user input (422); the text is translated by the route handler. */
+export class InputError extends LocalizedError {
+  constructor(key: string, values: MessageValues = {}) {
+    super(key, values, 422);
+    this.name = "InputError";
+  }
+}
 
 const SUBDOMAIN_RE = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
+
+/** Invalid game settings; each issue names the field so the message can use its translated label. */
+export class SettingsError extends InputError {
+  constructor(
+    readonly gameId: string,
+    readonly issues: SettingIssue[]
+  ) {
+    super("settings");
+    this.name = "SettingsError";
+  }
+}
 
 export function randomSecret(length = 20): string {
   return randomBytes(length).toString("base64url").slice(0, length);
@@ -35,9 +59,14 @@ export function slugify(name: string): string {
   );
 }
 
-export function uniqueSlug(base: string): string {
+async function slugTaken(slug: string): Promise<boolean> {
+  const [row] = await db.select({ id: gameInstances.id }).from(gameInstances).where(eq(gameInstances.slug, slug)).limit(1);
+  return Boolean(row);
+}
+
+export async function uniqueSlug(base: string): Promise<string> {
   let slug = base;
-  for (let i = 2; db.select({ id: gameInstances.id }).from(gameInstances).where(eq(gameInstances.slug, slug)).get(); i++) {
+  for (let i = 2; await slugTaken(slug); i++) {
     slug = `${base}-${i}`;
   }
   return slug;
@@ -45,16 +74,16 @@ export function uniqueSlug(base: string): string {
 
 export function validateName(raw: unknown): string {
   const name = String(raw ?? "").trim();
-  if (name.length < 2 || name.length > 60) throw new InputError("Der Name muss 2–60 Zeichen lang sein.");
+  if (name.length < 2 || name.length > 60) throw new InputError("nameLength");
   return name;
 }
 
-export function validateSubdomain(raw: unknown, instanceId?: number): string | null {
-  if (!getCloudflareConfig()) return null;
+export async function validateSubdomain(raw: unknown, instanceId?: number): Promise<string | null> {
+  if (!(await getCloudflareConfig())) return null;
   const sub = String(raw ?? "").trim().toLowerCase();
   if (!sub) return null;
-  if (!SUBDOMAIN_RE.test(sub)) throw new InputError("Subdomain: nur Kleinbuchstaben, Zahlen und Bindestriche.");
-  const clash = db
+  if (!SUBDOMAIN_RE.test(sub)) throw new InputError("subdomainFormat");
+  const [clash] = await db
     .select({ id: gameInstances.id })
     .from(gameInstances)
     .where(
@@ -64,28 +93,28 @@ export function validateSubdomain(raw: unknown, instanceId?: number): string | n
         instanceId ? ne(gameInstances.id, instanceId) : undefined
       )
     )
-    .get();
-  if (clash) throw new InputError(`Die Subdomain „${sub}“ wird schon von einem anderen Server genutzt.`);
+    .limit(1);
+  if (clash) throw new InputError("subdomainTaken", { subdomain: sub });
   return sub;
 }
 
 export function validateIdleMinutes(raw: unknown): number {
   const n = Math.round(Number(raw));
-  if (!Number.isFinite(n) || n < 0 || n > 24 * 60) throw new InputError("Leerlaufzeit: 0 (nie) bis 1440 Minuten.");
+  if (!Number.isFinite(n) || n < 0 || n > 24 * 60) throw new InputError("idleMinutes");
   return n;
 }
 
 export async function validateServerType(def: GameDefinition, serverType: unknown, region: unknown) {
   const options = await getHetznerOptions();
   const location = String(region ?? "");
-  if (!options.locations.some((l) => l.name === location)) throw new InputError("Unbekannter Standort.");
+  if (!options.locations.some((l) => l.name === location)) throw new InputError("unknownLocation");
   const type = options.serverTypes.find((t) => t.name === serverType);
-  if (!type) throw new InputError("Unbekannter Servertyp.");
+  if (!type) throw new InputError("unknownServerType");
   if (!type.availableIn.includes(location)) {
-    throw new InputError(`${type.name.toUpperCase()} ist in ${location} gerade nicht verfügbar.`);
+    throw new InputError("serverTypeUnavailable", { type: type.name.toUpperCase(), location });
   }
   if (type.memoryGb < def.minRamGb) {
-    throw new InputError(`${def.label} braucht mindestens ${def.minRamGb} GB RAM.`);
+    throw new InputError("minRam", { game: def.label, gb: def.minRamGb });
   }
   return { serverType: type.name, region: location };
 }
@@ -93,11 +122,11 @@ export async function validateServerType(def: GameDefinition, serverType: unknow
 /** Normalises game settings and fills generated secrets. */
 export function buildSettings(def: GameDefinition, input: unknown, previous?: SettingValues): SettingValues {
   const raw = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
-  const { values, errors } = normalizeSettings(def, raw, previous);
+  const { values, issues } = normalizeSettings(def, raw, previous);
   if (def.id === "valheim" && values.password && String(values.serverName).includes(String(values.password))) {
-    errors.push("Valheim: Das Passwort darf nicht im Servernamen vorkommen.");
+    issues.push({ code: "valheimPassword", field: "password" });
   }
-  if (errors.length) throw new InputError(errors.join(" "));
+  if (issues.length) throw new SettingsError(def.id, issues);
   for (const field of def.settings) {
     if (field.type === "password" && field.generate && !values[field.key]) values[field.key] = randomSecret(16);
   }
@@ -106,28 +135,28 @@ export function buildSettings(def: GameDefinition, input: unknown, previous?: Se
 
 export function buildMinecraftSource(input: unknown): MinecraftSource {
   const source = normalizeMinecraftSource(input);
-  const errors = validateMinecraftSource(source);
-  if (errors.length) throw new InputError(errors.join(" "));
+  const issues = validateMinecraftSourceIssues(source);
+  if (issues.length) throw new InputError(`minecraft.${issues[0]}`);
   return source;
 }
 
 export function requireDefinition(gameType: unknown): GameDefinition {
   const def = getGameDefinition(String(gameType ?? ""));
-  if (!def) throw new InputError("Dieses Spiel wird nicht unterstützt.");
+  if (!def) throw new InputError("unsupportedGame");
   return def;
 }
 
 /** Like `requireDefinition`, but only for games that can currently be created. */
 export function requireCreatableDefinition(gameType: unknown): GameDefinition {
   const def = requireDefinition(gameType);
-  if (!def.available) throw new InputError(`${def.label} ist noch nicht verfügbar.`);
+  if (!def.available) throw new InputError("gameUnavailable", { game: def.label });
   return def;
 }
 
 export function newProfile(def: GameDefinition, body: Record<string, unknown>): InstanceProfile {
   const volume = Math.round(Number(body.volumeSizeGb ?? def.defaultVolumeGb));
   if (!Number.isFinite(volume) || volume < def.minVolumeGb || volume > 2000) {
-    throw new InputError(`Speicher: ${def.minVolumeGb}–2000 GB.`);
+    throw new InputError("volumeSize", { min: def.minVolumeGb });
   }
   return {
     settings: buildSettings(def, body.settings),

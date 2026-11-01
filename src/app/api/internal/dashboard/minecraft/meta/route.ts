@@ -1,5 +1,6 @@
 import { requirePermission } from "@/lib/api/guard";
-import { fail, ok } from "@/lib/api/respond";
+import { ok } from "@/lib/api/respond";
+import { failFromError } from "@/lib/api/errors";
 import { listMinecraftVersionsByLoader } from "@/lib/minecraft/loaders";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +11,6 @@ export async function GET() {
   try {
     return ok(await listMinecraftVersionsByLoader());
   } catch (e) {
-    return fail(e instanceof Error ? e.message : "Versionsliste nicht abrufbar.", 502);
+    return failFromError(e, { wrapKey: "versionsFailed" });
   }
 }

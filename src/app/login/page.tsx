@@ -1,44 +1,38 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 
-import { DiscordLoginButton } from "@/components/auth/discord-login-button";
-import { pageMetadata } from "@/lib/metadata";
+import { LoginButtons } from "@/components/auth/login-buttons";
+import { getLoginProviders } from "@/lib/auth/config";
+import { translatedMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = pageMetadata({
-  title: "Anmelden",
-  description: "Anmeldung für das interne Tretu-Dashboard.",
-  path: "/login",
-});
+export const dynamic = "force-dynamic";
 
+export async function generateMetadata(): Promise<Metadata> {
+  return translatedMetadata("login", "/login", { noIndex: true });
+}
+
+/** Only same-site relative paths (no `//host` or scheme) are accepted as post-login targets. */
 function safeCallbackUrl(callbackUrl?: string): string {
-  if (!callbackUrl) return "/dashboard";
-  return callbackUrl.startsWith("/") ? callbackUrl : "/dashboard";
+  if (!callbackUrl || !callbackUrl.startsWith("/") || callbackUrl.startsWith("//") || callbackUrl.startsWith("/\\")) {
+    return "/dashboard";
+  }
+  return callbackUrl;
 }
 
-function getAuthErrorMessage(error?: string): string | null {
-  if (!error) return null;
-
-  const code = error.toLowerCase();
-  if (code === "discord" || code === "oauthsignin" || code === "oauthcallback") {
-    return "Die Discord-Anmeldung konnte nicht gestartet werden. Bitte prüfe Discord Client-ID, Secret und Redirect-URL.";
-  }
-  if (code === "oauthaccountnotlinked") {
-    return "Dieses Konto ist bereits mit einer anderen Anmeldemethode verknüpft.";
-  }
-  if (code === "accessdenied") {
-    return "Der Zugriff wurde abgelehnt.";
-  }
-  if (code === "configuration") {
-    return "Die Anmeldung ist aktuell nicht korrekt konfiguriert.";
-  }
-  if (code === "callback") {
-    return "Beim Abschluss der Anmeldung ist ein Fehler aufgetreten.";
-  }
-  if (code === "verification") {
-    return "Die Verifizierung ist fehlgeschlagen.";
-  }
-
-  return `Anmeldung fehlgeschlagen (${error}).`;
-}
+const KNOWN_ERRORS = new Set([
+  "access_denied",
+  "account_not_linked",
+  "unable_to_link_account",
+  "account_already_linked_to_different_user",
+  "email_not_found",
+  "email_not_verified",
+  "state_mismatch",
+  "please_restart_the_process",
+  "invalid_code",
+  "unable_to_get_user_info",
+  "oauth_provider_not_found",
+  "signup_disabled",
+]);
 
 export default async function SignInPage({
   searchParams,
@@ -46,28 +40,36 @@ export default async function SignInPage({
   searchParams: Promise<{ callbackUrl?: string; error?: string }>;
 }) {
   const { callbackUrl, error } = await searchParams;
+  const t = await getTranslations("login");
+  const providers = getLoginProviders();
   const target = safeCallbackUrl(callbackUrl);
-  const errorMessage = getAuthErrorMessage(error);
+  const code = error?.toLowerCase();
+  const errorMessage = code
+    ? KNOWN_ERRORS.has(code)
+      ? t(`errors.${code}`)
+      : t("errors.generic", { code: code.slice(0, 60) })
+    : null;
 
   return (
     <div className="mx-auto flex max-w-[1200px] items-center justify-center px-4 py-20 md:px-6 md:py-28 lg:px-8">
       <div className="w-full max-w-md p-2 sm:p-4">
-        <h1 className="text-center text-2xl font-semibold tracking-tight">Anmelden</h1>
+        <h1 className="text-center text-2xl font-semibold tracking-tight">{t("title")}</h1>
         <p className="mt-3 text-center text-sm text-muted-foreground leading-relaxed">
-          Nur für Team-Leute mit Discord-Konto und den passenden Rechten. Danach kommst du ins interne Dashboard.
+          {providers.tretu ? t("introTretu") : t("intro")}
         </p>
 
         {errorMessage ? (
-          <p className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {errorMessage} Bitte versuche es erneut.
+          <p
+            className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            role="alert"
+          >
+            {errorMessage} {t("tryAgain")}
           </p>
         ) : null}
 
         <div className="mt-6 space-y-2">
-          <DiscordLoginButton callbackUrl={target} />
-          <p className="text-center text-xs text-muted-foreground">
-            Es wird eine normale Anmeldesitzung gespeichert. Ohne die richtige Freigabe im Team siehst du keine Inhalte.
-          </p>
+          <LoginButtons callbackUrl={target} tretu={providers.tretu} discord={providers.discord} />
+          <p className="text-center text-xs text-muted-foreground">{t("sessionNote")}</p>
         </div>
       </div>
     </div>

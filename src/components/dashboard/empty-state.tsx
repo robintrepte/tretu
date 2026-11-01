@@ -1,5 +1,6 @@
 import { Sparkles } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { GameThumbnail } from "@/components/dashboard/game-thumbnail";
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,7 @@ import { Button } from "@/components/ui/button";
 const previewTypes = ["minecraft", "valheim", "satisfactory", "cs2"] as const;
 
 export function DashboardEmptyState({ canCreate }: { canCreate: boolean }) {
+  const t = useTranslations("dashboard.empty");
   return (
     <div className="relative mt-8 overflow-hidden rounded-3xl border border-border/80 bg-gradient-to-br from-card via-card to-muted/30 p-8 shadow-sm sm:p-10 dark:from-card dark:via-card dark:to-muted/15">
       <div
@@ -22,12 +24,11 @@ export function DashboardEmptyState({ canCreate }: { canCreate: boolean }) {
         <div>
           <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-muted/40 px-3 py-1 text-xs font-medium text-muted-foreground dark:bg-muted/20">
             <Sparkles className="h-3.5 w-3.5 text-[var(--tretu-accent)]" aria-hidden />
-            Los geht&apos;s
+            {t("badge")}
           </div>
-          <h2 className="mt-4 text-xl font-semibold tracking-tight sm:text-2xl">Noch keine Server angelegt</h2>
+          <h2 className="mt-4 text-xl font-semibold tracking-tight sm:text-2xl">{t("title")}</h2>
           <p className="mt-3 max-w-lg text-sm leading-relaxed text-muted-foreground">
-            Minecraft – Vanilla, Paper, Fabric, Forge, NeoForge oder komplette Modpacks: Version wählen, Größe festlegen,
-            fertig. Weitere Spiele folgen. VM, Speicher, Firewall und Adresse richtet das Dashboard automatisch ein.
+            {t("text")}
           </p>
           {canCreate ? (
           <div className="mt-6">
@@ -36,7 +37,7 @@ export function DashboardEmptyState({ canCreate }: { canCreate: boolean }) {
               size="lg"
               className="rounded-xl bg-[var(--tretu-accent)] px-6 hover:bg-[var(--tretu-accent-hover)] text-white shadow-md"
             >
-              <Link href="/dashboard/new">Ersten Server erstellen</Link>
+              <Link href="/dashboard/new">{t("create")}</Link>
             </Button>
           </div>
           ) : null}

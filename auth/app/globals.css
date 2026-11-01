@@ -1,0 +1,89 @@
+@import "tailwindcss";
+
+@custom-variant dark (@media (prefers-color-scheme: dark));
+
+@theme inline {
+  --font-sans: var(--font-jost), ui-sans-serif, system-ui, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-accent: var(--tretu-accent);
+  --color-accent-hover: var(--tretu-accent-hover);
+  --color-accent-soft: var(--tretu-accent-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+}
+
+:root {
+  /* Tretu brand (tretu.de) */
+  --tretu-accent: #ed6f1a;
+  --tretu-accent-hover: #f07d28;
+  --tretu-accent-soft: oklch(0.95 0.04 55);
+  --radius: 0.75rem;
+  --background: oklch(0.975 0.004 70);
+  --foreground: oklch(0.17 0 0);
+  --card: oklch(1 0 0);
+  --muted: oklch(0.955 0.004 70);
+  --muted-foreground: oklch(0.5 0.01 60);
+  --border: oklch(0.91 0.006 70);
+  --input: oklch(0.88 0.006 70);
+  --ring: var(--tretu-accent);
+  --danger: oklch(0.55 0.21 27);
+  --danger-soft: oklch(0.96 0.03 27);
+  --success: oklch(0.52 0.14 150);
+  --success-soft: oklch(0.96 0.04 150);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tretu-accent-soft: oklch(0.3 0.06 55);
+    --background: oklch(0.14 0.003 60);
+    --foreground: oklch(0.97 0 0);
+    --card: oklch(0.19 0.004 60);
+    --muted: oklch(0.23 0.004 60);
+    --muted-foreground: oklch(0.72 0.01 60);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 16%);
+    --danger: oklch(0.7 0.18 25);
+    --danger-soft: oklch(0.3 0.08 25);
+    --success: oklch(0.75 0.15 150);
+    --success-soft: oklch(0.28 0.06 150);
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html {
+    color-scheme: light dark;
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
+/* Subtle brand glow behind the auth card. */
+.tretu-backdrop {
+  background:
+    radial-gradient(60rem 30rem at 50% -10%, color-mix(in oklch, var(--tretu-accent) 18%, transparent), transparent 70%),
+    var(--background);
+}

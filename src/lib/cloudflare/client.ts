@@ -1,3 +1,5 @@
+import { LocalizedError } from "@/lib/i18n/errors";
+
 const BASE_URL = "https://api.cloudflare.com/client/v4";
 
 type CfResponse<T> = { success: boolean; errors: Array<{ code: number; message: string }>; result: T };
@@ -24,9 +26,7 @@ export const cloudflareClient = {
     const zones = await cffetch<Array<{ id: string; name: string }>>(token, `/zones?name=${encodeURIComponent(domain)}`);
     const zone = zones.find((z) => z.name === domain);
     if (!zone) {
-      throw new Error(
-        `Zone „${domain}“ nicht gefunden. Der Token braucht die Berechtigungen „Zone → Zone → Read“ und „Zone → DNS → Edit“ für diese Domain.`
-      );
+      throw new LocalizedError("cloudflareZoneNotFound", { domain });
     }
     return zone.id;
   },

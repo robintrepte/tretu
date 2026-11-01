@@ -1,14 +1,14 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { useInstance } from "@/components/dashboard/instance/instance-context";
 import { JobLog } from "@/components/dashboard/instance/job-log";
 import { Panel } from "@/components/dashboard/panel";
 import { Badge } from "@/components/ui/badge";
-import { formatDateTime } from "@/lib/dashboard/format";
-import { JOB_STATUS_LABELS } from "@/lib/orchestrator/action-types";
+import { useFormat } from "@/components/dashboard/use-format";
 import { cn } from "@/lib/utils";
 
 const VARIANT: Record<string, "secondary" | "warning" | "danger" | "success"> = {
@@ -20,13 +20,15 @@ const VARIANT: Record<string, "secondary" | "warning" | "danger" | "success"> = 
 };
 
 export function HistoryTab() {
+  const t = useTranslations("dashboard");
+  const format = useFormat();
   const { detail } = useInstance();
   const [open, setOpen] = useState<number | null>(null);
 
   return (
-    <Panel title="Verlauf" description="Die letzten Aktionen an diesem Server. Klicke auf einen Eintrag für das Protokoll.">
+    <Panel title={t("history.title")} description={t("history.intro")}>
       {detail.recentJobs.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Noch keine Aktionen.</p>
+        <p className="text-sm text-muted-foreground">{t("history.empty")}</p>
       ) : (
         <ul className="space-y-2">
           {detail.recentJobs.map((job) => (
@@ -37,14 +39,14 @@ export function HistoryTab() {
                 onClick={() => setOpen((o) => (o === job.id ? null : job.id))}
               >
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium">{job.label}</span>
+                  <span className="block text-sm font-medium">{t.has(`actions.${job.actionType}`) ? t(`actions.${job.actionType}`) : job.label}</span>
                   <span className="block text-xs text-muted-foreground">
-                    {formatDateTime(job.createdAt)}
+                    {format.dateTime(job.createdAt)}
                     {job.requestedBy ? ` · ${job.requestedBy}` : ""}
                     {job.error ? ` · ${job.error}` : ""}
                   </span>
                 </span>
-                <Badge variant={VARIANT[job.status] ?? "secondary"}>{JOB_STATUS_LABELS[job.status] ?? job.status}</Badge>
+                <Badge variant={VARIANT[job.status] ?? "secondary"}>{t.has(`jobStatus.${job.status}`) ? t(`jobStatus.${job.status}`) : job.status}</Badge>
                 <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", open === job.id && "rotate-180")} />
               </button>
               {open === job.id ? (

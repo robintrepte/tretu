@@ -7,5 +7,5 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const guard = await requirePermission("dashboard:view");
   if (guard.error) return guard.error;
-  return ok(workerHeartbeat());
+  return ok(await workerHeartbeat());
 }

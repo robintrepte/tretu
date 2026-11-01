@@ -13,6 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -36,12 +37,7 @@ const MAX_SAVED = 40;
 
 type SavedAvatar = { id: string; name: string; config: AvatarConfig; createdAt: number };
 
-const DIRECTIONS: Array<{ value: GradientDirection; label: string }> = [
-  { value: "vertical", label: "Vertikal" },
-  { value: "diagonal", label: "Diagonal" },
-  { value: "horizontal", label: "Horizontal" },
-  { value: "radial", label: "Radial" },
-];
+const DIRECTIONS: GradientDirection[] = ["vertical", "diagonal", "horizontal", "radial"];
 
 const EXPORT_SIZES = [256, 512, 1080, 2048];
 
@@ -89,11 +85,11 @@ function loadGallery(): SavedAvatar[] {
   }
 }
 
-function storeGallery(items: SavedAvatar[]) {
+function storeGallery(items: SavedAvatar[], errorMessage: string) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
   } catch {
-    toast.error("Speichern im Browser nicht möglich.");
+    toast.error(errorMessage);
   }
 }
 
@@ -110,6 +106,7 @@ function ColorField({
   onChange: (value: string) => void;
   label: string;
 }) {
+  const t = useTranslations("trt");
   const [text, setText] = useState(value);
   useEffect(() => setText(value), [value]);
   return (
@@ -122,7 +119,7 @@ function ColorField({
         className="h-9 w-11 shrink-0 cursor-pointer rounded-md border border-input bg-transparent p-1"
       />
       <Input
-        aria-label={`${label} (Hex)`}
+        aria-label={t("hex", { label })}
         value={text}
         maxLength={7}
         className="font-mono uppercase"
@@ -150,6 +147,7 @@ function Section({ title, children, action }: { title: string; children: React.R
 }
 
 export function TrtAvatarGenerator() {
+  const t = useTranslations("trt");
   const [config, setConfig] = useState<AvatarConfig>(DEFAULT_AVATAR);
   const [name, setName] = useState("");
   const [round, setRound] = useState(false);
@@ -185,12 +183,12 @@ export function TrtAvatarGenerator() {
     setBusy(true);
     try {
       download(await renderPng(config, exportSize), `${fileBase(name)}.png`);
-    } catch (error) {
-      toast.error((error as Error).message);
+    } catch {
+      toast.error(t("exportFailed"));
     } finally {
       setBusy(false);
     }
-  }, [config, exportSize, name]);
+  }, [config, exportSize, name, t]);
 
   const exportSvg = () =>
     download(new Blob([buildAvatarSvg(config, exportSize)], { type: "image/svg+xml" }), `${fileBase(name)}.svg`);
@@ -199,38 +197,38 @@ export function TrtAvatarGenerator() {
     try {
       const blob = await renderPng(config, exportSize);
       await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-      toast.success("Bild in die Zwischenablage kopiert");
+      toast.success(t("copied"));
     } catch {
-      toast.error("Kopieren wird von diesem Browser nicht unterstützt – bitte herunterladen.");
+      toast.error(t("copyUnsupported"));
     }
   };
 
   const copyLink = async () => {
     try {
       await navigator.clipboard.writeText(window.location.href);
-      toast.success("Link kopiert – damit kann jeder genau diesen Avatar öffnen.");
+      toast.success(t("linkCopied"));
     } catch {
-      toast.error("Link konnte nicht kopiert werden.");
+      toast.error(t("linkFailed"));
     }
   };
 
   const saveToGallery = () => {
     const item: SavedAvatar = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      name: name.trim() || "Ohne Namen",
+      name: name.trim() || t("unnamed"),
       config,
       createdAt: Date.now(),
     };
     const next = [item, ...gallery].slice(0, MAX_SAVED);
     setGallery(next);
-    storeGallery(next);
-    toast.success("In „Meine Avatare“ gespeichert");
+    storeGallery(next, t("storageFailed"));
+    toast.success(t("saved"));
   };
 
   const removeFromGallery = (id: string) => {
     const next = gallery.filter((g) => g.id !== id);
     setGallery(next);
-    storeGallery(next);
+    storeGallery(next, t("storageFailed"));
   };
 
   return (
@@ -241,7 +239,7 @@ export function TrtAvatarGenerator() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={preview}
-            alt="Vorschau des TRT-Avatars"
+            alt={t("previewAlt")}
             className={cn(
               "aspect-square w-full shadow-xl ring-1 ring-black/10 transition-[border-radius] dark:ring-white/10",
               round ? "rounded-full" : "rounded-2xl"
@@ -251,8 +249,8 @@ export function TrtAvatarGenerator() {
         <div className="mx-auto flex max-w-[560px] flex-wrap items-center justify-center gap-2">
           <div className="inline-flex rounded-xl border border-border bg-card p-1 text-sm">
             {[
-              { value: false, label: "Quadrat" },
-              { value: true, label: "Rund (Discord/TS)" },
+              { value: false, label: t("square") },
+              { value: true, label: t("round") },
             ].map((o) => (
               <button
                 key={String(o.value)}
@@ -278,14 +276,14 @@ export function TrtAvatarGenerator() {
 
       {/* Controls */}
       <div className="space-y-7 rounded-2xl border border-border/70 bg-card/70 p-5 shadow-sm sm:p-6">
-        <Section title="Vorlagen">
+        <Section title={t("presets")}>
           <div className="grid grid-cols-7 gap-2">
             {AVATAR_PRESETS.map((preset) => (
               <button
                 key={preset.id}
                 type="button"
-                title={preset.label}
-                aria-label={preset.label}
+                title={t(`presetNames.${preset.id}`)}
+                aria-label={t(`presetNames.${preset.id}`)}
                 onClick={() => setConfig({ ...preset.config, colors: [...preset.config.colors] })}
                 className={cn(
                   "overflow-hidden rounded-lg ring-offset-2 ring-offset-background transition-transform hover:scale-105",
@@ -298,19 +296,19 @@ export function TrtAvatarGenerator() {
             ))}
           </div>
           <Button variant="outline" className="w-full" onClick={() => setConfig((c) => randomAvatarConfig(c))}>
-            <Dices /> Zufall
+            <Dices /> {t("random")}
           </Button>
         </Section>
 
         <Section
-          title="Hintergrund"
+          title={t("background")}
           action={
             <div className="flex gap-1">
               <Button
                 variant="ghost"
                 size="icon-sm"
-                title="Farben umdrehen"
-                aria-label="Farben umdrehen"
+                title={t("reverse")}
+                aria-label={t("reverse")}
                 onClick={() => update({ colors: [...config.colors].reverse() })}
               >
                 <ArrowDownUp />
@@ -318,8 +316,8 @@ export function TrtAvatarGenerator() {
               <Button
                 variant="ghost"
                 size="icon-sm"
-                title="Farbe hinzufügen"
-                aria-label="Farbe hinzufügen"
+                title={t("addColor")}
+                aria-label={t("addColor")}
                 disabled={config.colors.length >= 4}
                 onClick={() => update({ colors: [...config.colors, config.colors[config.colors.length - 1]] })}
               >
@@ -332,12 +330,12 @@ export function TrtAvatarGenerator() {
             {config.colors.map((color, i) => (
               <div key={i} className="flex items-center gap-2">
                 <div className="flex-1">
-                  <ColorField label={`Farbe ${i + 1}`} value={color} onChange={(v) => setColor(i, v)} />
+                  <ColorField label={t("color", { n: i + 1 })} value={color} onChange={(v) => setColor(i, v)} />
                 </div>
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  aria-label={`Farbe ${i + 1} entfernen`}
+                  aria-label={t("removeColor", { n: i + 1 })}
                   disabled={config.colors.length <= 1}
                   onClick={() => update({ colors: config.colors.filter((_, j) => j !== i) })}
                 >
@@ -347,7 +345,7 @@ export function TrtAvatarGenerator() {
             ))}
           </div>
           <div className="grid grid-cols-4 gap-1 rounded-xl border border-border bg-background/60 p-1 text-xs">
-            {DIRECTIONS.map((d) => (
+            {DIRECTIONS.map((direction) => ({ value: direction, label: t(`directions.${direction}`) })).map((d) => (
               <button
                 key={d.value}
                 type="button"
@@ -363,13 +361,13 @@ export function TrtAvatarGenerator() {
           </div>
         </Section>
 
-        <Section title="Logo">
-          <ColorField label="Logo-Farbe" value={config.logoColor} onChange={(v) => update({ logoColor: v })} />
+        <Section title={t("logo")}>
+          <ColorField label={t("logoColor")} value={config.logoColor} onChange={(v) => update({ logoColor: v })} />
           <div className="flex gap-2">
             {[
-              { color: "#ffffff", label: "Weiß" },
-              { color: "#111111", label: "Schwarz" },
-              { color: "#ed6f1a", label: "Tretu-Orange" },
+              { color: "#ffffff", label: t("white") },
+              { color: "#111111", label: t("black") },
+              { color: "#ed6f1a", label: t("tretuOrange") },
             ].map((o) => (
               <button
                 key={o.color}
@@ -385,7 +383,7 @@ export function TrtAvatarGenerator() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="glow" className="flex justify-between">
-              Leuchten <span className="tabular-nums text-muted-foreground">{Math.round(config.glow * 100)} %</span>
+              {t("glow")} <span className="tabular-nums text-muted-foreground">{Math.round(config.glow * 100)} %</span>
             </Label>
             <input
               id="glow"
@@ -400,19 +398,19 @@ export function TrtAvatarGenerator() {
           </div>
         </Section>
 
-        <Section title="Speichern">
+        <Section title={t("save")}>
           <div className="space-y-2">
-            <Label htmlFor="avatar-name">Name (für den Dateinamen)</Label>
+            <Label htmlFor="avatar-name">{t("nameLabel")}</Label>
             <Input
               id="avatar-name"
               value={name}
               maxLength={40}
-              placeholder="z. B. DovahChief"
+              placeholder={t("namePlaceholder")}
               onChange={(e) => setName(e.target.value)}
             />
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Größe</span>
+            <span className="text-sm text-muted-foreground">{t("size")}</span>
             <div className="grid flex-1 grid-cols-4 gap-1 rounded-xl border border-border bg-background/60 p-1 text-xs">
               {EXPORT_SIZES.map((s) => (
                 <button
@@ -435,17 +433,17 @@ export function TrtAvatarGenerator() {
             onClick={exportPng}
             className="w-full rounded-xl bg-[var(--tretu-accent)] text-white hover:bg-[var(--tretu-accent-hover)]"
           >
-            <Download /> PNG herunterladen
+            <Download /> {t("downloadPng")}
           </Button>
           <div className="grid grid-cols-2 gap-2">
             <Button variant="outline" onClick={saveToGallery}>
-              <Bookmark /> Merken
+              <Bookmark /> {t("remember")}
             </Button>
             <Button variant="outline" onClick={copyImage}>
-              <Copy /> Bild kopieren
+              <Copy /> {t("copyImage")}
             </Button>
             <Button variant="outline" onClick={copyLink}>
-              <Link2 /> Link teilen
+              <Link2 /> {t("shareLink")}
             </Button>
             <Button variant="outline" onClick={exportSvg}>
               <Download /> SVG
@@ -456,8 +454,8 @@ export function TrtAvatarGenerator() {
 
       {gallery.length ? (
         <section className="space-y-3 lg:col-span-2">
-          <h2 className="text-lg font-semibold tracking-tight">Meine Avatare</h2>
-          <p className="text-sm text-muted-foreground">Gespeichert in diesem Browser. Klicken zum Bearbeiten.</p>
+          <h2 className="text-lg font-semibold tracking-tight">{t("myAvatars")}</h2>
+          <p className="text-sm text-muted-foreground">{t("galleryHint")}</p>
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-5 lg:grid-cols-8">
             {gallery.map((item) => (
               <div key={item.id} className="group relative">
@@ -465,7 +463,7 @@ export function TrtAvatarGenerator() {
                   type="button"
                   onClick={() => {
                     setConfig(item.config);
-                    setName(item.name === "Ohne Namen" ? "" : item.name);
+                    setName(item.name === t("unnamed") ? "" : item.name);
                     window.scrollTo({ top: 0, behavior: "smooth" });
                   }}
                   className="block w-full text-left"
@@ -476,7 +474,7 @@ export function TrtAvatarGenerator() {
                 </button>
                 <button
                   type="button"
-                  aria-label={`${item.name} löschen`}
+                  aria-label={t("deleteAvatar", { name: item.name })}
                   onClick={() => removeFromGallery(item.id)}
                   className="absolute right-1.5 top-1.5 rounded-full bg-background/90 p-1.5 opacity-0 shadow transition-opacity group-hover:opacity-100 focus:opacity-100"
                 >

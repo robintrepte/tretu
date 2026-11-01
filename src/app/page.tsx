@@ -4,20 +4,16 @@ import Image from "next/image";
 import { Gamepad2 } from "lucide-react";
 import Link from "next/link";
 import { PageTitle } from "@/components/page-title";
-import { pageMetadata } from "@/lib/metadata";
+import { translatedMetadata } from "@/lib/metadata";
 import { PLAY_URL } from "@/lib/nav/items";
 
 const HomeShaderBg = dynamic(
   () => import("@/components/home-shader-bg").then((m) => ({ default: m.HomeShaderBg }))
 );
 
-export const metadata: Metadata = pageMetadata({
-  title: "Tretu Gaming Community",
-  description:
-    "Willkommen bei Tretu – deine Gaming-Community. Teamspeak, Discord, Livestreams auf Twitch, YouTube-Videos, Minecraft-Map und Rankings. Von Gamern, für Gamer.",
-  path: "/",
-  keywords: ["Tretu", "Gaming Community", "Teamspeak", "Discord", "Twitch", "YouTube", "Minecraft"],
-});
+export async function generateMetadata(): Promise<Metadata> {
+  return translatedMetadata("home", "/", { keywords: ["Tretu", "Gaming Community", "Teamspeak", "Discord", "Twitch", "YouTube", "Minecraft"] });
+}
 
 export default function Home() {
   return (

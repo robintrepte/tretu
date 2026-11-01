@@ -5,8 +5,9 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { gameBackups } from "@/db/schema";
 import { parseId, requirePermission } from "@/lib/api/guard";
-import { fail } from "@/lib/api/respond";
-import { HostAccessError, requireRunningHost } from "@/lib/dashboard/host-access";
+
+import { failFromError, failKey } from "@/lib/api/errors";
+import { requireRunningHost } from "@/lib/dashboard/host-access";
 import { HOST_BACKUPS } from "@/lib/games/runtime";
 import { openRemoteReadStream } from "@/lib/orchestrator/ssh";
 
@@ -18,17 +19,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const resolved = await params;
   const id = parseId(resolved.id);
   const backupId = parseId(resolved.backupId);
-  if (!id || !backupId) return fail("Ungültige ID", 400);
+  if (!id || !backupId) return failKey("invalidId", 400);
 
-  const backup = db
+  const [backup] = await db
     .select()
     .from(gameBackups)
     .where(and(eq(gameBackups.id, backupId), eq(gameBackups.instanceId, id)))
-    .get();
-  if (!backup) return fail("Backup nicht gefunden.", 404);
+    .limit(1);
+  if (!backup) return failKey("backupNotFound", 404);
 
   try {
-    const { instance, ip } = requireRunningHost(id);
+    const { instance, ip } = await requireRunningHost(id);
     const { stream, size } = await openRemoteReadStream(ip, `${HOST_BACKUPS}/${backup.fileName}`);
     return new Response(Readable.toWeb(stream) as unknown as ReadableStream, {
       headers: {
@@ -39,7 +40,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       },
     });
   } catch (error) {
-    if (error instanceof HostAccessError) return fail(error.message, error.status);
-    return fail(`Download fehlgeschlagen: ${(error as Error).message}`, 502);
+    return failFromError(error, { wrapKey: "downloadFailed" });
   }
 }

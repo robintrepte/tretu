@@ -1,9 +1,9 @@
 import { hostname } from "node:os";
 
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 
-import { db, sqlite } from "@/db";
-import { actionJobs, gameInstances } from "@/db/schema";
+import { db } from "@/db";
+import { actionJobs, dashboardSettings, gameInstances } from "@/db/schema";
 import { runAction } from "@/lib/orchestrator/actions";
 import { createJobContext } from "@/lib/orchestrator/jobs";
 import { runMonitorTick } from "@/lib/orchestrator/monitor";
@@ -22,94 +22,96 @@ const runningByInstance = new Map<number, Promise<void>>();
 
 /**
  * Only one process (Next.js server or `npm run worker:orchestrator`) may run jobs.
- * The lease lives in the settings table and is renewed while the worker is alive.
+ * The lease lives in the settings table and is renewed while the worker is alive. Taking or renewing it is
+ * a single atomic upsert: it only writes when the lease is free, expired or already ours.
  */
-function acquireLease(): boolean {
+export async function acquireLease(leaseOwner: string = owner): Promise<boolean> {
   const now = Date.now();
-  const tx = sqlite.transaction(() => {
-    const row = sqlite.prepare("SELECT value FROM dashboard_settings WHERE key = ?").get(LEASE_KEY) as
-      | { value: string }
-      | undefined;
-    if (row) {
-      const lease = JSON.parse(row.value) as { owner: string; expiresAt: number };
-      if (lease.owner !== owner && lease.expiresAt > now) return false;
-    }
-    sqlite
-      .prepare(
-        "INSERT INTO dashboard_settings (key, value, encrypted, updated_at) VALUES (?, ?, 0, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at"
-      )
-      .run(LEASE_KEY, JSON.stringify({ owner, expiresAt: now + LEASE_TTL_MS }), Math.floor(now / 1000));
-    return true;
-  });
-  return tx.immediate();
+  const value = JSON.stringify({ owner: leaseOwner, expiresAt: now + LEASE_TTL_MS });
+  const rows = await db.execute<{ key: string }>(sql`
+    insert into dashboard_settings (key, value, encrypted, updated_at)
+    values (${LEASE_KEY}, ${value}, false, now())
+    on conflict (key) do update set value = excluded.value, updated_at = excluded.updated_at
+    where (dashboard_settings.value::jsonb ->> 'owner') = ${leaseOwner}
+       or coalesce((dashboard_settings.value::jsonb ->> 'expiresAt')::bigint, 0) <= ${now}
+    returning key
+  `);
+  return rows.length > 0;
 }
 
-export function workerHeartbeat(): { alive: boolean; owner: string | null } {
-  const row = sqlite.prepare("SELECT value FROM dashboard_settings WHERE key = ?").get(LEASE_KEY) as
-    | { value: string }
-    | undefined;
+export async function workerHeartbeat(): Promise<{ alive: boolean; owner: string | null }> {
+  const [row] = await db
+    .select({ value: dashboardSettings.value })
+    .from(dashboardSettings)
+    .where(eq(dashboardSettings.key, LEASE_KEY))
+    .limit(1);
   if (!row) return { alive: false, owner: null };
   const lease = JSON.parse(row.value) as { owner: string; expiresAt: number };
   return { alive: lease.expiresAt > Date.now(), owner: lease.owner };
 }
 
-function failInterruptedJobs() {
-  const interrupted = db.select().from(actionJobs).where(eq(actionJobs.status, "running")).all();
-  for (const job of interrupted) {
-    db.update(actionJobs)
-      .set({
-        status: "failed",
-        finishedAt: new Date(),
-        progress: null,
-        error: "Abgebrochen, weil das Dashboard neu gestartet wurde. Bitte erneut ausführen.",
-      })
-      .where(eq(actionJobs.id, job.id))
-      .run();
-  }
+async function failInterruptedJobs() {
+  await db
+    .update(actionJobs)
+    .set({
+      status: "failed",
+      finishedAt: new Date(),
+      progress: null,
+      error: "Abgebrochen, weil das Dashboard neu gestartet wurde. Bitte erneut ausführen.",
+    })
+    .where(eq(actionJobs.status, "running"));
 }
 
 async function executeJob(job: typeof actionJobs.$inferSelect) {
   const ctx = createJobContext(job.id, job.requestedByUserId);
   try {
-    const instance = db.select().from(gameInstances).where(eq(gameInstances.id, job.instanceId)).get();
+    const [instance] = await db.select().from(gameInstances).where(eq(gameInstances.id, job.instanceId)).limit(1);
     if (!instance) throw new Error("Instanz nicht gefunden.");
     if (instance.archivedAt) throw new Error("Instanz wurde gelöscht.");
     log("info", "job.started", { jobId: job.id, action: job.actionType, instanceId: job.instanceId });
     await runAction(instance, job.actionType, (job.payloadJson ?? {}) as Record<string, unknown>, ctx);
-    ctx.flush();
     ctx.log("✔ Fertig.");
-    db.update(actionJobs)
+    await ctx.flush();
+    await db
+      .update(actionJobs)
       .set({ status: "succeeded", finishedAt: new Date(), progress: null })
-      .where(eq(actionJobs.id, job.id))
-      .run();
+      .where(eq(actionJobs.id, job.id));
     log("info", "job.succeeded", { jobId: job.id });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    ctx.flush();
     ctx.log(`✖ ${message}`);
-    db.update(actionJobs)
+    await ctx.flush();
+    await db
+      .update(actionJobs)
       .set({ status: "failed", finishedAt: new Date(), progress: null, error: message.slice(0, 2000) })
-      .where(eq(actionJobs.id, job.id))
-      .run();
+      .where(eq(actionJobs.id, job.id));
     log("error", "job.failed", { jobId: job.id, action: job.actionType, error: message });
   }
 }
 
-function claimJobs() {
+async function claimJobs() {
   if (runningByInstance.size >= MAX_PARALLEL_JOBS) return;
-  const queued = db.select().from(actionJobs).where(eq(actionJobs.status, "queued")).orderBy(asc(actionJobs.createdAt)).all();
+  const queued = await db
+    .select()
+    .from(actionJobs)
+    .where(eq(actionJobs.status, "queued"))
+    .orderBy(asc(actionJobs.createdAt), asc(actionJobs.id));
 
   for (const job of queued) {
     if (runningByInstance.size >= MAX_PARALLEL_JOBS) return;
     if (runningByInstance.has(job.instanceId)) continue;
-    const claimed = db
+    const claimed = await db
       .update(actionJobs)
       .set({ status: "running", startedAt: new Date() })
       .where(and(eq(actionJobs.id, job.id), eq(actionJobs.status, "queued")))
-      .run();
-    if (claimed.changes !== 1) continue;
+      .returning({ id: actionJobs.id });
+    if (claimed.length !== 1) continue;
 
-    const promise = executeJob(job).finally(() => runningByInstance.delete(job.instanceId));
+    const promise = executeJob(job)
+      .catch((error: unknown) =>
+        log("error", "job.crashed", { jobId: job.id, error: error instanceof Error ? error.message : "unknown" })
+      )
+      .finally(() => runningByInstance.delete(job.instanceId));
     runningByInstance.set(job.instanceId, promise);
   }
 }
@@ -122,28 +124,32 @@ export function startWorker() {
   if (state.started) return;
   state.started = true;
 
-  seedDefaultRoles();
   let leader = false;
+  let rolesSeeded = false;
   let lastMonitor = 0;
   let monitorRunning = false;
 
   const loop = async () => {
     try {
-      const hasLease = acquireLease();
+      if (!rolesSeeded) {
+        await seedDefaultRoles();
+        rolesSeeded = true;
+      }
+      const hasLease = await acquireLease();
       if (hasLease && !leader) {
         leader = true;
-        failInterruptedJobs();
+        await failInterruptedJobs();
         log("info", "orchestrator.leader", { owner });
       } else if (!hasLease && leader) {
         leader = false;
       }
 
-      if (leader && getSetupStatus().hetzner) {
-        claimJobs();
+      if (leader && (await getSetupStatus()).hetzner) {
+        await claimJobs();
         if (!monitorRunning && Date.now() - lastMonitor > MONITOR_INTERVAL_MS) {
           lastMonitor = Date.now();
           monitorRunning = true;
-          runMonitorTick()
+          void runMonitorTick()
             .catch((error) => log("error", "monitor.failed", { error: (error as Error).message }))
             .finally(() => (monitorRunning = false));
         }
@@ -151,7 +157,7 @@ export function startWorker() {
     } catch (error) {
       log("error", "orchestrator.tick_failed", { error: error instanceof Error ? error.message : "unknown" });
     }
-    setTimeout(loop, JOB_POLL_MS).unref?.();
+    setTimeout(() => void loop(), JOB_POLL_MS).unref?.();
   };
 
   log("info", "orchestrator.started", { owner });

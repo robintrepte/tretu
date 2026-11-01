@@ -2,6 +2,7 @@
 
 import { ArrowLeft, Loader2, Rocket } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -10,25 +11,19 @@ import { MinecraftSourceEditor } from "@/components/dashboard/minecraft-source-e
 import { Hint, Panel } from "@/components/dashboard/panel";
 import { recommendedServerType, ServerTypePicker } from "@/components/dashboard/server-type-picker";
 import { FieldLabel, SettingsFields } from "@/components/dashboard/settings-fields";
+import { useFormat, useGameText } from "@/components/dashboard/use-format";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { dashboardApi } from "@/lib/api/dashboard-client";
-import { formatEuro } from "@/lib/dashboard/format";
 import { defaultSettings, GAME_CATALOG, type GameDefinition, type SettingValues } from "@/lib/games/catalog";
 import type { MinecraftSource } from "@/lib/games/minecraft-source";
 import type { HetznerOptions } from "@/lib/hetzner/types";
 import { cn } from "@/lib/utils";
 
-export const IDLE_OPTIONS = [
-  { value: "0", label: "Nie automatisch ausschalten" },
-  { value: "15", label: "Nach 15 Minuten ohne Spieler" },
-  { value: "30", label: "Nach 30 Minuten ohne Spieler" },
-  { value: "60", label: "Nach 1 Stunde ohne Spieler" },
-  { value: "120", label: "Nach 2 Stunden ohne Spieler" },
-  { value: "240", label: "Nach 4 Stunden ohne Spieler" },
-];
+/** Idle shutdown choices in minutes (labels: `dashboard.idle.<value>`). */
+export const IDLE_OPTIONS = ["0", "15", "30", "60", "120", "240"] as const;
 
 const DEFAULT_MINECRAFT: MinecraftSource = { loader: "paper", version: "LATEST", modpack: null, extraProjects: [] };
 
@@ -54,6 +49,10 @@ export function CreateServerWizard({
   cloudflareDomain: string | null;
   curseforgeAvailable: boolean;
 }) {
+  const t = useTranslations("dashboard.create");
+  const tDash = useTranslations("dashboard");
+  const format = useFormat();
+  const gameText = useGameText();
   const router = useRouter();
   const [game, setGame] = useState<GameDefinition | null>(null);
   const [options, setOptions] = useState<Options | null>(null);
@@ -137,7 +136,7 @@ export function CreateServerWizard({
           startNow,
         },
       });
-      toast.success(startNow ? "Server angelegt – wird jetzt gestartet." : "Server angelegt.");
+      toast.success(startNow ? t("createdStarting") : t("created"));
       router.push(`/dashboard/games/${id}`);
     } catch (error) {
       toast.error((error as Error).message);
@@ -164,13 +163,15 @@ export function CreateServerWizard({
             <GameThumbnail gameType={def.id} size="md" />
             {!def.available ? (
               <span className="absolute right-3 top-3 rounded-full bg-background/90 px-2.5 py-1 text-xs font-medium text-muted-foreground shadow-sm">
-                Bald verfügbar
+                {t("comingSoon")}
               </span>
             ) : null}
             <div className="p-4">
-              <h3 className="font-semibold tracking-tight">{def.label}</h3>
-              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{def.tagline}</p>
-              <p className="mt-3 text-xs text-muted-foreground">ab {def.minRamGb} GB RAM · empfohlen {def.recommendedRamGb} GB</p>
+              <h3 className="font-semibold tracking-tight">{gameText.label(def)}</h3>
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{gameText.tagline(def)}</p>
+              <p className="mt-3 text-xs text-muted-foreground">
+                {t("ram", { min: def.minRamGb, recommended: def.recommendedRamGb })}
+              </p>
             </div>
           </button>
         ))}
@@ -188,7 +189,7 @@ export function CreateServerWizard({
         onClick={() => setGame(null)}
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft className="size-4" /> Anderes Spiel wählen
+        <ArrowLeft className="size-4" /> {t("otherGame")}
       </button>
 
       <div className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm">
@@ -196,12 +197,12 @@ export function CreateServerWizard({
           <GameThumbnail gameType={game.id} size="md" className="min-h-28 sm:min-h-full" />
           <div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6">
             <div className="space-y-2">
-              <FieldLabel htmlFor="server-name" label="Name im Dashboard" />
+              <FieldLabel htmlFor="server-name" label={t("name")} />
               <Input id="server-name" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
             </div>
             {cloudflareDomain ? (
               <div className="space-y-2">
-                <FieldLabel htmlFor="server-subdomain" label="Adresse für Spieler" />
+                <FieldLabel htmlFor="server-subdomain" label={t("address")} />
                 <div className="flex items-center gap-1.5">
                   <Input
                     id="server-subdomain"
@@ -217,7 +218,7 @@ export function CreateServerWizard({
               </div>
             ) : (
               <Hint>
-                Ohne Cloudflare-Anbindung verbinden sich Spieler über die IP-Adresse (sie ändert sich bei jedem Einschalten).
+                {t("noCloudflare")}
               </Hint>
             )}
           </div>
@@ -225,37 +226,38 @@ export function CreateServerWizard({
       </div>
 
       {game.id === "minecraft" ? (
-        <Panel title="Minecraft-Version & Mods" description="Alles wird beim Start automatisch heruntergeladen und eingerichtet.">
+        <Panel title={t("minecraftTitle")} description={t("minecraftHint")}>
           <MinecraftSourceEditor value={minecraft} onChange={setMinecraft} curseforgeAvailable={curseforgeAvailable} />
         </Panel>
       ) : null}
 
-      <Panel title="Spiel-Einstellungen" description="Kannst du später jederzeit ändern.">
+      <Panel title={t("settingsTitle")} description={t("settingsHint")}>
         <SettingsFields
+          gameId={game.id}
           fields={game.settings}
           values={settings}
           onChange={(key, value) => setSettings((s) => ({ ...s, [key]: value }))}
         />
         {game.notes?.length ? (
           <div className="mt-4 space-y-2">
-            {game.notes.map((n) => (
-              <Hint key={n}>{n}</Hint>
+            {game.notes.map((n, i) => (
+              <Hint key={n}>{gameText.note(game, i, n)}</Hint>
             ))}
           </div>
         ) : null}
       </Panel>
 
-      <Panel title="Leistung & Standort" description="Der Server läuft auf einer eigenen Hetzner-VM. Bezahlt wird nur die Laufzeit.">
+      <Panel title={t("powerTitle")} description={t("powerHint")}>
         {optionsError ? <Hint tone="danger">{optionsError}</Hint> : null}
         {!options ? (
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" /> Lade Servertypen und Preise von Hetzner…
+            <Loader2 className="size-4 animate-spin" /> {t("loadingTypes")}
           </p>
         ) : (
           <div className="space-y-5">
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-2">
-                <FieldLabel label="Standort" />
+                <FieldLabel label={t("location")} />
                 <Select value={location} onValueChange={setLocation}>
                   <SelectTrigger>
                     <SelectValue />
@@ -270,7 +272,7 @@ export function CreateServerWizard({
                 </Select>
               </div>
               <div className="space-y-2">
-                <FieldLabel htmlFor="volume" label="Speicher für Welten (GB)" />
+                <FieldLabel htmlFor="volume" label={t("volume")} />
                 <Input
                   id="volume"
                   type="number"
@@ -281,15 +283,15 @@ export function CreateServerWizard({
                 />
               </div>
               <div className="space-y-2">
-                <FieldLabel label="Automatisch ausschalten" />
+                <FieldLabel label={t("idle")} />
                 <Select value={idleMinutes} onValueChange={setIdleMinutes} disabled={!game.features.playerCount}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {IDLE_OPTIONS.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>
-                        {o.label}
+                    {IDLE_OPTIONS.map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {tDash(`idle.${value}`)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -311,12 +313,12 @@ export function CreateServerWizard({
       <div className="sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border/80 bg-card/95 p-4 shadow-lg backdrop-blur sm:p-5">
         <div className="space-y-1 text-sm">
           <p>
-            <span className="font-semibold tabular-nums">{formatEuro(price?.hourly ?? null, 3)}</span>
-            <span className="text-muted-foreground"> pro Stunde Laufzeit</span>
+            <span className="font-semibold tabular-nums">{format.euro(price?.hourly ?? null, 3)}</span>
+            <span className="text-muted-foreground"> {t("perHourRuntime")}</span>
             {options?.volumePricePerGbMonth ? (
               <span className="text-muted-foreground">
                 {" "}
-                + {formatEuro(options.volumePricePerGbMonth * volumeGb)} / Monat Speicher
+                {t("storagePerMonth", { price: format.euro(options.volumePricePerGbMonth * volumeGb) })}
               </span>
             ) : null}
           </p>
@@ -325,16 +327,16 @@ export function CreateServerWizard({
         <div className="flex flex-wrap items-center gap-4">
           <label className="flex cursor-pointer items-center gap-2 text-sm">
             <Checkbox checked={startNow} onCheckedChange={(c) => setStartNow(c === true)} />
-            Direkt starten
+            {t("startNow")}
           </label>
           <Button
             size="lg"
             disabled={!canSubmit}
-            onClick={submit}
+            onClick={() => void submit()}
             className="rounded-xl bg-[var(--tretu-accent)] text-white shadow-md hover:bg-[var(--tretu-accent-hover)]"
           >
             {submitting ? <Loader2 className="animate-spin" /> : <Rocket />}
-            Server erstellen
+            {t("submit")}
           </Button>
         </div>
       </div>

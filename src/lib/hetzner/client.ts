@@ -1,4 +1,5 @@
 import { getHetznerToken } from "@/lib/settings/store";
+import { LocalizedError } from "@/lib/i18n/errors";
 
 const BASE_URL = "https://api.hetzner.cloud/v1";
 
@@ -14,8 +15,8 @@ export class HetznerApiError extends Error {
 }
 
 async function hfetch<T>(path: string, init?: RequestInit & { token?: string }): Promise<T> {
-  const token = init?.token ?? getHetznerToken();
-  if (!token) throw new Error("Hetzner ist noch nicht verbunden – bitte im Dashboard unter „Einrichtung“ den API-Token hinterlegen.");
+  const token = init?.token ?? (await getHetznerToken());
+  if (!token) throw new LocalizedError("hetznerNotConnected");
 
   const response = await fetch(`${BASE_URL}${path}`, {
     ...init,

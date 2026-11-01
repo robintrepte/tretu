@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, like, sql } from "drizzle-orm";
+import { and, asc, eq, gte, ilike, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
 import { db } from "@/db";
@@ -125,7 +125,7 @@ export async function fetchLeaderboard(params: {
     .as("ranked_users");
 
   const searchFilter =
-    search && search.length >= 2 ? like(ranked.nickname, `%${search}%`) : undefined;
+    search && search.length >= 2 ? ilike(ranked.nickname, `%${search}%`) : undefined;
 
   const rowsQuery = db
     .select({
@@ -158,7 +158,7 @@ export async function fetchLeaderboard(params: {
     const matchRows = await db
       .select({ count: sql<number>`count(*)` })
       .from(tsUsers)
-      .where(and(...boardFilters, like(tsUsers.nickname, `%${search}%`)));
+      .where(and(...boardFilters, ilike(tsUsers.nickname, `%${search}%`)));
     matchCount = Number(matchRows[0]?.count ?? 0);
   }
 

@@ -1,10 +1,12 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 export function ThemeToggle() {
+  const t = useTranslations("footer");
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -16,7 +18,7 @@ export function ThemeToggle() {
         variant="ghost"
         size="icon"
         className="h-9 w-9 text-[var(--footer-fg)] opacity-70"
-        aria-label="Theme umschalten"
+        aria-label={t("toggleTheme")}
       >
         <span className="h-4 w-4" />
       </Button>
@@ -31,7 +33,7 @@ export function ThemeToggle() {
       size="icon"
       className="h-9 w-9 text-[var(--footer-fg)] hover:bg-white/10 hover:text-[var(--footer-fg)] focus-visible:ring-2 focus-visible:ring-[var(--footer-fg)]"
       onClick={() => setTheme(isDark ? "light" : "dark")}
-      aria-label={isDark ? "Zu Hellmodus wechseln" : "Zu Dunkelmodus wechseln"}
+      aria-label={isDark ? t("lightMode") : t("darkMode")}
     >
       {isDark ? (
         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>

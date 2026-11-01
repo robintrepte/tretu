@@ -1,6 +1,7 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ export function ConfirmDialog({
   onConfirm: () => Promise<void> | void;
   onClose: () => void;
 }) {
+  const t = useTranslations("dashboard.common");
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
   const blocked = Boolean(options?.typeToConfirm && typed.trim() !== options.typeToConfirm);
@@ -56,14 +58,17 @@ export function ConfirmDialog({
         {options?.typeToConfirm ? (
           <div className="space-y-2">
             <p className="text-sm">
-              Zum Bestätigen <span className="font-mono font-semibold">{options.typeToConfirm}</span> eingeben:
+              {t.rich("typeToConfirm", {
+                text: options.typeToConfirm,
+                code: (chunks) => <span className="font-mono font-semibold">{chunks}</span>,
+              })}
             </p>
             <Input value={typed} onChange={(e) => setTyped(e.target.value)} autoFocus />
           </div>
         ) : null}
         <DialogFooter className="gap-2">
           <Button variant="outline" className="rounded-xl" disabled={busy} onClick={onClose}>
-            Abbrechen
+            {t("cancel")}
           </Button>
           <Button
             variant={options?.destructive ? "destructive" : "default"}

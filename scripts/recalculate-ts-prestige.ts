@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 
-import { db } from "@/db";
+import { closeDb, db } from "@/db";
 import { tsUsers } from "@/db/schema";
 import { RANKSYSTEM_SQL_DUMP } from "@/lib/env/server";
 import {
@@ -54,7 +54,9 @@ async function main() {
   console.log(JSON.stringify({ tiers: tiers.length, usersUpdated: updated }, null, 2));
 }
 
-void main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+void main()
+  .catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+  })
+  .finally(() => void closeDb());

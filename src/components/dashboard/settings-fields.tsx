@@ -1,7 +1,10 @@
 "use client";
 
 import { Eye, EyeOff } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
+
+import { useGameText } from "@/components/dashboard/use-format";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -23,6 +26,7 @@ function PasswordInput({
   placeholder?: string;
   disabled?: boolean;
 }) {
+  const t = useTranslations("dashboard.common");
   const [visible, setVisible] = useState(false);
   return (
     <div className="relative">
@@ -40,7 +44,7 @@ function PasswordInput({
         type="button"
         className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-muted-foreground hover:text-foreground"
         onClick={() => setVisible((v) => !v)}
-        aria-label={visible ? "Verbergen" : "Anzeigen"}
+        aria-label={visible ? t("hide") : t("show")}
       >
         {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
       </button>
@@ -58,20 +62,26 @@ export function FieldLabel({ htmlFor, label, help }: { htmlFor?: string; label: 
 }
 
 export function SettingsFields({
+  gameId,
   fields,
   values,
   onChange,
   disabled,
 }: {
+  /** Catalog id of the game, for translated labels. */
+  gameId: string;
   fields: SettingField[];
   values: SettingValues;
   onChange: (key: string, value: string | number | boolean) => void;
   disabled?: boolean;
 }) {
+  const t = useTranslations("dashboard.common");
+  const gameText = useGameText();
   return (
     <div className="grid gap-x-5 gap-y-4 sm:grid-cols-2">
       {fields.map((field) => {
         const id = `setting-${field.key}`;
+        const text = gameText.field(gameId, field);
         const value = values[field.key] ?? field.default;
 
         if (field.type === "boolean") {
@@ -89,8 +99,8 @@ export function SettingsFields({
                 className="mt-0.5"
               />
               <span className="space-y-1">
-                <span className="block text-sm font-medium leading-none">{field.label}</span>
-                {field.help ? <span className="block text-xs text-muted-foreground">{field.help}</span> : null}
+                <span className="block text-sm font-medium leading-none">{text.label}</span>
+                {text.help ? <span className="block text-xs text-muted-foreground">{text.help}</span> : null}
               </span>
             </label>
           );
@@ -98,7 +108,7 @@ export function SettingsFields({
 
         return (
           <div key={field.key} className={field.type === "list" ? "space-y-2 sm:col-span-2" : "space-y-2"}>
-            <FieldLabel htmlFor={id} label={`${field.label}${"required" in field && field.required ? " *" : ""}`} help={field.help} />
+            <FieldLabel htmlFor={id} label={`${text.label}${"required" in field && field.required ? " *" : ""}`} help={text.help} />
             {field.type === "select" ? (
               <Select value={String(value)} disabled={disabled} onValueChange={(v) => onChange(field.key, v)}>
                 <SelectTrigger id={id}>
@@ -107,7 +117,7 @@ export function SettingsFields({
                 <SelectContent>
                   {field.options.map((o) => (
                     <SelectItem key={o.value} value={o.value}>
-                      {o.label}
+                      {text.option(o.value, o.label)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -127,7 +137,7 @@ export function SettingsFields({
                 id={id}
                 value={String(value)}
                 disabled={disabled}
-                placeholder={field.generate ? "wird automatisch erzeugt" : undefined}
+                placeholder={field.generate ? t("generated") : undefined}
                 onChange={(v) => onChange(field.key, v)}
               />
             ) : field.type === "list" ? (
@@ -135,7 +145,7 @@ export function SettingsFields({
                 id={id}
                 rows={2}
                 value={String(value)}
-                placeholder={field.placeholder}
+                placeholder={text.placeholder}
                 disabled={disabled}
                 onChange={(e) => onChange(field.key, e.target.value)}
               />
@@ -144,7 +154,7 @@ export function SettingsFields({
                 id={id}
                 value={String(value)}
                 maxLength={field.maxLength}
-                placeholder={field.placeholder}
+                placeholder={text.placeholder}
                 disabled={disabled}
                 onChange={(e) => onChange(field.key, e.target.value)}
               />

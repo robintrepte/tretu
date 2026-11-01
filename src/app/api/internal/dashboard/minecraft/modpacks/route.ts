@@ -1,5 +1,6 @@
 import { requirePermission } from "@/lib/api/guard";
-import { fail, ok } from "@/lib/api/respond";
+import { ok } from "@/lib/api/respond";
+import { failFromError } from "@/lib/api/errors";
 import { searchCurseForgeModpacks } from "@/lib/minecraft/curseforge";
 import { searchModpacks } from "@/lib/minecraft/modrinth";
 
@@ -34,6 +35,6 @@ export async function GET(request: Request) {
           }));
     return ok({ hits });
   } catch (e) {
-    return fail(e instanceof Error ? e.message : "Modpack-Suche fehlgeschlagen.", 502);
+    return failFromError(e, { wrapKey: "modpackSearchFailed" });
   }
 }

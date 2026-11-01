@@ -1,7 +1,8 @@
 "use client";
 
 import type { ComponentType } from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { Activity, TrendingUp, Users } from "lucide-react";
 
@@ -18,10 +19,9 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import {
-  USAGE_RANGE_LABELS,
-  type UsageRange,
-} from "@/lib/teamspeak/server-usage-types";
+import type { UsageRange } from "@/lib/teamspeak/server-usage-types";
+import { formatBerlinBucketLabel } from "@/lib/teamspeak/usage-timeline";
+import { INTL_LOCALE, resolveLocale } from "@/i18n/config";
 import { cn } from "@/lib/utils";
 
 type ServerUsagePayload = {
@@ -37,11 +37,7 @@ type ServerUsagePayload = {
   hasHistory: boolean;
 };
 
-const RANGE_OPTIONS: { key: UsageRange; label: string }[] = [
-  { key: "24h", label: "24 Std." },
-  { key: "7d", label: "7 Tage" },
-  { key: "30d", label: "30 Tage" },
-];
+const RANGE_OPTIONS: UsageRange[] = ["24h", "7d", "30d"];
 
 const chartConfig = {
   online: {
@@ -78,6 +74,8 @@ function StatTile({
 }
 
 export function ServerUsageChart() {
+  const t = useTranslations("ranking.usage");
+  const locale = resolveLocale(useLocale());
   const [range, setRange] = useState<UsageRange>("24h");
   const [data, setData] = useState<ServerUsagePayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -90,16 +88,30 @@ export function ServerUsageChart() {
       const res = await fetch(`/api/teamspeak/usage?range=${range}`);
       const json = (await res.json()) as { data?: ServerUsagePayload; error?: string };
       if (!res.ok || !json.data) {
-        throw new Error(json.error ?? "Nutzungsdaten konnten nicht geladen werden");
+        throw new Error(t("loadFailed"));
       }
       setData(json.data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unbekannter Fehler");
+      setError(e instanceof Error && e.message ? e.message : t("loadFailed"));
       setData(null);
     } finally {
       setLoading(false);
     }
-  }, [range]);
+  }, [range, t]);
+
+  const config = useMemo(
+    () => ({ online: { ...chartConfig.online, label: t("series") } }) satisfies ChartConfig,
+    [t]
+  );
+  const points = useMemo(() => {
+    if (!data) return [];
+    const granularity = range === "30d" ? "day" : "hour";
+    return data.points.map((point) =>
+      data.hasHistory
+        ? { ...point, label: formatBerlinBucketLabel(point.bucket, granularity, INTL_LOCALE[locale]) }
+        : { ...point, label: t("now") }
+    );
+  }, [data, range, locale, t]);
 
   useEffect(() => {
     void load();
@@ -116,14 +128,14 @@ export function ServerUsageChart() {
               className="h-5 w-5 shrink-0 text-[var(--tretu-accent)]"
               aria-hidden
             />
-            <span className="truncate">Server-Auslastung</span>
+            <span className="truncate">{t("title")}</span>
           </CardTitle>
           <div
             className="inline-flex shrink-0 rounded-xl border border-border/80 bg-muted/30 p-1"
             role="tablist"
-            aria-label="Zeitraum"
+            aria-label={t("rangeLabel")}
           >
-            {RANGE_OPTIONS.map(({ key, label }) => (
+            {RANGE_OPTIONS.map((key) => (
               <button
                 key={key}
                 type="button"
@@ -137,32 +149,28 @@ export function ServerUsageChart() {
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                {label}
+                {t(`ranges.${key}`)}
               </button>
             ))}
           </div>
         </div>
         <CardDescription>
-          Alle verbundenen Spieler — {USAGE_RANGE_LABELS[range]}
-          {!data?.hasHistory && data ? " (Verlauf startet mit dem Rank-Worker)" : null}
+          {t("description", { range: t(`rangeNames.${range}`) })}
+          {!data?.hasHistory && data ? ` ${t("noHistory")}` : null}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {data && !loading && (
           <div className="grid gap-3 sm:grid-cols-3">
-            <StatTile icon={Users} label="Jetzt online" value={data.stats.onlineNow} />
-            <StatTile icon={TrendingUp} label="Peak" value={data.stats.peakInRange} />
-            <StatTile
-              icon={Activity}
-              label="Ø im Zeitraum"
-              value={data.stats.averageInRange}
-            />
+            <StatTile icon={Users} label={t("onlineNow")} value={data.stats.onlineNow} />
+            <StatTile icon={TrendingUp} label={t("peak")} value={data.stats.peakInRange} />
+            <StatTile icon={Activity} label={t("average")} value={data.stats.averageInRange} />
           </div>
         )}
 
         {loading && (
           <div className="flex h-[220px] items-center justify-center rounded-xl border border-dashed border-border/80 bg-muted/20 text-sm text-muted-foreground">
-            Chart wird geladen…
+            {t("loading")}
           </div>
         )}
 
@@ -172,10 +180,10 @@ export function ServerUsageChart() {
           </p>
         )}
 
-        {!loading && !error && data && data.points.length > 0 && (
-          <ChartContainer config={chartConfig} className="aspect-auto h-[240px] w-full">
+        {!loading && !error && data && points.length > 0 && (
+          <ChartContainer config={config} className="aspect-auto h-[240px] w-full">
             <AreaChart
-              data={data.points}
+              data={points}
               margin={{ top: 8, right: 8, left: -16, bottom: 0 }}
             >
               <defs>

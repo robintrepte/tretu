@@ -24,6 +24,7 @@ ${DEFAULT_DESCRIPTION}
 - Minecraft Map: ${SITE_URL}/map
 - Impressum (Legal): ${SITE_URL}/impressum
 - Datenschutz (Privacy): ${SITE_URL}/datenschutz
+- AGB (Terms of use, Tretu-Credits): ${SITE_URL}/agb
 
 ## Sitemap
 ${SITE_URL}/sitemap.xml

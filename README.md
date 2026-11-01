@@ -19,7 +19,9 @@ Source code for the official **Tretu** gaming community website. Teamspeak, Disc
 - **Videos** — YouTube content
 - **Minecraft Map** — Embedded map (map.tretu.de)
 - **Ranking & Stats** — Native TeamSpeak time ranking (monthly + all-time leaderboard)
-- **Impressum & Datenschutz** — Legal pages (German)
+- **Legal home** — Impressum, Datenschutz and AGB for every Tretu service (German, English translation)
+- **Languages** — German and English (next-intl, `NEXT_LOCALE` cookie, switcher in the footer)
+- **Accounts** — Better Auth: Discord login, optional Tretu-Konto (auth.tretu.de) as primary login
 - **Theme** — Light / dark / system with next-themes
 - **SEO & PWA** — Metadata, Open Graph, Twitter cards, JSON-LD, manifest, sitemap, robots.txt
 - **Security** — CSP, HSTS, X-Frame-Options and other security headers
@@ -36,8 +38,9 @@ Source code for the official **Tretu** gaming community website. Teamspeak, Disc
 | Styling    | [Tailwind CSS v4](https://tailwindcss.com), [shadcn](https://ui.shadcn.com) |
 | Fonts      | [Jost](https://fonts.google.com/specimen/Jost) (next/font) |
 | Icons      | [lucide-react](https://lucide.dev) |
-| Data       | Drizzle ORM, SQLite (better-sqlite3) |
-| Auth       | NextAuth (Discord OAuth) + role-based access |
+| Data       | Drizzle ORM, PostgreSQL (postgres.js) |
+| Auth       | Better Auth (Discord, Tretu-Konto via OIDC) + role-based access |
+| i18n       | next-intl (no URL prefixes) |
 | Validation | Zod |
 | Infra      | Hetzner Cloud API + SSH orchestration worker |
 
@@ -75,11 +78,12 @@ Site identity and default SEO are in `src/lib/seo.ts` (canonical URL: **https://
 ## Environment Setup
 
 1. Copy `.env.example` to `.env.local`.
-2. Fill required secrets:
-   - `AUTH_SECRET`
-   - `AUTH_DISCORD_CLIENT_ID`
-   - `AUTH_DISCORD_CLIENT_SECRET`
+2. Fill required values:
+   - `DATABASE_URL` (Postgres, database `tretu_web`)
+   - `AUTH_SECRET`, `BETTER_AUTH_URL`
+   - `AUTH_DISCORD_CLIENT_ID`, `AUTH_DISCORD_CLIENT_SECRET` (redirect URL `<BETTER_AUTH_URL>/api/auth/callback/discord`)
    - `DASHBOARD_ADMIN_DISCORD_IDS` (your Discord user id → admin role on login)
+   - optional `TRETU_AUTH_*` for the Tretu-Konto login (see [DEPLOY.md](DEPLOY.md))
 3. Keep `.env.local` private and never commit it.
 
 Hetzner, Cloudflare and CurseForge are connected in the dashboard itself (`/dashboard/setup`), not via env.
@@ -90,14 +94,34 @@ Hetzner, Cloudflare and CurseForge are connected in the dashboard itself (`/dash
 
 ```bash
 npm install
-npm run db:generate
-npm run db:push
+npm run db:migrate          # creates/updates the schema in DATABASE_URL
 # Import legacy ranks (place mysqldump at data/ranksystem-full.sql)
 npm run db:migrate-ts-ranks
 npm run dev
 ```
 
 Open `http://localhost:3020`.
+
+### Checks
+
+```bash
+npm run lint
+npm run typecheck
+npm test            # uses postgres://postgres@localhost:5432/tretu_web_test (override with TEST_DATABASE_URL)
+npm run build
+```
+
+Schema changes: edit `src/db/schema.ts`, then `npm run db:generate` (new file in `drizzle/`) and `npm run db:migrate`.
+
+### Translations
+
+UI texts live in `messages/de.json` and `messages/en.json`. Every `messages/<namespace>/<locale>.json` is merged under the
+key `<namespace>` (e.g. `messages/platform/de.json` → `t("platform.…")`); missing English keys fall back to German.
+
+### Deployment
+
+See [DEPLOY.md](DEPLOY.md) (including the one-time upgrade from SQLite) and [deploy/README.md](deploy/README.md) for the
+server setup of the whole ecosystem ([docs/ecosystem](docs/ecosystem/README.md)).
 
 ### TeamSpeak ranking worker
 
@@ -108,7 +132,7 @@ npm run ts:query-probe    # test raw Query reachability
 npm run worker:ts-rank
 ```
 
-Configure `TS_QUERY_*` and `TS_VIRTUALSERVER_PORT` in `.env.local`. Rank tiers and user times are stored in SQLite; import once from `data/ranksystem-full.sql` via `npm run db:migrate-ts-ranks`.
+Configure `TS_QUERY_*` and `TS_VIRTUALSERVER_PORT` in `.env.local`. Rank tiers and user times are stored in Postgres; import once from `data/ranksystem-full.sql` via `npm run db:migrate-ts-ranks`.
 
 Rank time counts **active** presence only: TeamSpeak `client_idle_time` must stay within `TS_RANK_IDLE_GRACE_SEC` (default 5 minutes). Channels whose name contains a token from `TS_RANK_AFK_CHANNEL_MATCH` (default `afk`) earn no time. The `/ranking` usage chart counts **all connected** clients.
 
@@ -135,7 +159,7 @@ mods/plugins). Valheim, Satisfactory, Palworld, Terraria (TShock) and Counter-St
    automatically on each start. Optional: CurseForge API key for CurseForge modpacks.
 4. Assign roles to other members under **Team**.
 
-Tokens and the SSH key are stored AES-GCM encrypted in SQLite (key: `DASHBOARD_SECRET_KEY`, falls back to `AUTH_SECRET` —
+Tokens and the SSH key are stored AES-GCM encrypted in Postgres (key: `DASHBOARD_SECRET_KEY`, falls back to `AUTH_SECRET` —
 changing it makes stored secrets unreadable, simply reconnect then).
 
 ### What a start does
@@ -167,6 +191,15 @@ npm run worker:orchestrator
 
 New tables/columns are created automatically on startup (`src/db/ensure-dashboard-schema.ts`); `npm run db:push` works
 as before.
+
+---
+
+## Tretu-Konto (`auth/`)
+
+`auth/` is a separate, self-contained Next.js app: **auth.tretu.de**, the OpenID Connect provider behind the
+Tretu account (PM2 `tretu-auth`, port 3021, database `tretu_auth`). It has its own `package.json`, tests and
+deploy files and will move to its own repository (`git subtree split --prefix auth`). See
+[auth/README.md](auth/README.md) and [auth/DEPLOY.md](auth/DEPLOY.md).
 
 ---
 

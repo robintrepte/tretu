@@ -2,6 +2,7 @@ import Image from "next/image";
 import {
   BarChart3,
   FileText,
+  Scale,
   Map,
   Shield,
   MessageCircle,
@@ -15,7 +16,8 @@ export type PageIconName =
   | "twitch"
   | "map"
   | "impressum"
-  | "datenschutz";
+  | "datenschutz"
+  | "agb";
 
 /** Icon size classes per variant (slightly smaller, vert-centered with title) */
 const iconSizeClass = {
@@ -100,6 +102,8 @@ export function PageTitle({
         return <FileText className={iconClass} strokeWidth={1.5} />;
       case "datenschutz":
         return <Shield className={iconClass} strokeWidth={1.5} />;
+      case "agb":
+        return <Scale className={iconClass} strokeWidth={1.5} />;
       default:
         return <MessageCircle className={iconClass} strokeWidth={1.5} />;
     }

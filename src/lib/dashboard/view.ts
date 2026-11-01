@@ -8,9 +8,9 @@ import type { MinecraftSource } from "@/lib/games/minecraft-source";
 import { readProfile } from "@/lib/games/profile";
 import { getHetznerOptions } from "@/lib/hetzner/catalog";
 import { ACTION_LABELS } from "@/lib/orchestrator/action-types";
-import { getActiveServer, getVolume, instanceHostname, type InstanceRow } from "@/lib/orchestrator/host";
+import { getActiveServer, getVolume, hostnameFor, type InstanceRow } from "@/lib/orchestrator/host";
 import type { GameStatus, OverallState } from "@/lib/dashboard/status";
-import { getCloudflareConfig } from "@/lib/settings/store";
+import { getCloudflareConfig, type CloudflareConfig } from "@/lib/settings/store";
 
 export type JobView = {
   id: number;
@@ -79,16 +79,13 @@ function toJobView(job: typeof actionJobs.$inferSelect, userNames: Map<number, s
   };
 }
 
-function userNameMap(ids: number[]) {
+async function userNameMap(ids: number[]) {
   if (!ids.length) return new Map<number, string>();
-  return new Map(
-    db
-      .select({ id: users.id, name: users.displayName })
-      .from(users)
-      .where(inArray(users.id, [...new Set(ids)]))
-      .all()
-      .map((u) => [u.id, u.name])
-  );
+  const rows = await db
+    .select({ id: users.id, name: users.displayName })
+    .from(users)
+    .where(inArray(users.id, [...new Set(ids)]));
+  return new Map(rows.map((u) => [u.id, u.name]));
 }
 
 async function priceLookup() {
@@ -101,27 +98,29 @@ async function priceLookup() {
   }
 }
 
-function buildSummary(
+async function buildSummary(
   instance: InstanceRow,
   price: (serverType: string, location: string) => number | null,
-  userNames: Map<number, string>
-): { summary: InstanceSummary; snapshot: typeof instanceStatusSnapshots.$inferSelect | undefined } {
+  userNames: Map<number, string>,
+  cf: CloudflareConfig | null
+): Promise<{ summary: InstanceSummary; snapshot: typeof instanceStatusSnapshots.$inferSelect | undefined }> {
   const def = getGameDefinition(instance.gameType);
-  const server = getActiveServer(instance.id);
-  const activeJobRow = db
+  const server = await getActiveServer(instance.id);
+  const [activeJobRow] = await db
     .select()
     .from(actionJobs)
     .where(and(eq(actionJobs.instanceId, instance.id), inArray(actionJobs.status, ["running", "queued"])))
+    // "running" sorts after "queued": the running job wins, otherwise the oldest queued one.
     .orderBy(desc(actionJobs.status), actionJobs.createdAt)
-    .get();
-  const snapshot = server
-    ? db
+    .limit(1);
+  const [snapshot] = server
+    ? await db
         .select()
         .from(instanceStatusSnapshots)
         .where(eq(instanceStatusSnapshots.instanceId, instance.id))
         .orderBy(desc(instanceStatusSnapshots.createdAt))
-        .get()
-    : undefined;
+        .limit(1)
+    : [];
   // Ignore snapshots from a previous VM.
   const freshSnapshot = snapshot && server && snapshot.createdAt >= server.createdAt ? snapshot : undefined;
 
@@ -131,7 +130,7 @@ function buildSummary(
   else if (!freshSnapshot) state = "starting";
   else state = (freshSnapshot.gameStatus as GameStatus) === "running" ? "online" : (freshSnapshot.gameStatus as OverallState);
 
-  const hostname = instanceHostname(instance);
+  const hostname = hostnameFor(instance, cf);
   const host = hostname ?? server?.ipV4 ?? null;
   const address =
     host && def ? (def.showPortInAddress ? `${host}:${def.connectPort}` : host) : host;
@@ -170,45 +169,49 @@ function buildSummary(
 }
 
 export async function listInstanceSummaries(): Promise<InstanceSummary[]> {
-  const instances = db
+  const instances = await db
     .select()
     .from(gameInstances)
     .where(isNull(gameInstances.archivedAt))
-    .orderBy(gameInstances.name)
-    .all();
-  const price = await priceLookup();
-  const names = userNameMap([]);
-  return instances.map((instance) => buildSummary(instance, price, names).summary);
+    .orderBy(gameInstances.name);
+  const [price, cf] = await Promise.all([priceLookup(), getCloudflareConfig()]);
+  const names = new Map<number, string>();
+  return Promise.all(instances.map(async (instance) => (await buildSummary(instance, price, names, cf)).summary));
 }
 
 export async function getInstanceDetail(instanceId: number): Promise<InstanceDetail | null> {
-  const instance = db
+  const [instance] = await db
     .select()
     .from(gameInstances)
     .where(and(eq(gameInstances.id, instanceId), isNull(gameInstances.archivedAt)))
-    .get();
+    .limit(1);
   if (!instance) return null;
 
-  const recentJobRows = db
+  const recentJobRows = await db
     .select()
     .from(actionJobs)
     .where(eq(actionJobs.instanceId, instance.id))
-    .orderBy(desc(actionJobs.createdAt))
-    .limit(15)
-    .all();
-  const names = userNameMap(recentJobRows.map((j) => j.requestedByUserId));
-  const { summary, snapshot } = buildSummary(instance, await priceLookup(), names);
+    .orderBy(desc(actionJobs.createdAt), desc(actionJobs.id))
+    .limit(15);
+  const names = await userNameMap(recentJobRows.map((j) => j.requestedByUserId));
+  const cf = await getCloudflareConfig();
+  const { summary, snapshot } = await buildSummary(instance, await priceLookup(), names, cf);
   const recentJobs = recentJobRows.map((j) => toJobView(j, names));
   const lastFinished = recentJobs.find((j) => j.status === "succeeded" || j.status === "failed");
 
   const profile = readProfile(instance.gameType, instance.configProfile);
-  const volume = getVolume(instance.id);
+  const volume = await getVolume(instance.id);
+  const backupRows = await db
+    .select()
+    .from(gameBackups)
+    .where(eq(gameBackups.instanceId, instance.id))
+    .orderBy(desc(gameBackups.createdAt), desc(gameBackups.id));
   const raw = (snapshot?.rawJson ?? {}) as { diskUsedBytes?: number | null; diskTotalBytes?: number | null };
 
   return {
     ...summary,
     subdomain: instance.subdomain,
-    domain: getCloudflareConfig()?.domain ?? null,
+    domain: cf?.domain ?? null,
     settings: profile.settings,
     minecraft: profile.minecraft ?? null,
     backupRetention: instance.backupRetention,
@@ -219,29 +222,23 @@ export async function getInstanceDetail(instanceId: number): Promise<InstanceDet
         : null,
     recentJobs,
     lastFailedJob: lastFinished?.status === "failed" ? lastFinished : null,
-    backups: db
-      .select()
-      .from(gameBackups)
-      .where(eq(gameBackups.instanceId, instance.id))
-      .orderBy(desc(gameBackups.createdAt))
-      .all()
-      .map((b) => ({
-        id: b.id,
-        fileName: b.fileName,
-        sizeBytes: b.sizeBytes,
-        kind: b.kind,
-        createdAt: b.createdAt.toISOString(),
-      })),
+    backups: backupRows.map((b) => ({
+      id: b.id,
+      fileName: b.fileName,
+      sizeBytes: b.sizeBytes,
+      kind: b.kind,
+      createdAt: b.createdAt.toISOString(),
+    })),
     lastHeartbeat: snapshot?.createdAt.toISOString() ?? null,
     createdAt: instance.createdAt.toISOString(),
   };
 }
 
-export function getJobLog(jobId: number, instanceId: number) {
-  const job = db
+export async function getJobLog(jobId: number, instanceId: number) {
+  const [job] = await db
     .select({ log: actionJobs.log, status: actionJobs.status, progress: actionJobs.progress })
     .from(actionJobs)
     .where(and(eq(actionJobs.id, jobId), eq(actionJobs.instanceId, instanceId)))
-    .get();
+    .limit(1);
   return job ?? null;
 }

@@ -1,20 +1,21 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { Panel } from "@/components/dashboard/panel";
 import { Checkbox } from "@/components/ui/checkbox";
 import { dashboardApi } from "@/lib/api/dashboard-client";
-import { formatDateTime } from "@/lib/dashboard/format";
-import { ROLE_LABELS, type Role } from "@/lib/permissions/types";
+import { useFormat } from "@/components/dashboard/use-format";
+import type { Role } from "@/lib/permissions/types";
 
 export type TeamMember = {
   id: number;
   displayName: string;
   avatarUrl: string | null;
-  discordId: string;
+  discordId: string | null;
   roles: Role[];
   lastLoginAt: string;
 };
@@ -22,6 +23,9 @@ export type TeamMember = {
 const EDITABLE_ROLES: Role[] = ["admin", "operator", "manager"];
 
 export function TeamPanel({ initial, currentUserId }: { initial: TeamMember[]; currentUserId: number }) {
+  const t = useTranslations("dashboard.team");
+  const tRoles = useTranslations("dashboard.roles");
+  const format = useFormat();
   const [members, setMembers] = useState(initial);
   const [saving, setSaving] = useState<number | null>(null);
 
@@ -31,7 +35,7 @@ export function TeamPanel({ initial, currentUserId }: { initial: TeamMember[]; c
     try {
       await dashboardApi(`/api/internal/dashboard/users/${member.id}`, { method: "PUT", json: { roles } });
       setMembers((list) => list.map((m) => (m.id === member.id ? { ...m, roles } : m)));
-      toast.success("Rollen gespeichert");
+      toast.success(t("saved"));
     } catch (error) {
       toast.error((error as Error).message);
     } finally {
@@ -41,20 +45,20 @@ export function TeamPanel({ initial, currentUserId }: { initial: TeamMember[]; c
 
   return (
     <div className="space-y-5">
-      <Panel title="Rollen">
+      <Panel title={t("roles")}>
         <dl className="grid gap-3 text-sm sm:grid-cols-3">
           {EDITABLE_ROLES.map((role) => (
             <div key={role} className="rounded-xl bg-muted/40 p-3 dark:bg-muted/20">
-              <dt className="font-medium">{ROLE_LABELS[role].label}</dt>
-              <dd className="mt-1 text-xs leading-relaxed text-muted-foreground">{ROLE_LABELS[role].description}</dd>
+              <dt className="font-medium">{tRoles(`${role}.label`)}</dt>
+              <dd className="mt-1 text-xs leading-relaxed text-muted-foreground">{tRoles(`${role}.description`)}</dd>
             </div>
           ))}
         </dl>
       </Panel>
 
       <Panel
-        title="Mitglieder"
-        description="Alle, die sich schon einmal per Discord angemeldet haben. Wer hier fehlt, muss sich einmal unter /login anmelden."
+        title={t("members")}
+        description={t("membersHint")}
       >
         <ul className="divide-y divide-border/60">
           {members.map((m) => (
@@ -69,9 +73,9 @@ export function TeamPanel({ initial, currentUserId }: { initial: TeamMember[]; c
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">
                     {m.displayName}
-                    {m.id === currentUserId ? <span className="ml-2 text-xs text-muted-foreground">(du)</span> : null}
+                    {m.id === currentUserId ? <span className="ml-2 text-xs text-muted-foreground">{t("you")}</span> : null}
                   </p>
-                  <p className="text-xs text-muted-foreground">Zuletzt aktiv {formatDateTime(m.lastLoginAt)}</p>
+                  <p className="text-xs text-muted-foreground">{t("lastActive", { date: format.dateTime(m.lastLoginAt) })}</p>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-4">
@@ -80,9 +84,9 @@ export function TeamPanel({ initial, currentUserId }: { initial: TeamMember[]; c
                     <Checkbox
                       checked={m.roles.includes(role)}
                       disabled={saving === m.id || (role === "admin" && m.id === currentUserId)}
-                      onCheckedChange={(c) => toggle(m, role, c === true)}
+                      onCheckedChange={(c) => void toggle(m, role, c === true)}
                     />
-                    {ROLE_LABELS[role].label}
+                    {tRoles(`${role}.label`)}
                   </label>
                 ))}
                 {saving === m.id ? <Loader2 className="size-4 animate-spin text-muted-foreground" /> : null}

@@ -13,6 +13,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -23,7 +24,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { dashboardApi } from "@/lib/api/dashboard-client";
-import { formatBytes, formatDateTime } from "@/lib/dashboard/format";
+import { useFormat } from "@/components/dashboard/use-format";
 
 type Entry = { name: string; type: "dir" | "file" | "link"; size: number; modifiedAt: string };
 
@@ -32,6 +33,9 @@ const EDITABLE = /\.(txt|properties|json|json5|ya?ml|toml|cfg|conf|ini|log|md|sh
 const join = (dir: string, name: string) => (dir ? `${dir}/${name}` : name);
 
 export function FilesTab() {
+  const t = useTranslations("dashboard.files");
+  const tCommon = useTranslations("dashboard.common");
+  const format = useFormat();
   const { detail, can } = useInstance();
   const base = `/api/internal/dashboard/instances/${detail.id}/files`;
   const hostUp = Boolean(detail.ip);
@@ -98,48 +102,48 @@ export function FilesTab() {
         const res = await fetch(`${base}?path=${encodeURIComponent(join(dir, file.name))}`, { method: "PUT", body: file });
         if (!res.ok) {
           const body = (await res.json().catch(() => ({}))) as { error?: string };
-          throw new Error(body.error ?? `Upload fehlgeschlagen (${res.status})`);
+          throw new Error(body.error ?? t("uploadFailed", { status: res.status }));
         }
       } catch (e) {
         toast.error(`${file.name}: ${(e as Error).message}`);
       }
     }
     setUploading(null);
-    toast.success("Upload abgeschlossen");
+    toast.success(t("uploadDone"));
     if (uploadRef.current) uploadRef.current.value = "";
     await load(dir);
   };
 
-  if (!hostUp) return <Hint>Dateien sind erreichbar, solange der Server läuft.</Hint>;
+  if (!hostUp) return <Hint>{t("onlyWhenRunning")}</Hint>;
 
   const crumbs = dir ? dir.split("/") : [];
 
   return (
     <Panel
-      title="Dateien"
-      description="Mods, Plugins, Welten und Konfigurationen. Änderungen an laufenden Spielen werden meist erst nach einem Neustart aktiv."
+      title={t("title")}
+      description={t("intro")}
       actions={
         <>
-          <Button variant="outline" size="sm" onClick={() => load(dir)} disabled={loading}>
+          <Button variant="outline" size="sm" onClick={() => void load(dir)} disabled={loading} aria-label={tCommon("refresh")}>
             {loading ? <Loader2 className="animate-spin" /> : <RefreshCw />}
           </Button>
           {writable ? (
             <>
               <Button variant="outline" size="sm" onClick={() => setNewFolder("")}>
-                <FolderPlus /> Ordner
+                <FolderPlus /> {t("folder")}
               </Button>
               <Button size="sm" onClick={() => uploadRef.current?.click()} disabled={Boolean(uploading)}>
                 {uploading ? <Loader2 className="animate-spin" /> : <Upload />}
-                {uploading ? `Lädt ${uploading}…` : "Hochladen"}
+                {uploading ? t("uploading", { name: uploading }) : t("upload")}
               </Button>
-              <input ref={uploadRef} type="file" multiple hidden onChange={(e) => upload(e.target.files)} />
+              <input ref={uploadRef} type="file" multiple hidden onChange={(e) => void upload(e.target.files)} />
             </>
           ) : null}
         </>
       }
     >
       <nav className="mb-3 flex flex-wrap items-center gap-1 text-sm">
-        <button type="button" onClick={() => load("")} className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 hover:bg-muted">
+        <button type="button" onClick={() => void load("")} className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 hover:bg-muted">
           <Home className="size-3.5" /> data
         </button>
         {crumbs.map((c, i) => (
@@ -147,7 +151,7 @@ export function FilesTab() {
             <ChevronRight className="size-3.5 text-muted-foreground" />
             <button
               type="button"
-              onClick={() => load(crumbs.slice(0, i + 1).join("/"))}
+              onClick={() => void load(crumbs.slice(0, i + 1).join("/"))}
               className="rounded-md px-1.5 py-0.5 hover:bg-muted"
             >
               {c}
@@ -160,7 +164,7 @@ export function FilesTab() {
 
       <div className="overflow-hidden rounded-xl border border-border/60">
         {entries.length === 0 && !loading ? (
-          <p className="p-6 text-center text-sm text-muted-foreground">Ordner ist leer.</p>
+          <p className="p-6 text-center text-sm text-muted-foreground">{t("emptyFolder")}</p>
         ) : null}
         <ul className="divide-y divide-border/60">
           {entries.map((entry) => {
@@ -175,22 +179,23 @@ export function FilesTab() {
                 <button
                   type="button"
                   className="min-w-0 flex-1 truncate text-left hover:underline"
-                  onClick={() =>
-                    entry.type === "dir" ? load(path) : EDITABLE.test(entry.name) && writable ? openEditor(path) : undefined
-                  }
+                  onClick={() => {
+                    if (entry.type === "dir") void load(path);
+                    else if (EDITABLE.test(entry.name) && writable) void openEditor(path);
+                  }}
                 >
                   {entry.name}
                 </button>
                 <span className="hidden w-24 text-right text-xs tabular-nums text-muted-foreground sm:block">
-                  {entry.type === "dir" ? "" : formatBytes(entry.size)}
+                  {entry.type === "dir" ? "" : format.bytes(entry.size)}
                 </span>
-                <span className="hidden w-32 text-right text-xs text-muted-foreground md:block">{formatDateTime(entry.modifiedAt)}</span>
+                <span className="hidden w-32 text-right text-xs text-muted-foreground md:block">{format.dateTime(entry.modifiedAt)}</span>
                 <span className="flex shrink-0 items-center gap-0.5 opacity-70 group-hover:opacity-100">
                   {entry.type !== "dir" && writable ? (
                     <a
                       href={`${base}?op=download&path=${encodeURIComponent(path)}`}
                       className="rounded-md p-1.5 hover:bg-muted"
-                      title="Herunterladen"
+                      title={t("download")}
                     >
                       <Download className="size-3.5" />
                     </a>
@@ -200,7 +205,7 @@ export function FilesTab() {
                       <button
                         type="button"
                         className="rounded-md p-1.5 hover:bg-muted"
-                        title="Umbenennen / verschieben"
+                        title={t("rename")}
                         onClick={() => setRename({ from: path, to: path })}
                       >
                         <Pencil className="size-3.5" />
@@ -208,10 +213,10 @@ export function FilesTab() {
                       <button
                         type="button"
                         className="rounded-md p-1.5 text-red-600 hover:bg-red-500/10"
-                        title="Löschen"
+                        title={t("delete")}
                         onClick={() => {
-                          if (window.confirm(`„${entry.name}“ wirklich löschen?`)) {
-                            void op({ op: "delete", path }, "Gelöscht");
+                          if (window.confirm(t("confirmDelete", { name: entry.name }))) {
+                            void op({ op: "delete", path }, t("deleted"));
                           }
                         }}
                       >
@@ -239,25 +244,24 @@ export function FilesTab() {
           />
           {detail.gameType === "minecraft" && editor?.path === "server.properties" ? (
             <Hint tone="warning">
-              Werte, die im Dashboard unter „Einstellungen“ gepflegt werden (z. B. MOTD, Spieler, Schwierigkeit), überschreiben
-              diese Datei beim nächsten Start.
+              {t("propertiesWarning")}
             </Hint>
           ) : null}
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditor(null)} disabled={saving}>
-              Abbrechen
+              {tCommon("cancel")}
             </Button>
             <Button
               disabled={saving}
               onClick={async () => {
                 if (!editor) return;
                 setSaving(true);
-                const okSaved = await op({ op: "write", path: editor.path, content: editor.content }, "Gespeichert");
+                const okSaved = await op({ op: "write", path: editor.path, content: editor.content }, t("saved"));
                 setSaving(false);
                 if (okSaved) setEditor(null);
               }}
             >
-              {saving ? <Loader2 className="animate-spin" /> : null} Speichern
+              {saving ? <Loader2 className="animate-spin" /> : null} {tCommon("save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -266,17 +270,17 @@ export function FilesTab() {
       <Dialog open={newFolder !== null} onOpenChange={(open) => !open && setNewFolder(null)}>
         <DialogContent className="rounded-2xl sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Neuer Ordner</DialogTitle>
+            <DialogTitle>{t("newFolder")}</DialogTitle>
           </DialogHeader>
-          <Input autoFocus value={newFolder ?? ""} onChange={(e) => setNewFolder(e.target.value)} placeholder="Name" />
+          <Input autoFocus value={newFolder ?? ""} onChange={(e) => setNewFolder(e.target.value)} placeholder={t("name")} />
           <DialogFooter>
             <Button
               disabled={!newFolder?.trim()}
               onClick={async () => {
-                if (await op({ op: "mkdir", path: join(dir, newFolder!.trim()) }, "Ordner angelegt")) setNewFolder(null);
+                if (await op({ op: "mkdir", path: join(dir, newFolder!.trim()) }, t("folderCreated"))) setNewFolder(null);
               }}
             >
-              Anlegen
+              {t("create")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -285,7 +289,7 @@ export function FilesTab() {
       <Dialog open={Boolean(rename)} onOpenChange={(open) => !open && setRename(null)}>
         <DialogContent className="rounded-2xl sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Umbenennen / verschieben</DialogTitle>
+            <DialogTitle>{t("rename")}</DialogTitle>
           </DialogHeader>
           <Input
             autoFocus
@@ -293,15 +297,15 @@ export function FilesTab() {
             onChange={(e) => setRename((r) => (r ? { ...r, to: e.target.value } : r))}
             className="font-mono"
           />
-          <p className="text-xs text-muted-foreground">Pfad relativ zum Datenordner, z. B. „mods/alt/meinmod.jar“.</p>
+          <p className="text-xs text-muted-foreground">{t("renameHint")}</p>
           <DialogFooter>
             <Button
               disabled={!rename?.to.trim() || rename.to === rename.from}
               onClick={async () => {
-                if (rename && (await op({ op: "rename", path: rename.from, to: rename.to.trim() }, "Umbenannt"))) setRename(null);
+                if (rename && (await op({ op: "rename", path: rename.from, to: rename.to.trim() }, t("renamed")))) setRename(null);
               }}
             >
-              Speichern
+              {tCommon("save")}
             </Button>
           </DialogFooter>
         </DialogContent>

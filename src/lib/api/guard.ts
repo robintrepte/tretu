@@ -1,6 +1,6 @@
 import type { NextResponse } from "next/server";
 
-import { fail } from "@/lib/api/respond";
+import { failKey } from "@/lib/api/errors";
 import { getUserId } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/permissions/checks";
 import type { Permission } from "@/lib/permissions/types";
@@ -10,10 +10,10 @@ type Guarded = { userId: number; error?: never } | { userId?: never; error: Next
 /** Resolves the signed-in user and checks a permission; returns an error response otherwise. */
 export async function requirePermission(permission: Permission): Promise<Guarded> {
   const userId = await getUserId();
-  if (!userId) return { error: fail("Nicht angemeldet.", 401) };
-  if (!hasPermission(userId, permission)) return { error: fail("Keine Berechtigung für diese Aktion.", 403) };
+  if (!userId) return { error: await failKey("notSignedIn", 401) };
+  if (!(await hasPermission(userId, permission))) return { error: await failKey("noPermission", 403) };
   const numeric = Number(userId);
-  if (!Number.isFinite(numeric)) return { error: fail("Nicht angemeldet.", 401) };
+  if (!Number.isFinite(numeric)) return { error: await failKey("notSignedIn", 401) };
   return { userId: numeric };
 }
 

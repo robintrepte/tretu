@@ -1,10 +1,11 @@
 "use client";
 
 import { Cpu, MemoryStick } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 
 import { Checkbox } from "@/components/ui/checkbox";
-import { formatEuro } from "@/lib/dashboard/format";
+import { useFormat } from "@/components/dashboard/use-format";
 import type { HetznerOptions, ServerTypeOption } from "@/lib/hetzner/types";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +41,8 @@ export function ServerTypePicker({
   recommendedRamGb: number;
   disabled?: boolean;
 }) {
+  const tr = useTranslations("dashboard.serverType");
+  const format = useFormat();
   const [showDedicated, setShowDedicated] = useState(false);
   const recommended = recommendedServerType(options, location, recommendedRamGb, minRamGb);
 
@@ -80,10 +83,10 @@ export function ServerTypePicker({
                 <span className="font-mono text-sm font-semibold uppercase">{t.name}</span>
                 {t.name === recommended ? (
                   <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
-                    Empfohlen
+                    {tr("recommended")}
                   </span>
                 ) : !available ? (
-                  <span className="text-[11px] text-muted-foreground">ausverkauft</span>
+                  <span className="text-[11px] text-muted-foreground">{tr("soldOut")}</span>
                 ) : null}
               </div>
               <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -91,12 +94,12 @@ export function ServerTypePicker({
                   <MemoryStick className="size-3.5" /> {t.memoryGb} GB RAM
                 </span>
                 <span className="inline-flex items-center gap-1">
-                  <Cpu className="size-3.5" /> {t.cores} vCPU{t.dedicatedCpu ? " (dediziert)" : ""}
+                  <Cpu className="size-3.5" /> {t.cores} vCPU{t.dedicatedCpu ? ` ${tr("dedicated")}` : ""}
                 </span>
               </div>
               <div className="mt-2 text-sm">
-                <span className="font-semibold tabular-nums">{formatEuro(price.hourly, 3)}</span>
-                <span className="text-muted-foreground"> / Std.</span>
+                <span className="font-semibold tabular-nums">{format.euro(price.hourly, 3)}</span>
+                <span className="text-muted-foreground"> {tr("perHourSuffix")}</span>
               </div>
             </button>
           );
@@ -104,11 +107,11 @@ export function ServerTypePicker({
       </div>
       <label className="flex w-fit cursor-pointer items-center gap-2 text-xs text-muted-foreground">
         <Checkbox checked={showDedicated} onCheckedChange={(c) => setShowDedicated(c === true)} />
-        Auch Server mit dedizierten CPUs zeigen (teurer, konstantere Leistung)
+        {tr("showDedicated")}
       </label>
       {recommendedRamGb > minRamGb ? (
         <p className="text-xs text-muted-foreground">
-          Mindestens {minRamGb} GB RAM, empfohlen {recommendedRamGb} GB. Abgerechnet wird nur, solange der Server an ist.
+          {tr("ramHint", { min: minRamGb, recommended: recommendedRamGb })}
         </p>
       ) : null}
     </div>

@@ -1,15 +1,15 @@
 import { eq } from "drizzle-orm";
 
-import { db } from "@/db";
+import { closeDb, db } from "@/db";
 import { tsServerSnapshots, tsUsers, tsWorkerState } from "@/db/schema";
-import { getTsRankConfig, SQLITE_DATABASE_PATH } from "@/lib/env/server";
+import { DATABASE_URL, getTsRankConfig } from "@/lib/env/server";
 import { formatQueryProbeHelp, probeTeamSpeakQuery } from "@/lib/teamspeak/query-probe";
 import { TeamSpeakQueryClient } from "@/lib/teamspeak/query-client";
 import { loadRankTiersFromDb } from "@/lib/teamspeak/ranks";
 
 async function main() {
   const config = getTsRankConfig();
-  console.log("DB:", SQLITE_DATABASE_PATH);
+  console.log("DB:", DATABASE_URL.replace(/\/\/[^@]*@/, "//***@"));
   console.log("TS config:", {
     enabled: config.enabled,
     host: config.queryHost,
@@ -80,4 +80,4 @@ async function main() {
   }
 }
 
-void main();
+void main().finally(() => void closeDb());

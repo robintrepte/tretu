@@ -5,11 +5,11 @@
 export const YOUTUBE_CHANNEL_ID =
   process.env.YOUTUBE_CHANNEL_ID ?? "UCrn4oucvfow7jUNGSeE7ySg";
 
-export const SQLITE_DATABASE_PATH =
-  process.env.SQLITE_DATABASE_PATH ?? "local.sqlite";
+/** Postgres connection string (one database per app, see deploy/README.md). */
+export const DATABASE_URL =
+  process.env.DATABASE_URL ?? "postgres://postgres@localhost:5432/tretu_web";
 
 export const AUTH_SECRET = process.env.AUTH_SECRET ?? "dev-only-change-me";
-export const AUTH_TRUST_HOST = (process.env.AUTH_TRUST_HOST ?? "true") === "true";
 export const AUTH_DISCORD_CLIENT_ID = process.env.AUTH_DISCORD_CLIENT_ID ?? "";
 export const AUTH_DISCORD_CLIENT_SECRET =
   process.env.AUTH_DISCORD_CLIENT_SECRET ?? "";

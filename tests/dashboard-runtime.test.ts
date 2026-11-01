@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import test from "node:test";
 
-// Must come first: modules below open the SQLite database on import.
-import "./helpers/memory-db";
+// Must come first: modules below import the database client.
+import { closeTestDatabase } from "./helpers/test-db";
 
 import { resolveDataPath } from "../src/lib/dashboard/host-access";
 import { defaultSettings, GAME_CATALOG, getGameDefinition, normalizeSettings } from "../src/lib/games/catalog";
@@ -194,4 +194,8 @@ test("only verified games can be created", async () => {
   const { requireCreatableDefinition, InputError } = await import("../src/lib/dashboard/instance-input");
   assert.equal(requireCreatableDefinition("minecraft").id, "minecraft");
   assert.throws(() => requireCreatableDefinition("valheim"), InputError);
+});
+
+test.after(async () => {
+  await closeTestDatabase();
 });

@@ -1,11 +1,20 @@
 "use client";
 
-import { Gamepad2, LayoutDashboard, LogIn } from "lucide-react";
+import { Gamepad2, LogIn } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { useState, useEffect, useMemo } from "react";
+import { UserMenu, type UserMenuState } from "@/components/auth/user-menu";
 import { HeaderLogo } from "@/components/header-logo";
 import { MobileNav } from "@/components/mobile-nav";
 import { getNavItems, PLAY_URL } from "@/lib/nav/items";
+
+type AccessPayload = {
+  allowed?: boolean;
+  authenticated?: boolean;
+  user?: { name: string; image: string | null } | null;
+  accountUrl?: string | null;
+};
 
 const socialLinks = [
   { label: "Twitch", href: "https://www.twitch.tv/TretuDE", icon: "twitch" },
@@ -17,8 +26,10 @@ const headerIconLinkClass =
   "inline-flex size-11 shrink-0 items-center justify-center text-header-fg transition-colors hover:text-[var(--tretu-accent)] md:size-auto md:min-h-0 md:min-w-0";
 
 export function Header() {
+  const t = useTranslations("header");
+  const tNav = useTranslations("nav");
   const [scrolled, setScrolled] = useState(false);
-  const [canAccessDashboard, setCanAccessDashboard] = useState(false);
+  const [userMenu, setUserMenu] = useState<UserMenuState | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [mapAvailable, setMapAvailable] = useState(false);
@@ -35,16 +46,25 @@ export function Header() {
   useEffect(() => {
     let mounted = true;
     void fetch("/api/auth/dashboard-access", { cache: "no-store" })
-      .then((res) => (res.ok ? res.json() : { allowed: false, authenticated: false }))
-      .then((data: { allowed?: boolean; authenticated?: boolean }) => {
+      .then((res) => (res.ok ? (res.json() as Promise<AccessPayload>) : { allowed: false, authenticated: false }))
+      .then((data: AccessPayload) => {
         if (!mounted) return;
-        setCanAccessDashboard(Boolean(data.allowed));
         setIsAuthenticated(Boolean(data.authenticated));
+        setUserMenu(
+          data.authenticated && data.user
+            ? {
+                name: data.user.name,
+                image: data.user.image,
+                canAccessDashboard: Boolean(data.allowed),
+                accountUrl: data.accountUrl ?? null,
+              }
+            : null
+        );
         setAuthChecked(true);
       })
       .catch(() => {
         if (!mounted) return;
-        setCanAccessDashboard(false);
+        setUserMenu(null);
         setIsAuthenticated(false);
         setAuthChecked(true);
       });
@@ -68,7 +88,7 @@ export function Header() {
     };
   }, []);
 
-  const showAuthAction = authChecked && (canAccessDashboard || !isAuthenticated);
+  const showAuthAction = authChecked;
 
   return (
     <header
@@ -78,7 +98,7 @@ export function Header() {
         <Link href="/" className="flex shrink-0" aria-label="Tretu">
           <HeaderLogo />
         </Link>
-        <nav className="hidden flex-1 items-center justify-center md:flex" aria-label="Hauptmenü">
+        <nav className="hidden flex-1 items-center justify-center md:flex" aria-label={t("mainNav")}>
           <ul className="flex flex-wrap items-center justify-center gap-1 text-sm uppercase tracking-wide md:gap-4">
             {navItems.filter((item) => !item.highlight).map((item) => (
               <li key={item.href} className="relative group">
@@ -88,7 +108,7 @@ export function Header() {
                       href={item.href}
                       className="flex items-center px-2 py-2 text-header-fg transition-colors hover:text-[var(--tretu-accent)] md:px-3"
                     >
-                      {item.label}
+                      {tNav(item.labelKey)}
                     </Link>
                     <ul className="absolute left-0 top-full hidden min-w-[180px] rounded border border-border bg-background py-1 shadow-lg group-hover:block">
                       {item.children.map((child) => (
@@ -97,7 +117,7 @@ export function Header() {
                             href={child.href}
                             className="block px-4 py-2 text-foreground hover:bg-muted hover:text-[var(--tretu-accent)]"
                           >
-                            {child.label}
+                            {tNav(child.labelKey)}
                           </Link>
                         </li>
                       ))}
@@ -108,7 +128,7 @@ export function Header() {
                     href={item.href}
                     className="block px-2 py-2 text-header-fg transition-colors hover:text-[var(--tretu-accent)] md:px-3"
                   >
-                    {item.label}
+                    {tNav(item.labelKey)}
                   </Link>
                 )}
               </li>
@@ -121,13 +141,13 @@ export function Header() {
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Tretu Play"
-            title="Tretu Play – Browser-Spiele mit Freunden"
+            title={t("playTitle")}
             className="hidden items-center gap-1.5 text-header-fg transition-colors hover:text-[var(--tretu-accent)] md:inline-flex"
           >
             <Gamepad2 className="h-5 w-5" aria-hidden />
           </a>
           <span aria-hidden className="hidden h-4 w-px shrink-0 bg-header-fg/25 md:block" />
-          <ul className="hidden items-center gap-6 md:flex" aria-label="Soziale Netzwerke">
+          <ul className="hidden items-center gap-6 md:flex" aria-label={t("social")}>
             {socialLinks.map(({ href, label, icon }) => (
               <li key={href}>
                 <a
@@ -164,22 +184,13 @@ export function Header() {
           ) : null}
           <div className="flex items-center gap-3">
             <MobileNav navItems={navItems} />
-            {authChecked && canAccessDashboard ? (
-              <Link
-                href="/dashboard/"
-                className={headerIconLinkClass}
-                aria-label="Dashboard"
-                title="Internes Game-Server-Dashboard"
-              >
-                <LayoutDashboard className="size-5 md:size-4" aria-hidden />
-              </Link>
-            ) : null}
+            {authChecked && userMenu ? <UserMenu state={userMenu} triggerClassName={headerIconLinkClass} /> : null}
             {authChecked && !isAuthenticated ? (
               <Link
                 href="/login?callbackUrl=/dashboard"
                 className={headerIconLinkClass}
-                aria-label="Anmelden"
-                title="Mit Discord anmelden"
+                aria-label={t("signIn")}
+                title={t("signIn")}
               >
                 <LogIn className="size-5 md:size-4" aria-hidden />
               </Link>

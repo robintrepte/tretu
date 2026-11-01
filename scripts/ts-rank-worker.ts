@@ -8,7 +8,8 @@ async function main() {
     console.error(
       "TS rank worker disabled: set TS_QUERY_HOST, TS_QUERY_USER, TS_QUERY_PASSWORD in .env.local"
     );
-    process.exit(1);
+    // EX_CONFIG: PM2 treats this exit code as final (stop_exit_codes) instead of restarting in a loop.
+    process.exit(78);
   }
 
   log("info", "ts-rank-worker.started", { pollIntervalSec: config.pollIntervalSec });

@@ -1,11 +1,31 @@
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 
-import { SQLITE_DATABASE_PATH } from "@/lib/env/server";
-import { ensureDashboardSchema } from "./ensure-dashboard-schema";
+import { DATABASE_URL } from "@/lib/env/server";
 import * as schema from "./schema";
 
-export const sqlite = new Database(SQLITE_DATABASE_PATH);
-sqlite.pragma("busy_timeout = 5000");
-ensureDashboardSchema(sqlite);
-export const db = drizzle(sqlite, { schema });
+type PgClient = ReturnType<typeof postgres>;
+
+/** One pool per process (survives Next.js dev hot reloads). Connects lazily on the first query. */
+const globalForDb = globalThis as unknown as { __tretuPg?: PgClient };
+
+export const client: PgClient = (globalForDb.__tretuPg ??= postgres(DATABASE_URL, {
+  max: Number(process.env.DATABASE_POOL_MAX ?? 10),
+  idle_timeout: 30,
+  connect_timeout: 10,
+  onnotice: () => undefined,
+}));
+
+export const db = drizzle(client, { schema });
+
+export type Db = typeof db;
+/** Transaction handle passed to `db.transaction(async (tx) => …)`. */
+export type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+/** Either the pool or an open transaction. */
+export type DbOrTx = Db | Tx;
+
+/** Closes the pool so CLI scripts can exit. */
+export async function closeDb(): Promise<void> {
+  await client.end({ timeout: 5 });
+  globalForDb.__tretuPg = undefined;
+}
