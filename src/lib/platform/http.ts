@@ -62,6 +62,15 @@ export function parseQuery<S extends z.ZodType>(url: URL, schema: S): z.infer<S>
   return parsed.data;
 }
 
+/** `/api/v1/users/<sub>/friends` → `/api/v1/users/:id/friends` (keeps the static route segments only). */
+export function routePattern(pathname: string): string {
+  const STATIC = new Set(["api", "v1", "me", "users", "wallet", "transactions", "daily", "friends", "requests", "accept", "decline", "remove", "presence", "invites", "notifications", "count", "read", "push", "settings", "teamspeak", "badges", "events"]);
+  return pathname
+    .split("/")
+    .map((segment) => (segment === "" || STATIC.has(segment) ? segment : ":id"))
+    .join("/");
+}
+
 function handleError(error: unknown, route: string): Response {
   if (error instanceof PlatformError) {
     return errorResponse(error.status, error.code, error.message, error.extra);
@@ -70,7 +79,8 @@ function handleError(error: unknown, route: string): Response {
     return errorResponse(503, "platform_unavailable", "The Tretu platform is not configured.");
   }
   log("error", "platform.api.error", {
-    route,
+    // Path parameters (subs, ids, usernames) are not logged.
+    route: routePattern(route),
     error: error instanceof Error ? error.message : String(error),
   });
   return errorResponse(500, "internal_error");

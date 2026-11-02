@@ -15,24 +15,31 @@ export interface UserShape {
   createdAt: string
 }
 
+/**
+ * The linked accounts of contract §2: Discord and Steam are sign-in identities (`account` rows), Minecraft and
+ * TeamSpeak are linked by other Tretu services through the admin API (`external_link`).
+ */
 export async function getUserLinks(userId: string, db: Db = defaultDb): Promise<UserLinks> {
-  const [discord] = await db
-    .select({ accountId: account.accountId })
+  const identities = await db
+    .select({ providerId: account.providerId, accountId: account.accountId })
     .from(account)
-    .where(and(eq(account.userId, userId), eq(account.providerId, "discord")))
-    .limit(1)
+    .where(and(eq(account.userId, userId), inArray(account.providerId, ["discord", "steam"])))
   const external = await db
     .select({ provider: externalLink.provider, id: externalLink.providerAccountId, displayName: externalLink.displayName })
     .from(externalLink)
-    .where(eq(externalLink.userId, userId))
+    .where(and(eq(externalLink.userId, userId), inArray(externalLink.provider, ["minecraft", "teamspeak"])))
   const links: UserLinks = {}
-  if (discord) links.discord = discord.accountId
+  for (const identity of identities) {
+    if (identity.providerId === "discord") links.discord = identity.accountId
+    else if (identity.providerId === "steam") links.steam = identity.accountId
+  }
   for (const link of external) {
     if (link.provider === "minecraft") {
       links.minecraft = link.id
       if (link.displayName) links.minecraftName = link.displayName
-    } else if (link.provider === "steam") {
-      links.steam = link.id
+    } else if (link.provider === "teamspeak") {
+      links.teamspeak = link.id
+      if (link.displayName) links.teamspeakName = link.displayName
     }
   }
   return links

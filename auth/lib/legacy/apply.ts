@@ -6,13 +6,12 @@ import { emitUserEvent } from "@/lib/tretu/events"
 import type { Anchor, IdentityProvider, LegacyApp, PlannedGroup } from "./plan"
 
 /** Every existing Tretu account, as anchors for the matching (identities, verified email, earlier imports). */
-export async function loadAnchors(db: Db): Promise<{ anchors: Anchor[]; takenSteamIds: string[] }> {
+export async function loadAnchors(db: Db): Promise<{ anchors: Anchor[] }> {
   const users = await db
     .select({ id: s.user.id, email: s.user.email, emailVerified: s.user.emailVerified, username: s.user.username })
     .from(s.user)
   const accounts = await db.select({ userId: s.account.userId, providerId: s.account.providerId, accountId: s.account.accountId }).from(s.account)
   const links = await db.select({ userId: s.legacyLink.userId, app: s.legacyLink.app, legacyUserId: s.legacyLink.legacyUserId }).from(s.legacyLink)
-  const steam = await db.select({ userId: s.externalLink.userId, id: s.externalLink.providerAccountId }).from(s.externalLink).where(eq(s.externalLink.provider, "steam"))
   const byUser = new Map<string, Anchor>()
   for (const u of users) {
     byUser.set(u.id, {
@@ -23,21 +22,16 @@ export async function loadAnchors(db: Db): Promise<{ anchors: Anchor[]; takenSte
       identities: [],
       legacy: [],
       hasPassword: false,
-      steamLinked: false,
     })
   }
   for (const a of accounts) {
     const anchor = byUser.get(a.userId)
     if (!anchor) continue
     if (a.providerId === "credential") anchor.hasPassword = true
-    else if (a.providerId === "discord" || a.providerId === "google" || a.providerId === "apple") anchor.identities.push({ provider: a.providerId as IdentityProvider, id: a.accountId })
+    else if (a.providerId === "discord" || a.providerId === "google" || a.providerId === "apple" || a.providerId === "steam") anchor.identities.push({ provider: a.providerId as IdentityProvider, id: a.accountId })
   }
   for (const l of links) byUser.get(l.userId)?.legacy.push({ app: l.app as LegacyApp, legacyUserId: l.legacyUserId })
-  for (const l of steam) {
-    const anchor = byUser.get(l.userId)
-    if (anchor) anchor.steamLinked = true
-  }
-  return { anchors: [...byUser.values()], takenSteamIds: steam.map((l) => l.id) }
+  return { anchors: [...byUser.values()] }
 }
 
 /** Writes one planned group (one transaction). Returns the Tretu ID and whether it is a new account. */
@@ -71,9 +65,6 @@ export async function applyGroup(db: Db, group: PlannedGroup, now = new Date()):
     if (group.passwordHash) {
       const credential = await tx.query.account.findFirst({ where: and(eq(s.account.userId, userId), eq(s.account.providerId, "credential")), columns: { id: true } })
       if (!credential) await tx.insert(s.account).values({ id: randomUUID(), userId, providerId: "credential", accountId: userId, password: group.passwordHash, createdAt: now, updatedAt: now })
-    }
-    if (group.steamId) {
-      await tx.insert(s.externalLink).values({ userId, provider: "steam", providerAccountId: group.steamId }).onConflictDoNothing()
     }
     for (const record of group.newRecords) {
       await tx

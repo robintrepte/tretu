@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 import { getTranslations } from "next-intl/server"
 import { AuthShell } from "@/components/auth-shell"
 import { RegisterForm } from "@/components/auth/register-form"
-import { enabledSocialProviders, env, turnstileEnabled } from "@/lib/env"
+import { enabledSocialProviders, env, steamEnabled, turnstileEnabled } from "@/lib/env"
 import { readOAuthRequest, toQueryString, type SearchParams } from "@/lib/oidc/flow"
 import { getSession } from "@/lib/session"
 
@@ -22,6 +22,7 @@ export default async function RegisterPage({ searchParams }: { searchParams: Pro
         query={toQueryString(params)}
         inOAuthFlow={Boolean(oauth?.valid)}
         providers={enabledSocialProviders}
+        steam={steamEnabled}
         turnstileSiteKey={turnstileEnabled ? env.TURNSTILE_SITE_KEY! : null}
         legalUrl={env.TRETU_LEGAL_URL}
       />

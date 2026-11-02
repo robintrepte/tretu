@@ -18,6 +18,11 @@ import { TeamSpeakQueryClient, type TsOnlineClient } from "@/lib/teamspeak/query
 
 export const TS_CODE_TTL_MS = 15 * 60 * 1000;
 
+/** ServerQuery credentials (TS_QUERY_*) are set: enough to remove groups even without a badge mapping. */
+export function teamspeakConfigured(): boolean {
+  return getTsRankConfig().enabled;
+}
+
 /** TS badge groups are on when ServerQuery is configured (TS_QUERY_*) and a badge mapping exists. */
 export function teamspeakSyncEnabled(): boolean {
   return getTsRankConfig().enabled && Object.keys(getTsBadgeGroups()).length > 0;
@@ -68,6 +73,8 @@ export type TsLinkState = {
   nickname: string | null;
   code: string | null;
   codeExpiresAt: string | null;
+  /** Why the last link was undone (e.g. `ts_identity_taken_auth` when auth has it on another Tretu-Konto). */
+  error: string | null;
 };
 
 export async function getTsLinkState(db: Executor, sub: string, now: Date = new Date()): Promise<TsLinkState> {
@@ -78,6 +85,7 @@ export async function getTsLinkState(db: Executor, sub: string, now: Date = new 
     nickname: row?.tsNickname ?? null,
     code: codeValid ? (row?.verifyCode ?? null) : null,
     codeExpiresAt: codeValid ? (row?.codeExpiresAt?.toISOString() ?? null) : null,
+    error: row?.verifiedAt ? null : (row?.linkError ?? null),
   };
 }
 
@@ -90,7 +98,7 @@ export async function startTsLink(db: Executor, sub: string, now: Date = new Dat
   await db
     .insert(platformTsLinks)
     .values({ sub, verifyCode: code, codeExpiresAt: expiresAt, updatedAt: now })
-    .onConflictDoUpdate({ target: platformTsLinks.sub, set: { verifyCode: code, codeExpiresAt: expiresAt, updatedAt: now } });
+    .onConflictDoUpdate({ target: platformTsLinks.sub, set: { verifyCode: code, codeExpiresAt: expiresAt, linkError: null, updatedAt: now } });
   return { code, expiresAt: expiresAt.toISOString() };
 }
 
@@ -100,7 +108,7 @@ export async function verifyTsLink(
   sub: string,
   now: Date = new Date(),
   listClients: () => Promise<TsOnlineClient[]> = listOnlineTsClients
-): Promise<{ nickname: string }> {
+): Promise<{ nickname: string; uid: string }> {
   const [row] = await db.select().from(platformTsLinks).where(eq(platformTsLinks.sub, sub)).limit(1);
   if (!row?.verifyCode || !row.codeExpiresAt || row.codeExpiresAt.getTime() <= now.getTime()) {
     throw new PlatformError(410, "code_expired", "Start the linking again.");
@@ -121,12 +129,15 @@ export async function verifyTsLink(
       verifiedAt: now,
       verifyCode: null,
       codeExpiresAt: null,
+      linkError: null,
       updatedAt: now,
     })
     .where(eq(platformTsLinks.sub, sub));
-  return { nickname };
+  return { nickname, uid };
 }
 
-export async function unlinkTs(db: Executor, sub: string): Promise<void> {
-  await db.delete(platformTsLinks).where(eq(platformTsLinks.sub, sub));
+/** Removes the link; returns the client database id that was linked (for taking back granted groups). */
+export async function unlinkTs(db: Executor, sub: string): Promise<string | null> {
+  const [row] = await db.delete(platformTsLinks).where(eq(platformTsLinks.sub, sub)).returning();
+  return row?.verifiedAt && row.tsClientDbId ? String(row.tsClientDbId) : null;
 }

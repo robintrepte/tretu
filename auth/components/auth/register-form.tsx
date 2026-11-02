@@ -20,12 +20,14 @@ export function RegisterForm({
   query,
   inOAuthFlow,
   providers,
+  steam,
   turnstileSiteKey,
   legalUrl,
 }: {
   query: string
   inOAuthFlow: boolean
   providers: ProviderId[]
+  steam: boolean
   turnstileSiteKey: string | null
   legalUrl: string
 }) {
@@ -149,10 +151,10 @@ export function RegisterForm({
           {t("submit")}
         </Button>
       </form>
-      {providers.length > 0 && (
+      {(providers.length > 0 || steam) && (
         <>
           <Divider label={tc("or")} />
-          <SocialButtons providers={providers} callbackURL="/konto" />
+          <SocialButtons providers={providers} steam={steam} callbackURL="/konto" />
         </>
       )}
       <p className="text-center text-sm text-muted-foreground">

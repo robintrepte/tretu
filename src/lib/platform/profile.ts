@@ -1,10 +1,10 @@
 /** Profiles: the signed `GET /users/{sub}` shape and the data behind the /u/[username] page. */
 import { desc, eq } from "drizzle-orm";
 
-import { platformProfileSettings, platformUserBadges, platformUserProgress, platformUsers } from "@/db/platform-schema";
+import { platformProfileSettings, platformTsLinks, platformUserBadges, platformUserProgress, platformUsers } from "@/db/platform-schema";
 import { getBadge, type Locale } from "@/lib/platform/badges";
 import { type Executor } from "@/lib/platform/db";
-import { getDirectoryUser, isErased, type DirectoryUser } from "@/lib/platform/directory";
+import { getDirectoryUser, isErased, steamProfileUrl, validSteamId, type DirectoryUser } from "@/lib/platform/directory";
 import { getPlatformBaseUrl } from "@/lib/platform/env";
 import { areFriends, friendCount } from "@/lib/platform/friends";
 import { levelInfo, type LevelInfo } from "@/lib/platform/levels";
@@ -96,7 +96,35 @@ export type ProfilePage =
       badges: EarnedBadge[];
       stats: Record<string, number>;
       friends: number;
+      /** `https://steamcommunity.com/profiles/<id>` when a Steam account is linked at auth.tretu.de. */
+      steamUrl: string | null;
+      linked: LinkedAccounts;
     };
+
+/** Accounts linked to the Tretu-Konto, as shown on the profile (no ids except the public Steam / Minecraft name). */
+export type LinkedAccounts = { discord: boolean; minecraftName: string | null; minecraft: boolean; steamUrl: string | null; teamspeak: boolean };
+
+export async function getLinkedAccounts(db: Executor, user: DirectoryUser): Promise<LinkedAccounts> {
+  const [ts] = await db
+    .select({ verifiedAt: platformTsLinks.verifiedAt })
+    .from(platformTsLinks)
+    .where(eq(platformTsLinks.sub, user.sub))
+    .limit(1);
+  const links = user.links ?? {};
+  return {
+    discord: Boolean(user.discordId || links.discord),
+    minecraft: Boolean(links.minecraft || links.minecraftName),
+    minecraftName: links.minecraftName ?? null,
+    steamUrl: steamUrlFor(user),
+    teamspeak: Boolean(ts?.verifiedAt || links.teamspeak),
+  };
+}
+
+/** Linked Steam profile (only ever shown where the profile itself may be seen). */
+export function steamUrlFor(user: Pick<DirectoryUser, "steamId" | "links">): string | null {
+  const id = validSteamId(user.steamId) ?? validSteamId(user.links?.steam);
+  return id ? steamProfileUrl(id) : null;
+}
 
 export async function findProfileUser(db: Executor, usernameOrSub: string): Promise<DirectoryUser | null> {
   const value = decodeURIComponent(usernameOrSub).trim();
@@ -129,5 +157,7 @@ export async function loadProfilePage(
     badges: await getEarnedBadges(db, user.sub, locale),
     stats: await getStats(db, user.sub),
     friends: await friendCount(db, user.sub),
+    steamUrl: steamUrlFor(user),
+    linked: await getLinkedAccounts(db, user),
   };
 }

@@ -150,10 +150,10 @@ describe("legacy import", () => {
     expect((await linkFor("saga", "1"))!.userId).toBe(robin!.id)
     expect((await linkFor("hollowmere", "11111111-1111-4111-8111-111111111111"))!.userId).toBe(robin!.id)
     const accounts = await db.select().from(s.account).where(eq(s.account.userId, robin!.id))
-    expect(accounts.map((a) => `${a.providerId}:${a.providerId === "credential" ? "-" : a.accountId}`).sort()).toEqual(["credential:-", "discord:1001"])
+    expect(accounts.map((a) => `${a.providerId}:${a.providerId === "credential" ? "-" : a.accountId}`).sort()).toEqual(["credential:-", "discord:1001", "steam:76561198000000001"])
     expect(accounts.find((a) => a.providerId === "credential")!.password!.startsWith("multi:")).toBe(true)
-    const steam = await db.query.externalLink.findFirst({ where: eq(s.externalLink.userId, robin!.id) })
-    expect(steam).toMatchObject({ provider: "steam", providerAccountId: "76561198000000001" })
+    // Nakama's Steam ID became a "Mit Steam anmelden" identity (an account row), not an external link.
+    expect(await db.query.externalLink.findFirst({ where: eq(s.externalLink.userId, robin!.id) })).toBeUndefined()
 
     const maxPlay = await db.query.user.findFirst({ where: eq(s.user.id, (await linkFor("play", "p-max"))!.userId) })
     expect(maxPlay).toMatchObject({ username: "max_2", usernamePending: true })

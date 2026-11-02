@@ -24,7 +24,7 @@ Source code for the official **Tretu** gaming community website. Teamspeak, Disc
 - **Accounts** — Better Auth: Discord login, optional Tretu-Konto (auth.tretu.de) as primary login
 - **Theme** — Light / dark / system with next-themes
 - **SEO & PWA** — Metadata, Open Graph, Twitter cards, JSON-LD, manifest, sitemap, robots.txt
-- **Security** — CSP, HSTS, X-Frame-Options and other security headers
+- **Security** — CSP, HSTS, X-Frame-Options, COOP and other security headers, rate limits, redacted logs
 - **Internal Dashboard** — Hetzner game server control plane with RBAC, action queue, backups, and activity feed
 
 ---
@@ -108,8 +108,14 @@ Open `http://localhost:3020`.
 npm run lint
 npm run typecheck
 npm test            # uses postgres://postgres@localhost:5432/tretu_web_test (override with TEST_DATABASE_URL)
+npm run test:platform
 npm run build
+npm run test:e2e    # browser tests (Playwright) against the build
+npm run test:deploy # deploy/scripts (secrets generator, databases, smoke test, backups)
 ```
+
+CI (`.github/workflows/ci.yml`) runs all of it, plus `auth/`'s suite, on pull requests and pushes to `main`; GitHub
+Actions must be enabled for the repository.
 
 Schema changes: edit `src/db/schema.ts`, then `npm run db:generate` (new file in `drizzle/`) and `npm run db:migrate`.
 
@@ -121,7 +127,8 @@ key `<namespace>` (e.g. `messages/platform/de.json` → `t("platform.…")`); mi
 ### Deployment
 
 See [DEPLOY.md](DEPLOY.md) (including the one-time upgrade from SQLite) and [deploy/README.md](deploy/README.md) for the
-server setup of the whole ecosystem ([docs/ecosystem](docs/ecosystem/README.md)).
+server setup of the whole ecosystem ([docs/ecosystem](docs/ecosystem/README.md)); the first go-live of everything is
+[deploy/GO-LIVE.md](deploy/GO-LIVE.md).
 
 ### TeamSpeak ranking worker
 

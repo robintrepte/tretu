@@ -1,7 +1,10 @@
 import { readdir, readFile } from "node:fs/promises"
 import http from "node:http"
 import path from "node:path"
-import { ISSUER, OUTBOX_DIR } from "./env"
+import { base32 } from "@better-auth/utils/base32"
+import { createOTP } from "@better-auth/utils/otp"
+import * as oidc from "openid-client"
+import { ISSUER, OUTBOX_DIR, PROVIDER_MOCK, STEAM_STUB } from "./env"
 
 /** A minimal cookie jar: enough to act like one browser against the app. */
 export class Jar {
@@ -30,20 +33,26 @@ export class Jar {
  * `sec-fetch-mode: cors`, so requests go through node:http: GETs look like page navigations, JSON posts like
  * the auth client's fetch calls.
  */
-export async function request(jar: Jar, url: string | URL, init: { method?: string; json?: unknown; headers?: Record<string, string> } = {}): Promise<Response> {
+export async function request(
+  jar: Jar,
+  url: string | URL,
+  init: { method?: string; json?: unknown; form?: Record<string, string>; headers?: Record<string, string>; withoutCookies?: boolean } = {},
+): Promise<Response> {
   const target = new URL(url, ISSUER)
-  const body = init.json !== undefined ? JSON.stringify(init.json) : undefined
+  const body = init.json !== undefined ? JSON.stringify(init.json) : init.form ? new URLSearchParams(init.form).toString() : undefined
   const headers: Record<string, string> = {
-    accept: body ? "application/json" : "text/html",
+    accept: init.json !== undefined ? "application/json" : "text/html",
     "user-agent": "Mozilla/5.0 (X11; Linux x86_64) integration-test",
-    "sec-fetch-mode": body ? "cors" : "navigate",
+    "sec-fetch-mode": init.json !== undefined ? "cors" : "navigate",
     ...init.headers,
   }
-  const cookie = jar.header()
+  // A cross-site form POST (Apple's form_post) arrives without the SameSite=Lax cookies.
+  const cookie = init.withoutCookies ? "" : jar.header()
   if (cookie) headers.cookie = cookie
   if (body) {
-    headers["content-type"] = "application/json"
-    headers.origin = ISSUER
+    headers["content-type"] = init.form ? "application/x-www-form-urlencoded" : "application/json"
+    headers.origin ??= ISSUER
+    if (init.headers?.origin) headers.origin = init.headers.origin
     headers["content-length"] = String(Buffer.byteLength(body))
   }
   const response = await new Promise<Response>((resolve, reject) => {
@@ -77,7 +86,7 @@ export interface StoredMail {
 }
 
 /** Waits for the newest email to `to` in the test outbox (MAIL_OUTBOX_DIR). */
-export async function waitForMail(to: string, match: RegExp = /./, timeoutMs = 10_000): Promise<StoredMail> {
+export async function waitForMail(to: string, match: RegExp = /./, timeoutMs = 10_000, since = 0): Promise<StoredMail> {
   const until = Date.now() + timeoutMs
   while (Date.now() < until) {
     let files: string[] = []
@@ -87,6 +96,7 @@ export async function waitForMail(to: string, match: RegExp = /./, timeoutMs = 1
       // not created yet
     }
     for (const file of files) {
+      if (Number(file.split("-")[0]) < since) continue
       const mail = JSON.parse(await readFile(path.join(OUTBOX_DIR, file), "utf8")) as StoredMail
       if (mail.to.toLowerCase() === to.toLowerCase() && match.test(mail.subject)) return mail
     }
@@ -121,4 +131,156 @@ export async function registerVerifiedUser(prefix?: string) {
   const body = (await session.json()) as { user: { id: string } } | null
   if (!body) throw new Error("no session after verification")
   return { ...user, id: body.user.id, jar }
+}
+
+/** Where a redirect response points (absolute, resolved against the issuer). */
+export function locationOf(response: Response): URL {
+  const location = response.headers.get("location")
+  if (!location) throw new Error(`expected a redirect, got ${response.status}`)
+  return new URL(location, ISSUER)
+}
+
+/* ───────────── OIDC client side (the "app") ───────────── */
+
+export const SCOPES = "openid profile email offline_access tretu"
+export const SAGA_REDIRECT = "http://localhost:3038/api/auth/oauth2/callback/tretu"
+
+export async function discover(clientId: string, auth: oidc.ClientAuth) {
+  return oidc.discovery(new URL(ISSUER), clientId, undefined, auth, { execute: [oidc.allowInsecureRequests] })
+}
+
+export function startAuthorization(config: oidc.Configuration, redirectUri: string, extra: Record<string, string> = {}) {
+  const verifier = oidc.randomPKCECodeVerifier()
+  const state = oidc.randomState()
+  const nonce = oidc.randomNonce()
+  return {
+    verifier,
+    state,
+    nonce,
+    url: async () =>
+      oidc.buildAuthorizationUrl(config, {
+        redirect_uri: redirectUri,
+        scope: SCOPES,
+        code_challenge: await oidc.calculatePKCECodeChallenge(verifier),
+        code_challenge_method: "S256",
+        state,
+        nonce,
+        ...extra,
+      }),
+  }
+}
+
+/** Starts an app sign-in in `jar` and returns the signed request the login page carries (`oauth_query`). */
+export async function loginPageQuery(jar: Jar, authorizeUrl: URL): Promise<string> {
+  const res = await request(jar, authorizeUrl)
+  const login = locationOf(res)
+  if (login.pathname !== "/login") throw new Error(`expected the login page, got ${login.pathname}`)
+  return login.search.slice(1)
+}
+
+/* ───────────── Two-factor ───────────── */
+
+export interface TotpDevice {
+  /** A code for a time step not handed out before: codes are accepted once, so this waits for the next 30 s step if needed. */
+  code: () => Promise<string>
+  /** The code of a given time step (unix time / 30 s), and the current step. */
+  codeAt: (step: number) => Promise<string>
+  step: () => number
+  /** The newest step handed out (or claimed through codeAt by the caller). */
+  lastStep: () => number
+  markUsed: (step: number) => void
+  /** One unused backup code per call. */
+  backupCode: () => string
+  backupCodes: string[]
+}
+
+/** Turns on TOTP for a signed-in user (enable + first code) and returns the "authenticator app". */
+export async function enableTwoFactor(jar: Jar, password?: string): Promise<TotpDevice> {
+  const enable = await request(jar, "/api/auth/two-factor/enable", { method: "POST", json: password ? { password } : {} })
+  if (!enable.ok) throw new Error(`2fa enable failed: ${enable.status} ${await enable.text()}`)
+  const { totpURI, backupCodes } = (await enable.json()) as { totpURI: string; backupCodes: string[] }
+  const secret = new TextDecoder().decode(base32.decode(new URL(totpURI).searchParams.get("secret")!))
+  const otp = createOTP(secret, { digits: 6 })
+  const step = () => Math.floor(Date.now() / 30_000)
+  let last = -1
+  let backup = 0
+  const device: TotpDevice = {
+    step,
+    codeAt: (s) => otp.hotp(s),
+    lastStep: () => last,
+    markUsed: (s) => {
+      last = Math.max(last, s)
+    },
+    code: async () => {
+      // Waiting for the clock (not for the server): a new time step starts at most 30 s from now.
+      while (step() <= last) await new Promise((r) => setTimeout(r, 250))
+      last = step()
+      return otp.hotp(last)
+    },
+    backupCode: () => {
+      const value = backupCodes[backup++]
+      if (!value) throw new Error("out of backup codes")
+      return value
+    },
+    backupCodes,
+  }
+  const verify = await request(jar, "/api/auth/two-factor/verify-totp", { method: "POST", json: { code: await device.code() } })
+  if (!verify.ok) throw new Error(`2fa verify failed: ${verify.status} ${await verify.text()}`)
+  return device
+}
+
+/* ───────────── Provider mock and Steam stub ───────────── */
+
+export async function mockProviderCode(provider: "discord" | "google" | "apple", code: string, profile: Record<string, unknown>, options: { forge?: boolean } = {}) {
+  const res = await fetch(`${PROVIDER_MOCK}/__mock/codes`, { method: "POST", body: JSON.stringify({ provider, code, profile, ...options }) })
+  if (!res.ok) throw new Error("mock not reachable")
+}
+
+export async function mockSteamPlayer(steamid: string, personaname: string, avatarfull = `https://avatars.steamstatic.com/${steamid}_full.jpg`) {
+  await fetch(`${PROVIDER_MOCK}/__mock/players`, { method: "POST", body: JSON.stringify({ steamid, personaname, avatarfull }) })
+}
+
+export async function steamNext(identity: { steamId: string } | { cancel: true }) {
+  await fetch(`${STEAM_STUB}/__stub/next`, { method: "POST", body: JSON.stringify(identity) })
+}
+
+export async function steamAssertion(returnTo: string, steamId: string, options: { nonce?: string; opEndpoint?: string } = {}): Promise<URLSearchParams> {
+  const res = await fetch(`${STEAM_STUB}/__stub/assertion`, { method: "POST", body: JSON.stringify({ returnTo, steamId, ...options }) })
+  return new URLSearchParams(await res.text())
+}
+
+/**
+ * A provider sign-in in `jar`, up to the provider's authorization page: returns the `state` Better Auth put in
+ * the provider URL (and the URL itself).
+ */
+export async function startSocial(jar: Jar, provider: "discord" | "google" | "apple", body: Record<string, unknown> = {}) {
+  const res = await request(jar, "/api/auth/sign-in/social", { method: "POST", json: { provider, callbackURL: "/konto", errorCallbackURL: "/login", ...body } })
+  if (!res.ok) throw new Error(`sign-in/social failed: ${res.status} ${await res.text()}`)
+  const { url } = (await res.json()) as { url: string }
+  const providerUrl = new URL(url)
+  return { providerUrl, state: providerUrl.searchParams.get("state")! }
+}
+
+/** The provider redirects back with a code: GET callback (Apple: cross-site form POST, then Better Auth's GET). */
+export async function finishSocial(jar: Jar, provider: "discord" | "google" | "apple", state: string, code: string, extra: Record<string, string> = {}): Promise<Response> {
+  if (provider === "apple") {
+    const post = await request(jar, `/api/auth/callback/apple`, { method: "POST", form: { code, state, ...extra }, withoutCookies: true, headers: { origin: "https://appleid.apple.com" } })
+    if (post.status !== 302) throw new Error(`apple form_post: ${post.status} ${await post.text()}`)
+    return request(jar, locationOf(post))
+  }
+  return request(jar, `/api/auth/callback/${provider}?${new URLSearchParams({ code, state, ...extra })}`)
+}
+
+/** "Mit Steam anmelden" in `jar`: start, let the stub answer as Steam, return the callback's response. */
+export async function steamSignIn(jar: Jar, steamId: string, body: Record<string, unknown> = {}, path = "/api/auth/sign-in/steam"): Promise<Response> {
+  const start = await request(jar, path, { method: "POST", json: { callbackURL: "/konto", errorCallbackURL: "/login", ...body } })
+  if (!start.ok) throw new Error(`steam start failed: ${start.status} ${await start.text()}`)
+  const { url } = (await start.json()) as { url: string }
+  await steamNext({ steamId })
+  const atSteam = await fetch(url, { redirect: "manual" })
+  return request(jar, locationOf(atSteam))
+}
+
+export async function sessionOf(jar: Jar): Promise<{ user: { id: string; twoFactorEnabled?: boolean } } | null> {
+  return (await (await request(jar, "/api/auth/get-session")).json()) as { user: { id: string } } | null
 }

@@ -4,6 +4,20 @@ Everything runs on one Hetzner server: **PM2** processes behind **nginx** (TLS b
 database and role per app. No Docker for hosting. The binding names, ports and endpoints are in
 [docs/ecosystem/CONTRACT.md](../docs/ecosystem/CONTRACT.md); each app's own `DEPLOY.md` has its deploy steps.
 
+**Taking everything live for the first time: follow [GO-LIVE.md](GO-LIVE.md)** (ordered runbook with checks and
+rollbacks). Tools in this folder:
+
+| Path | What |
+|---|---|
+| `env/*.example` | env templates for every app and service (tretu-web, tretu-auth, saga, play, Hollowmere `server/.env` + Nakama `local.yml`, mc-dashboard, umami, Postgres roles), rendered by `generate-secrets.mjs --templates deploy/env` |
+| `scripts/generate-secrets.mjs` | one consistent set of secrets → filled env files (mode 600), `--import` keeps running apps' values |
+| `scripts/create-databases.sh` | one least-privileged role + database per app, idempotent |
+| `scripts/smoke.sh` | every `/api/health`, OIDC discovery + JWKS, Umami, Uptime Kuma, signed platform ping → pass/fail table |
+| `scripts/check-nginx.sh` | `nginx -t` for site files without root or real certificates |
+| `scripts/pg-backup.sh`, `scripts/pg-restore-test.sh`, `systemd/tretu-pg-*` | nightly dumps, weekly restore test |
+
+`npm run test:deploy` tests all scripts (Postgres ones against the local server with throwaway names).
+
 ## Hosts, processes, ports
 
 | Service | Host | Repo / path | PM2 name | Port | Postgres DB |
@@ -27,20 +41,46 @@ or `503` – that is what Uptime Kuma watches.
 
 ```bash
 sudo apt install postgresql          # Ubuntu 24.04 ships 16
-sudo -u postgres psql
+node deploy/scripts/generate-secrets.mjs --out /root/tretu-secrets      # passwords in postgres/roles.env
+install -m 600 -o postgres /root/tretu-secrets/postgres/roles.env /tmp/tretu-roles.env
+sudo -u postgres deploy/scripts/create-databases.sh --passwords /tmp/tretu-roles.env && shred -u /tmp/tretu-roles.env
 ```
 
-```sql
--- repeat for: tretu_web, tretu_auth, saga, play, mc_dashboard, nakama, umami
-CREATE ROLE tretu_web LOGIN PASSWORD 'generate-a-long-random-password';
-CREATE DATABASE tretu_web OWNER tretu_web;
-REVOKE ALL ON DATABASE tretu_web FROM PUBLIC;
-```
-
+- Roles `tretu_web`, `tretu_auth`, `saga`, `play`, `mc_dashboard`, `nakama`, `umami`: LOGIN only (no superuser,
+  createdb, createrole, replication), each owns its database and its `public` schema, `CONNECT` is revoked from
+  PUBLIC, so no app can open another app's database. `tretu_legacy_reader` can only read saga, play, tretu_web and
+  nakama (auth's one-time legacy import). Running the script again only re-applies passwords and grants; databases
+  owned by another role are left alone (see [GO-LIVE.md](GO-LIVE.md) step 4).
 - Each app gets only its own `DATABASE_URL`, e.g. `postgres://tretu_web:…@localhost:5432/tretu_web`.
 - Keep Postgres on localhost (`listen_addresses = 'localhost'`, the default) and use `scram-sha-256` in `pg_hba.conf`.
-- Backups: a nightly `pg_dump -Fc` per database (cron or systemd timer) to a different machine or Hetzner Storage Box;
-  keep e.g. 14 days. Test a restore with `pg_restore -d <db>_restore`.
+
+### Backups (every database) and restore test
+
+```bash
+install -d -m 700 -o postgres /var/backups/tretu-postgres
+install -d -m 755 /etc/tretu && install -m 600 /dev/null /etc/tretu/pg-backup.env   # optional settings, see below
+sudo cp deploy/systemd/tretu-pg-* /etc/systemd/system/ && sudo systemctl daemon-reload
+sudo systemctl enable --now tretu-pg-backup.timer tretu-pg-restore-test.timer
+```
+
+| What | When | Details |
+|---|---|---|
+| `pg_dump -Fc` of tretu_web, tretu_auth, saga, play, mc_dashboard, nakama, umami + `pg_dumpall --globals-only` | daily 03:17 (`tretu-pg-backup.timer`) | `/var/backups/tretu-postgres/<db>/<db>-<UTC time>.dump` + `.sha256`, mode 600, verified with `pg_restore --list`, kept 14 days (`RETENTION_DAYS`) |
+| copy off the machine | after each backup | `BACKUP_REMOTE` + `BACKUP_RSYNC_SSH` (rsync over SSH, e.g. Hetzner Storage Box port 23) |
+| restore test | Sundays 05:41 (`tretu-pg-restore-test.timer`) | newest dump of each database → `<db>_restore_test`, counts tables/rows, drops it; fails on missing, older than 26 h, or checksum mismatch |
+| alerting | | `BACKUP_PING_URL` / `RESTORE_PING_URL` = Uptime Kuma push monitors (heartbeat 25 h / 8 d): a run that fails or never happens turns them red |
+
+Restore one database (e.g. after a bad migration):
+
+```bash
+pm2 stop saga                                                           # stop the app that writes to it
+sudo -u postgres pg_restore --clean --if-exists -d saga /var/backups/tretu-postgres/saga/saga-<time>.dump
+pm2 start saga
+```
+
+On a new server: restore `globals/globals-<time>.sql` with `psql -f` first (roles), then each dump with
+`createdb -O <role> <db> && pg_restore -d <db> <dump>`. Besides Postgres, keep the env files / `tretu-secrets.json`
+(password manager) and the app data outside Postgres (Saga `STORAGE_DIR`, Minecraft worlds, see each app's doc).
 
 ## nginx and certbot
 
@@ -142,6 +182,19 @@ Add one **HTTP(s) – Json Query** monitor per app (interval 60 s, retries 2), e
 | Hollowmere | https://hollowmere.tretu.de/api/health |
 | Minecraft dashboard | https://mc.tretu.de/api/health |
 | Umami | https://stats.tretu.de/api/heartbeat (plain HTTP monitor) |
+| tretu.de platform worker | https://tretu.de/api/health, Json Query `checks.worker != "stale"`, expected `true` |
+| Backups | Push monitors for `BACKUP_PING_URL` (heartbeat 25 h) and `RESTORE_PING_URL` (8 days) |
 
 Optional: a TCP monitor for `tretu.de:25565` (Minecraft) and the TeamSpeak port, a notification channel (e.g. Discord
 webhook or email) and a public status page at `/status/tretu` showing all monitors. Certificate expiry alerts are built in.
+
+## Smoke test
+
+```bash
+deploy/scripts/smoke.sh --env-file /srv/tretu/.env.local     # signed ping as tretu-web; --only/--skip/--map, see --help
+```
+
+## CI
+
+`.github/workflows/ci.yml` runs both apps' full check suites (Postgres 16 service) on pull requests and pushes to
+`main`. GitHub Actions must be enabled for the repository (Settings → Actions → General).

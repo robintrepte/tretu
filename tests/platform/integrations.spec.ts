@@ -102,7 +102,7 @@ test("TeamSpeak: link identity via nickname code, then add the mapped server gro
   assert.match(code, /^TRT-[A-Z2-9]{5}$/);
   const online = [{ clid: "5", clientDatabaseId: 77, uniqueIdentifier: "abc\\/def=", nickname: `Speaker ${code}`, channelId: 1, clientIdleTimeMs: 0 }];
   await assert.rejects(() => verifyTsLink(platformDb, sub, new Date(), async () => []), { code: "ts_client_not_found" });
-  assert.deepEqual(await verifyTsLink(platformDb, sub, new Date(), async () => online), { nickname: "Speaker" });
+  assert.deepEqual(await verifyTsLink(platformDb, sub, new Date(), async () => online), { nickname: "Speaker", uid: "abc/def=" });
   assert.equal((await getTsLinkState(platformDb, sub)).linked, true);
 
   process.env.TS_QUERY_HOST = "127.0.0.1";

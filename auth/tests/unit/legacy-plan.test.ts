@@ -15,7 +15,6 @@ function rec(partial: Partial<LegacyRecord> & Pick<LegacyRecord, "app">): Legacy
     createdAt: new Date(Date.UTC(2024, 0, seq)),
     passwordHash: null,
     identities: [],
-    steamId: null,
     roles: [],
     ...partial,
   }
@@ -23,6 +22,7 @@ function rec(partial: Partial<LegacyRecord> & Pick<LegacyRecord, "app">): Legacy
 
 const discord = (id: string) => ({ provider: "discord" as const, id })
 const google = (id: string) => ({ provider: "google" as const, id })
+const steam = (id: string) => ({ provider: "steam" as const, id })
 const groupOf = (plan: ReturnType<typeof planImport>, r: LegacyRecord) => plan.groups.find((g) => g.records.includes(r))!
 
 describe("legacy matching rules", () => {
@@ -85,7 +85,7 @@ describe("legacy matching rules", () => {
   })
 
   it("respects names of existing Tretu accounts and reserved names", () => {
-    const anchor: Anchor = { userId: "u-1", email: "x@example.test", emailVerified: true, username: "taken", identities: [], legacy: [], hasPassword: true, steamLinked: false }
+    const anchor: Anchor = { userId: "u-1", email: "x@example.test", emailVerified: true, username: "taken", identities: [], legacy: [], hasPassword: true }
     const a = rec({ app: "saga", username: "taken" })
     const b = rec({ app: "play", username: "admin" })
     const plan = planImport([a, b], [anchor])
@@ -102,23 +102,32 @@ describe("legacy matching rules", () => {
       identities: [discord("333")],
       legacy: [],
       hasPassword: true,
-      steamLinked: false,
     }
-    const r = rec({ app: "hollowmere", username: "hm", identities: [discord("333")], passwordHash: "bcrypt:x", steamId: "7656" })
+    const r = rec({ app: "hollowmere", username: "hm", identities: [discord("333"), steam("76561198000000009")], passwordHash: "bcrypt:x" })
     const plan = planImport([r], [anchor])
-    expect(plan.groups[0]).toMatchObject({ anchorUserId: "existing", newUserId: null, passwordHash: null, steamId: "7656" })
+    expect(plan.groups[0]).toMatchObject({ anchorUserId: "existing", newUserId: null, passwordHash: null })
+    expect(plan.groups[0]!.identities).toEqual(expect.arrayContaining([steam("76561198000000009")]))
+  })
+
+  it("merges a Hollowmere account into the Tretu account that signs in with the same Steam ID", () => {
+    const anchor: Anchor = { userId: "steamer", email: "u-x@users.tretu.invalid", emailVerified: false, username: "steamer", identities: [steam("76561198000000010")], legacy: [], hasPassword: false }
+    const r = rec({ app: "hollowmere", username: "hm_steam", identities: [steam("76561198000000010")] })
+    const other = rec({ app: "hollowmere", username: "hm_other", identities: [steam("76561198000000011")] })
+    const plan = planImport([r, other], [anchor])
+    expect(groupOf(plan, r)).toMatchObject({ anchorUserId: "steamer", reasons: ["steam"] })
+    expect(groupOf(plan, other)).toMatchObject({ anchorUserId: null })
   })
 
   it("is idempotent: records linked by an earlier run are not imported again", () => {
     const r = rec({ app: "saga", username: "again" })
-    const anchor: Anchor = { userId: "imported", email: "a@x.test", emailVerified: false, username: "again", identities: [], legacy: [{ app: "saga", legacyUserId: r.legacyUserId }], hasPassword: true, steamLinked: false }
+    const anchor: Anchor = { userId: "imported", email: "a@x.test", emailVerified: false, username: "again", identities: [], legacy: [{ app: "saga", legacyUserId: r.legacyUserId }], hasPassword: true }
     const plan = planImport([r], [anchor])
     expect(plan.groups[0]).toMatchObject({ anchorUserId: "imported", newRecords: [] })
   })
 
   it("skips groups that would join two existing Tretu accounts", () => {
-    const a: Anchor = { userId: "a", email: "a@x.test", emailVerified: true, username: "a", identities: [discord("1")], legacy: [], hasPassword: false, steamLinked: false }
-    const b: Anchor = { userId: "b", email: "b@x.test", emailVerified: true, username: "b", identities: [], legacy: [], hasPassword: false, steamLinked: false }
+    const a: Anchor = { userId: "a", email: "a@x.test", emailVerified: true, username: "a", identities: [discord("1")], legacy: [], hasPassword: false }
+    const b: Anchor = { userId: "b", email: "b@x.test", emailVerified: true, username: "b", identities: [], legacy: [], hasPassword: false }
     const r = rec({ app: "saga", identities: [discord("1")], email: "b@x.test", emailVerified: true })
     const plan = planImport([r], [a, b])
     expect(plan.groups).toHaveLength(0)

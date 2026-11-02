@@ -763,5 +763,12 @@
       "curseforgeKeyMissing": "Für CurseForge fehlt der API-Key – bitte unter „Einrichtung“ hinterlegen."
     }
   },
-  "games": {}
+  "games": {},
+  "error": {
+    "title": "Da ist etwas schiefgelaufen",
+    "message": "Diese Seite konnte gerade nicht geladen werden. Versuch es gleich noch einmal.",
+    "retry": "Erneut versuchen",
+    "home": "Zur Startseite",
+    "reference": "Fehlercode: {digest}"
+  }
 }

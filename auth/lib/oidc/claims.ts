@@ -23,6 +23,7 @@ export const TRETU_CLAIMS = [
   "minecraft_uuid",
   "minecraft_name",
   "steam_id",
+  "teamspeak_uid",
 ] as const
 
 export type Locale = "de" | "en"
@@ -44,6 +45,8 @@ export interface UserLinks {
   minecraft?: string
   minecraftName?: string
   steam?: string
+  teamspeak?: string
+  teamspeakName?: string
 }
 
 export function normalizeLocale(value: unknown): Locale {
@@ -77,6 +80,7 @@ export function buildClaims(user: ClaimSource, links: UserLinks, scopes: readonl
     if (links.minecraft) claims.minecraft_uuid = links.minecraft
     if (links.minecraftName) claims.minecraft_name = links.minecraftName
     if (links.steam) claims.steam_id = links.steam
+    if (links.teamspeak) claims.teamspeak_uid = links.teamspeak
   }
   for (const key of Object.keys(claims)) if (claims[key] === undefined) delete claims[key]
   return claims

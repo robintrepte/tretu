@@ -34,6 +34,7 @@ export const authUserSchema = z.object({
       minecraft: optionalString(64),
       minecraftName: optionalString(64),
       steam: optionalString(64),
+      teamspeak: optionalString(128),
     })
     .nullish(),
   createdAt: optionalString(64),
@@ -43,10 +44,25 @@ export type DirectoryUser = typeof platformUsers.$inferSelect;
 
 export const USERNAME_PATTERN = /^[A-Za-z0-9_.-]{2,32}$/;
 
+/** SteamID64 range of individual accounts (universe 1, type 1, instance 1): 76561197960265728 + account id. */
+const STEAM_INDIVIDUAL_BASE = BigInt("76561197960265728");
+const STEAM_ACCOUNT_ID_MAX = BigInt(0xffffffff);
+
+/** The Steam ID if it is a valid individual SteamID64 (decimal), else null (never render anything else as a link). */
+export function validSteamId(value: string | null | undefined): string | null {
+  if (!value || !/^\d{17}$/.test(value)) return null;
+  const accountId = BigInt(value) - STEAM_INDIVIDUAL_BASE;
+  return accountId > BigInt(0) && accountId <= STEAM_ACCOUNT_ID_MAX ? value : null;
+}
+
+export function steamProfileUrl(steamId: string): string {
+  return `https://steamcommunity.com/profiles/${steamId}`;
+}
+
 function cleanLinks(links: AuthUser["links"]): PlatformUserLinks {
   const out: PlatformUserLinks = {};
   if (!links) return out;
-  for (const key of ["discord", "minecraft", "minecraftName", "steam"] as const) {
+  for (const key of ["discord", "minecraft", "minecraftName", "steam", "teamspeak"] as const) {
     if (links[key]) out[key] = links[key];
   }
   return out;
@@ -100,6 +116,7 @@ export async function upsertDirectoryUser(db: Executor, user: AuthUser, sourceAt
     roles: user.roles ?? [],
     links,
     discordId: links.discord ?? null,
+    steamId: validSteamId(links.steam),
     authCreatedAt: parseDate(user.createdAt) ?? previous?.authCreatedAt ?? null,
     sourceUpdatedAt: sourceAt,
     fetchedAt: new Date(),
@@ -131,6 +148,36 @@ function selfSecret(): string | null {
 }
 
 export class AuthUnavailableError extends Error {}
+
+/**
+ * Signed request to the auth admin API (as `tretu-web`, 5 s timeout). Returns the raw response;
+ * throws AuthUnavailableError when not configured.
+ */
+export async function authRequest(
+  method: "GET" | "POST" | "DELETE",
+  pathWithQuery: string,
+  body?: unknown,
+  fetchImpl: (url: string, init: RequestInit) => Promise<Response> = fetch
+): Promise<Response> {
+  const issuer = getAuthIssuer();
+  const secret = selfSecret();
+  if (!issuer || !secret) throw new AuthUnavailableError("auth admin API not configured");
+  const url = new URL(issuer + pathWithQuery);
+  const raw = body === undefined ? "" : JSON.stringify(body);
+  const headers = signedHeaders(SELF_APP_ID, secret, { method, pathWithQuery: url.pathname + url.search, body: raw });
+  return fetchImpl(url.toString(), {
+    method,
+    headers: raw ? { ...headers, "content-type": "application/json" } : headers,
+    body: raw || undefined,
+    signal: AbortSignal.timeout(5000),
+    cache: "no-store",
+  });
+}
+
+/** True when tretu.de can call auth's admin API (issuer + own secret). */
+export function authAdminConfigured(): boolean {
+  return Boolean(getAuthIssuer() && selfSecret());
+}
 
 async function authGet(pathWithQuery: string): Promise<unknown | null> {
   const issuer = getAuthIssuer();

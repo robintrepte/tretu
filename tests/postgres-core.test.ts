@@ -116,4 +116,30 @@ test("health report", async () => {
   assert.equal(report.checks.db, "ok");
   assert.match(report.version, /^\d+\.\d+\.\d+/);
   assert.ok(!Number.isNaN(Date.parse(report.time)));
+  assert.equal(report.checks.migrations, "ok");
+  assert.equal(report.checks.worker, "off", "platform not configured");
+  assert.ok(!JSON.stringify(report).includes("postgres://"), "no connection details");
+});
+
+test("health report: pending migrations fail it, an overdue platform backlog marks the worker stale", async () => {
+  const { sql } = await import("drizzle-orm");
+  process.env.TRETU_APPS_JSON = JSON.stringify({ saga: { secret: "s", webhook: "https://saga.test/api/tretu/webhook" } });
+  try {
+    assert.equal((await healthReport()).checks.worker, "ok");
+    await db.execute(sql`insert into platform_jobs (type, payload, next_attempt_at) values ('user.fetch', '{}', now() - interval '11 minutes')`);
+    const stale = await healthReport();
+    assert.equal(stale.checks.worker, "stale");
+    assert.equal(stale.status, "ok", "the site itself still works");
+    await db.execute(sql`update platform_jobs set locked_until = now() + interval '1 minute'`);
+    assert.equal((await healthReport()).checks.worker, "ok", "being worked on");
+    await db.execute(sql`delete from platform_jobs`);
+
+    const [last] = (await db.execute(sql`select id from drizzle.__drizzle_migrations order by id desc limit 1`)) as unknown as { id: number }[];
+    await db.execute(sql`delete from drizzle.__drizzle_migrations where id = ${last.id}`);
+    const pending = await healthReport();
+    assert.deepEqual([pending.status, pending.checks.migrations], ["error", "pending"]);
+  } finally {
+    delete process.env.TRETU_APPS_JSON;
+    await resetTestDatabase();
+  }
 });

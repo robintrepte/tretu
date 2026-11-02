@@ -10,6 +10,10 @@ Production runs on the shared Hetzner server: PM2 behind nginx, one Postgres ser
 | `tretu-ts-rank` | TeamSpeak ranking worker (`npm run worker:ts-rank`) | – |
 | `tretu-platform-worker` | platform webhooks, jobs, presence expiry, badge sync (`npm run platform:worker`, see [docs/ecosystem/PLATFORM.md](docs/ecosystem/PLATFORM.md)) | – |
 
+First go-live of the whole ecosystem: [deploy/GO-LIVE.md](deploy/GO-LIVE.md). The env template is
+[deploy/env/tretu-web.env.local.example](deploy/env/tretu-web.env.local.example) (`deploy/scripts/generate-secrets.mjs`
+fills it in consistently with every other app).
+
 The identity provider auth.tretu.de lives in [`auth/`](auth/) with its own PM2 processes (`tretu-auth`, `tretu-auth-events`) and its own [DEPLOY.md](auth/DEPLOY.md).
 
 Requirements: Node 22, Postgres 16+, nginx, certbot, PM2 (`npm i -g pm2`).
@@ -23,8 +27,24 @@ npm ci
 npm run db:migrate       # applies pending migrations from drizzle/
 npm run build
 pm2 reload ecosystem.config.cjs --update-env
-curl -fsS https://tretu.de/api/health
+curl -fsS https://tretu.de/api/health       # {"status":"ok",…,"checks":{"db":"ok","migrations":"ok","worker":"ok"}}
 ```
+
+`/api/health` answers `503` when the database is unreachable or a migration is missing (`checks.migrations:
+"pending"`: run `npm run db:migrate`). `checks.worker` is `stale` when platform webhooks/jobs are overdue by more than
+10 minutes (the `tretu-platform-worker` is not running); it does not fail the check, Uptime Kuma watches it
+separately (deploy/README.md). Migration `0002_badge_grants_steam_teamspeak` (additive) adds the badge-grant
+columns, `platform_ts_links.link_error` and `platform_users.steam_id`.
+
+**Production safety:** `next start` refuses to start without an `AUTH_SECRET` (or `BETTER_AUTH_SECRET`) of at least
+32 characters. Security headers (CSP, HSTS, COOP, …) come from `next.config.ts`; nginx adds per-IP rate limits
+for `/api/auth/` and `/api/` (not for the signed `/api/v1/`, which the app limits per calling app). Logs are JSON
+lines without secrets (credential/email keys are redacted, platform errors log route patterns, not subs).
+
+**Platform worker restarts:** `pm2 reload` sends SIGTERM; the worker finishes the job in progress, hands the
+other claimed jobs back and exits within the 15 s `kill_timeout`. A crashed worker's claimed work is retried once
+its lock expires (≤ 2 min). Failing passes (e.g. Postgres restarting) back off up to 60 s instead of exiting.
+Without `DATABASE_URL` it exits 78 and PM2 leaves it stopped.
 
 ## Fresh install
 
@@ -114,7 +134,7 @@ the SQLite file was never modified.
 |---|---|---|
 | `DATABASE_URL` | yes | Postgres connection string (`tretu_web`) |
 | `DATABASE_POOL_MAX` | no | connections per process (default 10) |
-| `AUTH_SECRET` / `BETTER_AUTH_SECRET` | yes | signs sessions; `AUTH_SECRET` also encrypts dashboard secrets |
+| `AUTH_SECRET` / `BETTER_AUTH_SECRET` | yes (32+ chars in production) | signs sessions; `AUTH_SECRET` also encrypts dashboard secrets |
 | `BETTER_AUTH_URL` | yes (prod) | public base URL, e.g. `https://tretu.de` (`NEXTAUTH_URL` is read as fallback) |
 | `AUTH_DISCORD_CLIENT_ID`, `AUTH_DISCORD_CLIENT_SECRET` | yes | Discord login |
 | `DASHBOARD_ADMIN_DISCORD_IDS` | no | Discord IDs that get the admin role on login |
@@ -124,5 +144,23 @@ the SQLite file was never modified.
 | `NEXT_PUBLIC_UMAMI_SRC`, `NEXT_PUBLIC_UMAMI_WEBSITE_ID` | no | Umami tag (build time; both required) |
 | `ORCHESTRATOR_EMBEDDED` | no | run jobs inside Next.js (default `true`; PM2 sets `false`) |
 | `SQLITE_DATABASE_PATH` | upgrade only | source file for `npm run db:migrate-sqlite` |
+| `AUTH_RATE_LIMIT` | tests only | `off` disables Better Auth's per-IP limits (e2e) |
+
+Platform variables (`TRETU_APPS_JSON`, `TRETU_APP_*`, `WEB_PUSH_*`, Discord/TeamSpeak badge sync, economy) are in
+[docs/ecosystem/PLATFORM.md](docs/ecosystem/PLATFORM.md#env-vars).
+
+## Checks and CI
+
+```bash
+npm run lint && npm run typecheck
+npm test                      # postgres://postgres@localhost:5432/tretu_web_test (TEST_DATABASE_URL)
+npm run test:platform         # tretu_platform_test (created automatically)
+NODE_OPTIONS=--max-old-space-size=3072 npm run build
+npm run test:e2e              # Playwright against next start (needs the build; database tretu_web_test_e2e)
+npm run test:deploy           # deploy/scripts (local Postgres with throwaway names, nginx for check-nginx.sh)
+```
+
+`.github/workflows/ci.yml` runs exactly these (and `auth/`'s suite) with a Postgres 16 service on every pull request
+and push to `main`. **GitHub Actions must be enabled** for the repository (Settings → Actions → General).
 
 TeamSpeak (`TS_*`), Hetzner/Cloudflare/CurseForge fallbacks and the remaining variables are documented in `.env.example`.

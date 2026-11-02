@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm"
-import { boolean, customType, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core"
+import { bigint, boolean, customType, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core"
 
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => "bytea" })
 
@@ -78,6 +78,8 @@ export const account = pgTable(
     scope: text(),
     /** Native Better Auth scrypt hash, or an imported `bcrypt:`/`multi:` hash (see lib/passwords.ts). */
     password: text(),
+    /** Tretu: the name at the provider where it has no profile endpoint of its own (Steam persona name). */
+    displayName: text(),
     createdAt,
     updatedAt,
   },
@@ -142,6 +144,8 @@ export const twoFactor = pgTable(
     verified: boolean().default(true),
     failedVerificationCount: integer().default(0),
     lockedUntil: timestamp({ withTimezone: true }),
+    /** Tretu: the TOTP time step (unix time / 30 s) last accepted, so no code is accepted twice (lib/totp-replay.ts). */
+    lastTotpCounter: bigint({ mode: "number" }),
   },
   (t) => [index("two_factor_user_idx").on(t.userId)],
 )
@@ -296,7 +300,11 @@ export const oauthClientAssertion = pgTable("oauth_client_assertion", {
 
 /* ───────────────────────── Tretu ───────────────────────── */
 
-/** Accounts linked by other Tretu services through the admin API (Minecraft, Steam). One per provider and user. */
+/**
+ * Accounts linked by other Tretu services through the admin API (Minecraft, TeamSpeak). One per provider and user.
+ * Steam IDs live in `account` (provider `steam`) since Steam login exists; old `steam` rows here were moved there
+ * by migration 0001 and are no longer read.
+ */
 export const externalLink = pgTable(
   "external_link",
   {
@@ -304,7 +312,8 @@ export const externalLink = pgTable(
     userId: text()
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    provider: text().$type<"minecraft" | "steam">().notNull(),
+    /** `steam` only in rows from before migration 0001 (no longer read). */
+    provider: text().$type<"minecraft" | "teamspeak" | "steam">().notNull(),
     providerAccountId: text().notNull(),
     displayName: text(),
     createdAt,
@@ -314,6 +323,16 @@ export const externalLink = pgTable(
     uniqueIndex("external_link_provider_account_idx").on(t.provider, t.providerAccountId),
     uniqueIndex("external_link_user_provider_idx").on(t.userId, t.provider),
   ],
+)
+
+/** Used `openid.response_nonce` values of Steam OpenID assertions, kept for their validity window (replay protection). */
+export const openidNonce = pgTable(
+  "openid_nonce",
+  {
+    nonce: text().primaryKey(),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+  },
+  (t) => [index("openid_nonce_expires_idx").on(t.expiresAt)],
 )
 
 /** Uploaded profile pictures (256 px WebP), served at /api/avatar/<user id>. */

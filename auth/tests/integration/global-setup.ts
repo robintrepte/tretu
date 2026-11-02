@@ -3,11 +3,15 @@ import { existsSync, rmSync } from "node:fs"
 import { createServer, type Server } from "node:http"
 import path from "node:path"
 import postgres from "postgres"
-import { ADMIN_DATABASE_URL, appEnv, ISSUER, OUTBOX_DIR, PLATFORM_PORT, TEST_DATABASE_URL } from "./env"
+import { startProviderMock } from "../support/provider-mock"
+import { startSteamStub, type SteamStub } from "../support/steam-stub"
+import { ADMIN_DATABASE_URL, appEnv, ISSUER, OUTBOX_DIR, PLATFORM_PORT, PROVIDER_MOCK_PORT, STEAM_STUB_PORT, TEST_DATABASE_URL } from "./env"
 
 const root = path.resolve(import.meta.dirname, "../..")
 let app: ChildProcess | undefined
 let platform: Server | undefined
+let providers: Server | undefined
+let steam: SteamStub | undefined
 
 /** A stand-in for the platform API: stores every event POST so tests can read them back. */
 function startPlatform(): Promise<Server> {
@@ -66,6 +70,8 @@ export async function setup() {
     if (build.status !== 0) throw new Error("next build failed")
   }
   platform = await startPlatform()
+  providers = await startProviderMock(PROVIDER_MOCK_PORT)
+  steam = await startSteamStub(STEAM_STUB_PORT)
   app = spawn(process.execPath, [path.join(root, "node_modules/next/dist/bin/next"), "start", "-p", String(new URL(ISSUER).port)], {
     cwd: root,
     env: { ...process.env, ...appEnv() },
@@ -85,4 +91,6 @@ export async function teardown() {
     }
   }
   await new Promise((resolve) => platform?.close(resolve) ?? resolve(null))
+  await new Promise((resolve) => providers?.close(resolve) ?? resolve(null))
+  await steam?.close()
 }

@@ -125,15 +125,24 @@ export function TeamspeakLink({ initial }: { initial: TsLinkState }) {
       const code = error instanceof MeApiError ? error.code : "error";
       const key = `settings.teamspeakErrors.${code}`;
       toast.error(t(key) === key ? t("common.error") : t(key));
+      // auth.tretu.de refused the identity after the check: the link was undone, show why.
+      if (code === "ts_identity_taken_auth") setState({ linked: false, nickname: null, code: null, codeExpiresAt: null, error: code });
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <section className="rounded-2xl border border-border/70 bg-card p-5 shadow-sm md:p-6">
+    <section id="teamspeak" className="scroll-mt-24 rounded-2xl border border-border/70 bg-card p-5 shadow-sm md:p-6">
       <h2 className="mb-2 text-xl font-semibold">{t("settings.teamspeakTitle")}</h2>
       <p className="mb-4 text-sm text-muted-foreground">{t("settings.teamspeakText")}</p>
+      {state.error && !state.linked ? (
+        <p role="alert" data-testid="teamspeak-error" className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
+          {t(`settings.teamspeakErrors.${state.error}`) === `settings.teamspeakErrors.${state.error}`
+            ? t("common.error")
+            : t(`settings.teamspeakErrors.${state.error}`)}
+        </p>
+      ) : null}
       {state.linked ? (
         <div className="flex flex-wrap items-center gap-3">
           <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-sm text-emerald-700 dark:text-emerald-300">
@@ -146,7 +155,7 @@ export function TeamspeakLink({ initial }: { initial: TsLinkState }) {
             onClick={() =>
               act(async () => {
                 await meApi("/teamspeak", { method: "DELETE", body: {} });
-                setState({ linked: false, nickname: null, code: null, codeExpiresAt: null });
+                setState({ linked: false, nickname: null, code: null, codeExpiresAt: null, error: null });
               })
             }
           >
@@ -166,7 +175,7 @@ export function TeamspeakLink({ initial }: { initial: TsLinkState }) {
               onClick={() =>
                 act(async () => {
                   const res = await meApi<{ nickname: string }>("/teamspeak", { method: "POST", body: { action: "verify" } });
-                  setState({ linked: true, nickname: res.nickname, code: null, codeExpiresAt: null });
+                  setState({ linked: true, nickname: res.nickname, code: null, codeExpiresAt: null, error: null });
                   toast.success(t("settings.teamspeakDone"));
                 })
               }
@@ -182,7 +191,7 @@ export function TeamspeakLink({ initial }: { initial: TsLinkState }) {
           onClick={() =>
             act(async () => {
               const res = await meApi<{ code: string; expiresAt: string }>("/teamspeak", { method: "POST", body: { action: "start" } });
-              setState({ linked: false, nickname: null, code: res.code, codeExpiresAt: res.expiresAt });
+              setState({ linked: false, nickname: null, code: res.code, codeExpiresAt: res.expiresAt, error: null });
             })
           }
         >

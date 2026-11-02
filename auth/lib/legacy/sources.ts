@@ -38,7 +38,7 @@ export function toDate(value: unknown): Date {
 
 const lower = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().toLowerCase() : null)
 const text = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null)
-const SOCIAL = new Set<IdentityProvider>(["discord", "google", "apple"])
+const SOCIAL = new Set<IdentityProvider>(["discord", "google", "apple", "steam"])
 
 /** Saga (Prisma): "User" and "Account". bcrypt passwords. */
 export async function readSaga(url: string): Promise<LegacyRecord[]> {
@@ -66,7 +66,6 @@ export async function readSaga(url: string): Promise<LegacyRecord[]> {
         createdAt: toDate(u.createdAt),
         passwordHash: fromBcrypt(u.password),
         identities,
-        steamId: null,
         roles: u.role ? [String(u.role)] : [],
       }
     })
@@ -104,7 +103,6 @@ export async function readPlay(url: string): Promise<{ records: LegacyRecord[]; 
         createdAt: toDate(u.created_at),
         passwordHash: entry.password,
         identities: entry.identities,
-        steamId: null,
         roles: u.role ? [String(u.role)] : [],
       })
     }
@@ -133,8 +131,7 @@ export async function readTretu(url: string): Promise<LegacyRecord[]> {
           createdAt: toDate(u.created_at),
           passwordHash: null,
           identities: [{ provider: "discord", id: String(u.discord_id) }],
-          steamId: null,
-          roles: roles.get(String(u.id)) ?? [],
+            roles: roles.get(String(u.id)) ?? [],
         }),
       )
   })
@@ -142,7 +139,10 @@ export async function readTretu(url: string): Promise<LegacyRecord[]> {
 
 const NAKAMA_SYSTEM_USER = "00000000-0000-0000-0000-000000000000"
 
-/** Hollowmere (Nakama): "users". bcrypt passwords (bytea); Discord via custom_id "discord:<id>". Emails are unverified. */
+/**
+ * Hollowmere (Nakama): "users". bcrypt passwords (bytea); Discord via custom_id "discord:<id>"; Google, Apple and
+ * Steam from Nakama's own columns (Nakama verified those tokens itself). Emails are unverified.
+ */
 export async function readNakama(url: string): Promise<{ records: LegacyRecord[]; skipped: number }> {
   return withSql(url, async (sql) => {
     const users = await sql`select id, username, display_name, avatar_url, email, password, custom_id, google_id, apple_id, steam_id, create_time from users`
@@ -158,6 +158,9 @@ export async function readNakama(url: string): Promise<{ records: LegacyRecord[]
       if (custom?.startsWith("discord:")) identities.push({ provider: "discord", id: custom.slice("discord:".length) })
       if (text(u.google_id)) identities.push({ provider: "google", id: text(u.google_id)! })
       if (text(u.apple_id)) identities.push({ provider: "apple", id: text(u.apple_id)! })
+      // Only well-formed SteamID64s: they become "Mit Steam anmelden" identities.
+      const steamId = text(u.steam_id)
+      if (steamId && /^\d{17}$/.test(steamId)) identities.push({ provider: "steam", id: steamId })
       records.push({
         app: "hollowmere",
         legacyUserId: String(u.id),
@@ -169,7 +172,6 @@ export async function readNakama(url: string): Promise<{ records: LegacyRecord[]
         createdAt: toDate(u.create_time),
         passwordHash: fromBcrypt(u.password as Uint8Array | string | null),
         identities,
-        steamId: text(u.steam_id),
         roles: [],
       })
     }

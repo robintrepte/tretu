@@ -61,8 +61,20 @@ const options = {
   account: {
     accountLinking: { enabled: true, requireLocalEmailVerified: true },
   },
+  // Per client IP (nginx overwrites X-Forwarded-For with the real address). In-memory: one tretu-web process.
+  rateLimit: {
+    enabled: process.env.NODE_ENV === "production" && process.env.AUTH_RATE_LIMIT !== "off",
+    window: 60,
+    max: 120,
+    customRules: {
+      "/sign-in/*": { window: 60, max: 10 },
+      "/oauth2/*": { window: 60, max: 20 },
+      "/callback/*": { window: 60, max: 20 },
+    },
+  },
   advanced: {
     cookiePrefix: AUTH_COOKIE_PREFIX,
+    ipAddress: { ipAddressHeaders: ["x-forwarded-for", "x-real-ip"] },
     // Keep the integer primary keys of `users` (and every table that references them).
     database: { generateId: "serial" },
   },

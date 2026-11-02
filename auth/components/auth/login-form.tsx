@@ -10,11 +10,12 @@ import { Button } from "@/components/ui/button"
 import { Divider } from "@/components/ui/card"
 import { Field, Input } from "@/components/ui/field"
 import { PasswordInput } from "@/components/ui/password-input"
-import { authClient } from "@/lib/client/auth-client"
+import { authClient, passkeyOptionsSettled } from "@/lib/client/auth-client"
 import { errorCode, isRateLimited } from "@/lib/client/errors"
 
 interface Props {
   providers: ProviderId[]
+  steam: boolean
   oauth: { clientName: string; valid: boolean } | null
   signedIn: { name: string } | null
   error?: string
@@ -23,9 +24,9 @@ interface Props {
   query: string
 }
 
-const PROVIDER_NAMES: Record<string, string> = { discord: "Discord", google: "Google", apple: "Apple" }
+const PROVIDER_NAMES: Record<string, string> = { discord: "Discord", google: "Google", apple: "Apple", steam: "Steam" }
 
-export function LoginForm({ providers, oauth, signedIn, error: initialError, notice, next, query }: Props) {
+export function LoginForm({ providers, steam, oauth, signedIn, error: initialError, notice, next, query }: Props) {
   const t = useTranslations("login")
   const tc = useTranslations("common")
   const tl = useTranslations("legacy")
@@ -42,7 +43,8 @@ export function LoginForm({ providers, oauth, signedIn, error: initialError, not
 
   function describeInitialError(code?: string): string | null {
     if (!code) return null
-    if (code === "two_factor_required" || code === "invalid_token") return t(`errors.${code}`)
+    if (code === "two_factor_required" || code === "invalid_token" || code === "steam_failed" || code === "state_mismatch" || code === "signup_disabled") return t(`errors.${code}`)
+    if (code === "access_denied") return t("errors.cancelled")
     if (code === "account_already_linked_to_different_user" || code === "account_not_linked") return t("errors.account_not_linked")
     if (code === "claim_inUse" || code === "claim_expired") return tl(`errors.${code.slice(6) as "inUse" | "expired"}`)
     if (code.startsWith("claim_")) return tl("errors.oauthFailed")
@@ -123,6 +125,7 @@ export function LoginForm({ providers, oauth, signedIn, error: initialError, not
   async function onPasskey() {
     setError(null)
     setBusy("passkey")
+    await passkeyOptionsSettled()
     const result = await authClient.signIn.passkey()
     if (result?.error) {
       setBusy(null)
@@ -228,7 +231,7 @@ export function LoginForm({ providers, oauth, signedIn, error: initialError, not
               <Fingerprint className="size-5 text-accent" />
               {t("passkey")}
             </Button>
-            <SocialButtons providers={providers} callbackURL={next} />
+            <SocialButtons providers={providers} steam={steam} callbackURL={next} />
             <Button type="button" variant="ghost" size="lg" onClick={() => setMagicMode(true)} disabled={busy !== null}>
               <Mail className="size-5" />
               {t("magicLink")}

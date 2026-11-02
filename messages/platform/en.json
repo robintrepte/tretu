@@ -63,6 +63,9 @@
     "editSettings": "Settings",
     "addFriend": "Add as friend",
     "friendBadge": "You are friends",
+    "steam": "Steam profile",
+    "steamTitle": "Open {name}'s Steam profile",
+    "connectSteam": "Connect Steam",
     "requestSent": "Request sent",
     "stats": {
       "play": {
@@ -87,7 +90,9 @@
         "playtime": "Playtime",
         "hours": "{hours, plural, one {# hour} other {# hours}}"
       }
-    }
+    },
+    "linkedTitle": "Linked accounts",
+    "minecraftAs": "Minecraft: {name}"
   },
   "friends": {
     "metaTitle": "Friends",
@@ -233,7 +238,7 @@
       "app": "Messages from the apps"
     },
     "teamspeakTitle": "Link TeamSpeak",
-    "teamspeakText": "Link your TeamSpeak identity so your badges also show up as server groups on the Tretu TeamSpeak.",
+    "teamspeakText": "Link your TeamSpeak identity to your Tretu account: it then shows up in “My account”, and your badges are granted as server groups on the Tretu TeamSpeak.",
     "teamspeakLinked": "Linked with {nickname}",
     "teamspeakStart": "Start linking",
     "teamspeakStep": "Connect to the Tretu TeamSpeak and add {code} to your nickname (e.g. “Name {code}”). Then click Verify. The code is valid for 15 minutes.",
@@ -244,8 +249,11 @@
       "ts_client_not_found": "No TeamSpeak client with that code in its nickname found. Are you online?",
       "code_expired": "The code has expired. Start linking again.",
       "ts_identity_taken": "This TeamSpeak identity is already linked to another account.",
-      "teamspeak_unavailable": "TeamSpeak cannot be reached right now."
-    }
+      "teamspeak_unavailable": "TeamSpeak cannot be reached right now.",
+      "teamspeak_disabled": "TeamSpeak linking is not available right now.",
+      "ts_identity_taken_auth": "This TeamSpeak identity is already linked to another Tretu account. The link was removed."
+    },
+    "teamspeakRefusedTitle": "TeamSpeak link removed"
   },
   "notificationTexts": {
     "badgeTitle": "New badge: {badge}",

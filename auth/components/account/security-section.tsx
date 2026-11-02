@@ -17,6 +17,8 @@ import { describeDevice } from "@/lib/client/user-agent"
 
 interface Props {
   hasPassword: boolean
+  /** No real email yet (Steam sign-up, imported account): a first password comes with an email to confirm. */
+  needsEmail: boolean
   twoFactorEnabled: boolean
   isAdmin: boolean
   passkeys: { id: string; name: string | null; createdAt: string | null }[]
@@ -29,7 +31,7 @@ type Status = { tone: "success" | "error"; text: string } | null
 export function SecuritySection(props: Props) {
   return (
     <>
-      <PasswordCard hasPassword={props.hasPassword} />
+      <PasswordCard hasPassword={props.hasPassword} needsEmail={props.needsEmail} />
       <PasskeysCard passkeys={props.passkeys} />
       <TwoFactorCard enabled={props.twoFactorEnabled} isAdmin={props.isAdmin} hasPassword={props.hasPassword} />
       <SessionsCard currentSessionId={props.currentSessionId} />
@@ -38,13 +40,14 @@ export function SecuritySection(props: Props) {
   )
 }
 
-function PasswordCard({ hasPassword }: { hasPassword: boolean }) {
+function PasswordCard({ hasPassword, needsEmail }: { hasPassword: boolean; needsEmail: boolean }) {
   const t = useTranslations("security")
   const tr = useTranslations("register")
   const tc = useTranslations("common")
   const router = useRouter()
   const [current, setCurrent] = useState("")
   const [next, setNext] = useState("")
+  const [email, setEmail] = useState("")
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<Status>(null)
 
@@ -53,11 +56,14 @@ function PasswordCard({ hasPassword }: { hasPassword: boolean }) {
     if (next.length < 10) return setStatus({ tone: "error", text: tr("errors.passwordShort") })
     setBusy(true)
     if (!hasPassword) {
-      const result = await setFirstPassword(next)
+      const result = await setFirstPassword(next, needsEmail ? email : undefined)
       setBusy(false)
-      if (!result.ok) return setStatus({ tone: "error", text: result.error === "compromised" ? tr("errors.passwordCompromised") : result.error === "short" ? tr("errors.passwordShort") : tc("genericError") })
+      if (!result.ok) {
+        const text = result.error === "compromised" ? tr("errors.passwordCompromised") : result.error === "short" ? tr("errors.passwordShort") : result.error === "email" ? tr("errors.emailInvalid") : tc("genericError")
+        return setStatus({ tone: "error", text })
+      }
       setNext("")
-      setStatus({ tone: "success", text: tc("saved") })
+      setStatus({ tone: "success", text: result.emailSent ? t("passwordSetConfirmEmail", { email: email.trim() }) : tc("saved") })
       return router.refresh()
     }
     const { error } = await authClient.changePassword({ currentPassword: current, newPassword: next, revokeOtherSessions: true })
@@ -78,6 +84,14 @@ function PasswordCard({ hasPassword }: { hasPassword: boolean }) {
     <Card>
       <CardHeader title={t("passwordTitle")} description={hasPassword ? t("passwordDescription") : t("passwordNone")} />
       <form onSubmit={onSubmit} className="space-y-4">
+        {!hasPassword && needsEmail && (
+          <>
+            <p className="text-sm text-muted-foreground">{t("passwordNeedsEmail")}</p>
+            <Field label={tc("email")} htmlFor="first-password-email">
+              <Input id="first-password-email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+            </Field>
+          </>
+        )}
         {hasPassword && (
           <Field label={t("currentPassword")} htmlFor="current-password">
             <PasswordInput id="current-password" autoComplete="current-password" required value={current} onChange={(e) => setCurrent(e.target.value)} />
@@ -225,7 +239,7 @@ function TwoFactorCard({ enabled, isAdmin, hasPassword }: { enabled: boolean; is
     setBusy(true)
     const { error } = await authClient.twoFactor.verifyTotp({ code: code.replace(/\s/g, "") })
     setBusy(false)
-    if (error) return setStatus({ tone: "error", text: isRateLimited(error) ? tc("rateLimited") : tt("invalid") })
+    if (error) return setStatus({ tone: "error", text: isRateLimited(error) ? tc("rateLimited") : errorCode(error) === "TOTP_CODE_REUSED" ? tt("reused") : tt("invalid") })
     setStatus({ tone: "success", text: t("twoFactorEnabled") })
     setStep("codes")
     setCode("")

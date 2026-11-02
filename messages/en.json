@@ -1002,5 +1002,12 @@
         }
       }
     }
+  },
+  "error": {
+    "title": "Something went wrong",
+    "message": "This page could not be loaded right now. Please try again in a moment.",
+    "retry": "Try again",
+    "home": "Back to the home page",
+    "reference": "Error code: {digest}"
   }
 }

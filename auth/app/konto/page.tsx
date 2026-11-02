@@ -12,7 +12,7 @@ import { SecuritySection } from "@/components/account/security-section"
 import { SiteFooter } from "@/components/site-footer"
 import { Alert } from "@/components/ui/alert"
 import { loadAccountData } from "@/lib/account-data"
-import { enabledSocialProviders } from "@/lib/env"
+import { enabledSocialProviders, env, steamEnabled } from "@/lib/env"
 import { isPlaceholderEmail } from "@/lib/oidc/claims"
 import { readOAuthRequest, type SearchParams } from "@/lib/oidc/flow"
 import { requireUser } from "@/lib/session"
@@ -107,6 +107,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
             {tab === "sicherheit" && (
               <SecuritySection
                 hasPassword={hasPassword}
+                needsEmail={isPlaceholderEmail(user.email)}
                 twoFactorEnabled={Boolean(user.twoFactorEnabled)}
                 isAdmin={admin}
                 passkeys={passkeys.map((p) => ({ id: p.id, name: p.name, createdAt: p.createdAt?.toISOString() ?? null }))}
@@ -117,9 +118,13 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
             {tab === "konten" && (
               <ConnectionsSection
                 enabled={enabledSocialProviders}
+                steamEnabled={steamEnabled}
                 linked={providers}
-                canRemoveLast={hasPassword || passkeys.length > 0}
-                games={gameLinks.map((g) => ({ provider: g.provider, id: g.id, displayName: g.displayName }))}
+                hasPasskey={passkeys.length > 0}
+                hasPassword={hasPassword}
+                games={gameLinks.map((g) => ({ provider: g.provider as "minecraft" | "teamspeak", id: g.id, displayName: g.displayName }))}
+                linkUrls={{ minecraft: env.TRETU_MC_LINK_URL, teamspeak: env.TRETU_TS_LINK_URL }}
+                notice={typeof params.error === "string" ? params.error.slice(0, 80) : null}
               />
             )}
             {tab === "sprache" && <LanguageSection locale={user.locale === "en" ? "en" : "de"} />}
@@ -129,7 +134,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                 connected={legacy.map((l) => ({ app: l.app, name: l.legacyUsername ?? l.legacyEmail ?? "–" }))}
                 until={firstImport ? claimUntil : null}
                 open={claimOpen}
-                providers={enabledSocialProviders.filter((p) => p !== "apple")}
+                providers={[...enabledSocialProviders.filter((p) => p !== "apple"), ...(steamEnabled ? (["steam"] as const) : [])]}
                 notice={typeof params.claim === "string" ? params.claim : null}
               />
             )}

@@ -42,8 +42,8 @@ export async function runImport(db: Db, sources: ImportSources, options: { dryRu
   }
   log(`read ${records.length} legacy accounts from ${Object.keys(counts).join(", ") || "no sources"}`)
 
-  const { anchors, takenSteamIds } = await loadAnchors(db)
-  const plan = planImport(records, anchors, { takenSteamIds })
+  const { anchors } = await loadAnchors(db)
+  const plan = planImport(records, anchors)
   const report = buildReport(plan, counts, options.dryRun, records)
 
   let written: { created: number; joined: number } | null = null

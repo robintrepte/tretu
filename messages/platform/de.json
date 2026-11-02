@@ -63,6 +63,9 @@
     "editSettings": "Einstellungen",
     "addFriend": "Als Freund hinzufügen",
     "friendBadge": "Ihr seid befreundet",
+    "steam": "Steam-Profil",
+    "steamTitle": "Steam-Profil von {name} öffnen",
+    "connectSteam": "Steam verbinden",
     "requestSent": "Anfrage gesendet",
     "stats": {
       "play": {
@@ -87,7 +90,9 @@
         "playtime": "Spielzeit",
         "hours": "{hours, plural, one {# Stunde} other {# Stunden}}"
       }
-    }
+    },
+    "linkedTitle": "Verknüpfte Konten",
+    "minecraftAs": "Minecraft: {name}"
   },
   "friends": {
     "metaTitle": "Freunde",
@@ -233,7 +238,7 @@
       "app": "Nachrichten aus den Apps"
     },
     "teamspeakTitle": "TeamSpeak verknüpfen",
-    "teamspeakText": "Verknüpfe deine TeamSpeak-Identität, damit deine Abzeichen auch als Servergruppen auf dem Tretu-TeamSpeak erscheinen.",
+    "teamspeakText": "Verknüpfe deine TeamSpeak-Identität mit deinem Tretu-Konto: Sie erscheint dann in „Mein Konto“, und deine Abzeichen werden als Servergruppen auf dem Tretu-TeamSpeak vergeben.",
     "teamspeakLinked": "Verknüpft mit {nickname}",
     "teamspeakStart": "Verknüpfung starten",
     "teamspeakStep": "Verbinde dich mit dem Tretu-TeamSpeak und füge {code} an deinen Nickname an (z. B. „Name {code}“). Dann klicke auf Prüfen. Der Code gilt 15 Minuten.",
@@ -244,8 +249,11 @@
       "ts_client_not_found": "Kein TeamSpeak-Client mit diesem Code im Nickname gefunden. Bist du online?",
       "code_expired": "Der Code ist abgelaufen. Starte die Verknüpfung neu.",
       "ts_identity_taken": "Diese TeamSpeak-Identität ist bereits mit einem anderen Konto verknüpft.",
-      "teamspeak_unavailable": "TeamSpeak ist gerade nicht erreichbar."
-    }
+      "teamspeak_unavailable": "TeamSpeak ist gerade nicht erreichbar.",
+      "teamspeak_disabled": "TeamSpeak-Verknüpfung ist gerade nicht verfügbar.",
+      "ts_identity_taken_auth": "Diese TeamSpeak-Identität ist bereits mit einem anderen Tretu-Konto verknüpft. Die Verknüpfung wurde aufgehoben."
+    },
+    "teamspeakRefusedTitle": "TeamSpeak-Verknüpfung aufgehoben"
   },
   "notificationTexts": {
     "badgeTitle": "Neues Abzeichen: {badge}",

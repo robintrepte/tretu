@@ -1,5 +1,6 @@
-import { Lock, Settings, UserRound, Users } from "lucide-react";
+import { Check, ExternalLink, Gamepad2, Lock, Settings, UserRound, Users } from "lucide-react";
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -7,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { pageMetadata } from "@/lib/metadata";
 import { platformDb } from "@/lib/platform/db";
 import { displayName } from "@/lib/platform/directory";
-import { formatDate } from "@/lib/platform/format";
+import { getAuthIssuer } from "@/lib/platform/env";
+import { accountUrl, formatDate } from "@/lib/platform/format";
 import { getTranslations } from "@/lib/platform/i18n";
-import { findProfileUser, getVisibility, loadProfilePage } from "@/lib/platform/profile";
+import { findProfileUser, getVisibility, loadProfilePage, type LinkedAccounts } from "@/lib/platform/profile";
 
 import { AddFriendButton } from "../../_components/add-friend-button";
 import { Avatar } from "../../_components/avatar";
@@ -97,6 +99,7 @@ export default async function ProfilePage({ params }: Props) {
             </p>
           </div>
           <LevelBar level={page.level} t={t} />
+          <LinkedAccountsRow linked={page.linked} name={name} isOwner={page.isOwner} t={t} />
         </div>
         <div className="flex shrink-0 gap-2">
           {page.isOwner ? (
@@ -143,5 +146,79 @@ export default async function ProfilePage({ params }: Props) {
         {cards.length ? <StatCards cards={cards} /> : <p className="text-muted-foreground">{t("profile.noStats")}</p>}
       </section>
     </PlatformPage>
+  );
+}
+
+type T = Awaited<ReturnType<typeof getTranslations>>["t"];
+
+const chip =
+  "inline-flex items-center gap-1.5 rounded-full border border-border/70 px-2.5 py-0.5 text-sm font-medium text-foreground";
+
+/** Discord / Minecraft / Steam / TeamSpeak linked to the Tretu-Konto (only rendered where the profile may be seen). */
+function LinkedAccountsRow({ linked, name, isOwner, t }: { linked: LinkedAccounts; name: string; isOwner: boolean; t: T }) {
+  const items: ReactNode[] = [];
+  if (linked.discord) {
+    items.push(
+      <li key="discord" className={chip} data-testid="profile-linked-discord">
+        <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden />
+        Discord
+      </li>
+    );
+  }
+  if (linked.minecraft) {
+    items.push(
+      <li key="minecraft" className={chip} data-testid="profile-linked-minecraft">
+        <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden />
+        {linked.minecraftName ? t("profile.minecraftAs", { name: linked.minecraftName }) : "Minecraft"}
+      </li>
+    );
+  }
+  if (linked.steamUrl) {
+    items.push(
+      <li key="steam">
+        <a
+          href={linked.steamUrl}
+          target="_blank"
+          rel="noopener noreferrer nofollow"
+          title={t("profile.steamTitle", { name })}
+          data-testid="profile-steam"
+          className={`${chip} transition-colors hover:border-[var(--tretu-accent)] hover:text-[var(--tretu-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--tretu-accent)]`}
+        >
+          <Gamepad2 className="size-4" aria-hidden />
+          {t("profile.steam")}
+          <ExternalLink className="size-3" aria-hidden />
+        </a>
+      </li>
+    );
+  }
+  if (linked.teamspeak) {
+    items.push(
+      <li key="teamspeak" className={chip} data-testid="profile-linked-teamspeak">
+        <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden />
+        TeamSpeak
+      </li>
+    );
+  }
+  const connectSteam = isOwner && !linked.steamUrl && getAuthIssuer();
+  if (!items.length && !connectSteam) return null;
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t("profile.linkedTitle")}</p>
+      <ul className="flex flex-wrap items-center gap-2" aria-label={t("profile.linkedTitle")}>
+        {items}
+        {connectSteam ? (
+          <li>
+            <a
+              href={accountUrl()}
+              data-testid="profile-connect-steam"
+              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground underline-offset-4 hover:text-[var(--tretu-accent)] hover:underline"
+            >
+              <Gamepad2 className="size-4" aria-hidden />
+              {t("profile.connectSteam")}
+            </a>
+          </li>
+        ) : null}
+      </ul>
+    </div>
   );
 }

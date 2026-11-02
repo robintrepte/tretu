@@ -23,7 +23,8 @@
     "clients:sync": "tsx --env-file-if-exists=.env scripts/clients-sync.ts",
     "worker:events": "tsx --env-file-if-exists=.env scripts/worker-events.ts",
     "import:legacy": "tsx --env-file-if-exists=.env scripts/import-legacy.ts",
-    "admin": "tsx --env-file-if-exists=.env scripts/admin.ts"
+    "admin": "tsx --env-file-if-exists=.env scripts/admin.ts",
+    "secrets": "tsx scripts/secrets.ts"
   },
   "dependencies": {
     "@aws-sdk/client-sesv2": "3.1161.0",
