@@ -4,6 +4,8 @@ One Tretu account, one platform, many apps. This folder documents how they fit t
 
 - **[CONTRACT.md](CONTRACT.md)** – the binding contract every app implements: hosts, PM2 names and ports, OIDC claims,
   signed server-to-server requests (with test vectors), events, platform API and UX conventions.
+- **[../../deploy/GO-LIVE.md](../../deploy/GO-LIVE.md)** – the ordered go-live runbook (DNS, certificates, databases, secrets,
+  deploy order, legacy import, switching each app on, verification, rollback per step).
 - **[../../deploy/README.md](../../deploy/README.md)** – server setup for all apps: Postgres per app, nginx/certbot, PM2,
   Umami, Uptime Kuma.
 

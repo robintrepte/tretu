@@ -23,6 +23,11 @@ openssl dhparam -dsaparam -out "$tmp/dh.pem" 2048 >/dev/null 2>&1
 # nginx -t opens the listen sockets: hosts without IPv6 (some CI containers) cannot check `listen [::]:…`.
 strip_v6=()
 if [ ! -s /proc/net/if_inet6 ]; then strip_v6=(-e '/listen[[:space:]]+\[::\]/d'); fi
+# It also binds them: without root, ports 80/443 are moved to 18080/18443 (the syntax check is the same).
+remap=()
+if [ "$(id -u)" != "0" ]; then
+  remap=(-e 's/(listen[[:space:]]+(\[::\]:)?)80([[:space:];])/\118080\3/' -e 's/(listen[[:space:]]+(\[::\]:)?)443([[:space:];])/\118443\3/')
+fi
 
 for f in "${files[@]}"; do
   name="$(basename "$f")"
@@ -32,7 +37,7 @@ for f in "${files[@]}"; do
     -e "s#/etc/letsencrypt/options-ssl-nginx.conf#$tmp/options-ssl.conf#g" \
     -e "s#/etc/letsencrypt/ssl-dhparams.pem#$tmp/dh.pem#g" \
     -e "s#/var/log/nginx/#$tmp/logs/#g" \
-    "${strip_v6[@]}" \
+    "${strip_v6[@]}" "${remap[@]}" \
     "$f" > "$tmp/sites/$name"
 done
 
