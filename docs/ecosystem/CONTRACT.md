@@ -17,7 +17,7 @@ import done before any app's Tretu-only version is opened to members (`deploy/GO
 | Hub + platform API | tretu.de | tretu (root app) | tretu-web | 3020 | tretu_web |
 | Identity provider | auth.tretu.de | tretu/auth | tretu-auth | 3021 | tretu_auth |
 | Saga | saga.tretu.de | adventure.ai | saga | 3038 | saga |
-| Play | play.tretu.de | play | play | 3030 | play |
+| Play | play.tretu.de | play | play.tretu.de | 3041 | play |
 | Hollowmere web + Nakama | hollowmere.tretu.de | hollowmere | hollowmere-nakama | 7350 (console 7351, localhost) | nakama |
 | Minecraft dashboard | mc.tretu.de | tretu-minecraft/dashboard | mc-dashboard | 8130 | mc_dashboard |
 

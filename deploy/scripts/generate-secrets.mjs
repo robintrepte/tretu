@@ -33,7 +33,7 @@ export const APPS = {
   "tretu-web": { host: "", dir: "/srv/tretu", db: "tretu_web", port: 3020 },
   auth: { host: "auth.", dir: "/srv/tretu/auth", db: "tretu_auth", port: 3021 },
   saga: { host: "saga.", dir: "/srv/saga", db: "saga", port: 3038 },
-  play: { host: "play.", dir: "/srv/play", db: "play", port: 3030 },
+  play: { host: "play.", dir: "/srv/play", db: "play", port: 3041, pm2: "play.tretu.de" },
   hollowmere: { host: "hollowmere.", dir: "/srv/hollowmere", db: "nakama", port: 7350 },
   "mc-dashboard": { host: "mc.", dir: "/srv/tretu-minecraft", db: "mc_dashboard", port: 8130 },
 };
@@ -319,7 +319,8 @@ function specs(domain, s) {
         ["APP_URL", u.play],
         ["DATABASE_URL", { db: ["play", "play"] }],
         ["BETTER_AUTH_SECRET", G("play.betterAuthSecret"), "import the existing one: a new value signs everyone out"],
-        ["PORT", String(APPS.play.port)],
+        ["PLAY_PM2_NAME", APPS.play.pm2, "PM2 process name and port (ecosystem.config.cjs); the port must match the nginx upstream"],
+        ["PLAY_PORT", String(APPS.play.port)],
         ["TRUST_PROXY", "true"],
         "# Email (Amazon SES)",
         ["SES_REGION", X()],
