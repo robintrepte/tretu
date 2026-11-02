@@ -134,3 +134,30 @@ test("production refuses to start without the Tretu-Konto configuration", async 
   expect(output).toContain("TRETU_AUTH_CLIENT_ID, TRETU_AUTH_CLIENT_SECRET must be set");
   expect(code).not.toBe(0);
 });
+
+test("privacy policy and terms describe the Tretu-Konto-only sign-in (German and English)", async ({ page, context, baseURL }) => {
+  await page.goto("/datenschutz");
+  await expect(page.getByText("Stand: 2. November 2026")).toBeVisible();
+  await expect(page.locator("#konto")).toContainText("ausschließlich über „Mit Tretu-Konto anmelden“");
+  await expect(page.locator("#konto")).toContainText("über die Kennung deines bisherigen Kontos");
+  await expect(page.locator("#konto")).toContainText("Steam (Valve Corporation");
+  await expect(page.locator("#saga")).toContainText("In Saga meldest du dich nur mit dem Tretu-Konto an");
+  await expect(page.locator("#saga")).not.toContainText("Passwort (nur als sicherer Hash)");
+  await expect(page.locator("#play")).toContainText("Gastkonten");
+  await expect(page.locator("#play")).not.toContainText("Passkey (nur der öffentliche");
+  await expect(page.locator("#hollowmere")).toContainText("Anmeldung nur mit dem Tretu-Konto");
+  await expect(page.locator("#minecraft")).toContainText("nur noch, um dein Minecraft-Konto mit deinem Tretu-Konto zu verknüpfen");
+  await expect(page.locator("#hub")).toContainText("ausschließlich mit deinem Tretu-Konto");
+  await page.goto("/agb");
+  await expect(page.locator("#konto")).toContainText("die Dienste haben keine eigene Anmeldung");
+
+  await context.addCookies([{ name: "NEXT_LOCALE", value: "en", url: baseURL! }]);
+  await page.goto("/datenschutz");
+  await expect(page.getByText("Last updated: 2 November 2026")).toBeVisible();
+  await expect(page.locator("#konto")).toContainText("sign you in only via “Sign in with your Tretu account”");
+  await expect(page.locator("#saga")).toContainText("You sign in to Saga only with the Tretu account");
+  await expect(page.locator("#hollowmere")).toContainText("sign-in only with the Tretu account");
+  await expect(page.locator("#minecraft")).toContainText("now only links your Minecraft account to your Tretu account");
+  await page.goto("/agb");
+  await expect(page.locator("#konto")).toContainText("the services have no sign-in of their own");
+});

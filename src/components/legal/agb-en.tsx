@@ -51,9 +51,9 @@ export function AgbEn() {
       <Section id="konto" title="§ 2 Tretu account and conclusion of contract">
         <OL>
           <li>
-            You can use many services without an account or as a guest. Other features require an account – a Tretu account or an
-            account in the respective service. Registering or signing in for the first time concludes a free contract of use under
-            these terms.
+            You can use many services without an account or as a guest. Other features require a Tretu account; it signs you in to
+            all services (the services have no sign-in of their own). Registering or signing in for the first time concludes a free
+            contract of use under these terms.
           </li>
           <li>
             Your details must be accurate; you must keep your credentials secret and protect them from access by third parties. One

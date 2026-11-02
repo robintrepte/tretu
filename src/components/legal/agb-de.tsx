@@ -52,9 +52,9 @@ export function AgbDe() {
       <Section id="konto" title="§ 2 Tretu-Konto und Vertragsschluss">
         <OL>
           <li>
-            Viele Dienste kannst du ohne Konto oder als Gast nutzen. Für andere Funktionen brauchst du ein Konto – ein Tretu-Konto
-            oder ein Konto im jeweiligen Dienst. Mit der Registrierung bzw. der ersten Anmeldung kommt ein unentgeltlicher
-            Nutzungsvertrag nach diesen Bedingungen zustande.
+            Viele Dienste kannst du ohne Konto oder als Gast nutzen. Für andere Funktionen brauchst du ein Tretu-Konto; mit ihm
+            meldest du dich bei allen Diensten an (die Dienste haben keine eigene Anmeldung). Mit der Registrierung bzw. der ersten
+            Anmeldung kommt ein unentgeltlicher Nutzungsvertrag nach diesen Bedingungen zustande.
           </li>
           <li>
             Deine Angaben müssen zutreffen; deine Zugangsdaten musst du geheim halten und vor dem Zugriff Dritter schützen. Pro
