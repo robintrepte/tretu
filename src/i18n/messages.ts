@@ -10,7 +10,7 @@ const cache = new Map<string, Messages>();
 
 function readJson(file: string): Messages {
   try {
-    const parsed: unknown = JSON.parse(readFileSync(file, "utf8"));
+    const parsed: unknown = JSON.parse(readFileSync(/*turbopackIgnore: true*/ file, "utf8"));
     return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Messages) : {};
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return {};
@@ -45,7 +45,8 @@ export function loadMessages(locale: Locale, dir: string = DEFAULT_DIR): Message
     let messages = readJson(path.join(dir, `${l}.json`));
     let entries: string[] = [];
     try {
-      entries = readdirSync(dir, { withFileTypes: true })
+      // Read at runtime from the checkout (`next start`, not standalone): keep the bundler from tracing the whole project.
+      entries = readdirSync(/*turbopackIgnore: true*/ dir, { withFileTypes: true })
         .filter((entry) => entry.isDirectory())
         .map((entry) => entry.name)
         .sort();
