@@ -22,6 +22,13 @@
       "when": 1793593173108,
       "tag": "0002_totp_replay",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793605361669,
+      "tag": "0003_admin_lock_search",
+      "breakpoints": true
     }
   ]
 }

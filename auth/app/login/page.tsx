@@ -23,6 +23,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   if (session && !oauth) redirect(next as "/konto")
 
   const error = typeof params.error === "string" ? params.error : undefined
+  const lockedUntil = typeof params.until === "string" && !Number.isNaN(Date.parse(params.until)) ? params.until : undefined
   const notice = NOTICES.find((n) => params[n] === "1")
   const query = toQueryString(params)
   return (
@@ -33,6 +34,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         oauth={oauth ? { clientName: oauth.clientName, valid: oauth.valid } : null}
         signedIn={session && oauth && oauth.valid && !oauth.forceLogin ? { name: session.user.name } : null}
         error={error}
+        lockedUntil={lockedUntil}
         notice={notice}
         next={next}
         query={query}

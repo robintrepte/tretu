@@ -2,7 +2,7 @@
 
 import { Fingerprint, Mail } from "lucide-react"
 import Link from "next/link"
-import { useTranslations } from "next-intl"
+import { useFormatter, useTranslations } from "next-intl"
 import { useEffect, useRef, useState, type FormEvent } from "react"
 import { SocialButtons, type ProviderId } from "@/components/auth/social-buttons"
 import { Alert } from "@/components/ui/alert"
@@ -19,6 +19,8 @@ interface Props {
   oauth: { clientName: string; valid: boolean } | null
   signedIn: { name: string } | null
   error?: string
+  /** With error ACCOUNT_LOCKED: the end of the lock (ISO), if it has one. */
+  lockedUntil?: string
   notice?: "verified" | "reset" | "deleted" | "signedOut"
   next: string
   query: string
@@ -26,9 +28,10 @@ interface Props {
 
 const PROVIDER_NAMES: Record<string, string> = { discord: "Discord", google: "Google", apple: "Apple", steam: "Steam" }
 
-export function LoginForm({ providers, steam, oauth, signedIn, error: initialError, notice, next, query }: Props) {
+export function LoginForm({ providers, steam, oauth, signedIn, error: initialError, lockedUntil, notice, next, query }: Props) {
   const t = useTranslations("login")
   const tc = useTranslations("common")
+  const format = useFormatter()
   const [identifier, setIdentifier] = useState("")
   const [password, setPassword] = useState("")
   const [busy, setBusy] = useState<"password" | "passkey" | "magic" | "continue" | null>(null)
@@ -40,8 +43,17 @@ export function LoginForm({ providers, steam, oauth, signedIn, error: initialErr
   // Email links (verification, magic link) come back here; inside an app sign-in the flow then continues.
   const returnURL = oauth ? `/login${suffix}` : next
 
+  /** The admin lock (lib/admin/lock.ts), with its end date when it has one. */
+  function lockedMessage(until: unknown): string {
+    // The auth client parses ISO dates in JSON answers into Date objects; the login page passes a string.
+    const date = until instanceof Date ? until : typeof until === "string" ? new Date(until) : null
+    if (!date || Number.isNaN(date.getTime())) return t("errors.accountLocked")
+    return t("errors.accountLockedUntil", { until: format.dateTime(date, { dateStyle: "long", timeStyle: "short" }) })
+  }
+
   function describeInitialError(code?: string): string | null {
     if (!code) return null
+    if (code === "ACCOUNT_LOCKED") return lockedMessage(lockedUntil)
     if (code === "two_factor_required" || code === "invalid_token" || code === "steam_failed" || code === "state_mismatch" || code === "signup_disabled") return t(`errors.${code}`)
     if (code === "access_denied") return t("errors.cancelled")
     if (code === "account_already_linked_to_different_user" || code === "account_not_linked") return t("errors.account_not_linked")
@@ -61,6 +73,7 @@ export function LoginForm({ providers, steam, oauth, signedIn, error: initialErr
       case "CREDENTIAL_ACCOUNT_NOT_FOUND":
         return t("errors.invalid")
       case "ACCOUNT_LOCKED":
+        return lockedMessage((err as { lockedUntil?: unknown }).lockedUntil)
       case "TOO_MANY_ATTEMPTS":
         return t("errors.locked")
       case "invalid_signature":
@@ -127,7 +140,9 @@ export function LoginForm({ providers, steam, oauth, signedIn, error: initialErr
     if (result?.error) {
       setBusy(null)
       // Cancelling the browser dialog is not an error worth shouting about.
-      if (errorCode(result.error) !== "AUTH_CANCELLED") setError(t("errors.passkey"))
+      const code = errorCode(result.error)
+      if (code === "ACCOUNT_LOCKED") setError(describe(result.error))
+      else if (code !== "AUTH_CANCELLED") setError(t("errors.passkey"))
       return
     }
     afterSignIn(result?.data)

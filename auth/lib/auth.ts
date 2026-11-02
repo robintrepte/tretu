@@ -4,6 +4,7 @@ import { getCurrentAuthEndpointContext } from "@better-auth/core/context"
 import { betterAuth, type BetterAuthPlugin } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { APIError, createAuthMiddleware, getOAuthState, getSessionFromCtx, isAPIError } from "better-auth/api"
+import { deleteSessionCookie } from "better-auth/cookies"
 import { symmetricDecrypt } from "better-auth/crypto"
 import { nextCookies } from "better-auth/next-js"
 import { captcha, jwt, magicLink, twoFactor, username } from "better-auth/plugins"
@@ -12,6 +13,7 @@ import type { AppleOptions, AppleProfile } from "@better-auth/core/social-provid
 import { base32 } from "@better-auth/utils/base32"
 import { createRemoteJWKSet, jwtVerify } from "jose"
 import { localeFromHeaders, type Locale } from "@/i18n/locales"
+import { ACCOUNT_LOCKED, activeLock, revokeAllAccess } from "@/lib/admin/lock"
 import { audit, requestIp, type AuditEvent } from "@/lib/audit"
 import { db } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
@@ -133,6 +135,34 @@ async function keepsASignInMethod(userId: string, accountRowId: string): Promise
   return Boolean(passkey)
 }
 
+/*
+ * Locked accounts (lib/admin/lock.ts). Every sign-in creates a session, and the session create hook refuses it for a
+ * locked account: password, passkey and two-factor sign-ins get a JSON error with code ACCOUNT_LOCKED (and
+ * `lockedUntil`), which the forms show as a friendly message; sign-ins that arrive as a page load (Discord, Google,
+ * Apple and Steam callbacks, magic links, email confirmation links) are redirected to the login page, which shows it.
+ */
+function accountLockedError(until: Date | null) {
+  return new APIError("FORBIDDEN", { message: "This Tretu-Konto is locked.", code: ACCOUNT_LOCKED, lockedUntil: until?.toISOString() ?? null })
+}
+
+function accountLockedUrl(until: Date | null) {
+  const url = new URL("/login", issuer)
+  url.searchParams.set("error", ACCOUNT_LOCKED)
+  if (until) url.searchParams.set("until", until.toISOString())
+  return url.toString()
+}
+
+/** Whether an endpoint's result is the refusal of a locked account (JSON error or redirect to the login page). */
+function isLockRefusal(returned: unknown): boolean {
+  if (!isAPIError(returned)) return false
+  if ((returned.body as { code?: unknown } | undefined)?.code === ACCOUNT_LOCKED) return true
+  const location = returned.headers instanceof Headers ? returned.headers.get("location") : null
+  return Boolean(location && new URL(location, issuer).searchParams.get("error") === ACCOUNT_LOCKED)
+}
+
+/** Endpoints that hand out OIDC authorization codes for the browser's existing session. */
+const OIDC_SESSION_PATHS = new Set(["/oauth2/authorize", "/oauth2/continue", "/oauth2/consent"])
+
 /**
  * Tretu's own rules on top of Better Auth: username rules, redirect targets, unlink rules, the second factor for
  * provider and email-link sign-ins, audit log, transparent re-hashing of imported passwords and the user events
@@ -202,6 +232,22 @@ const tretu = (): BetterAuthPlugin => ({
         }),
       },
       {
+        // A locked account never gets an authorization code, also not from a session that predates the lock.
+        matcher: (ctx) => OIDC_SESSION_PATHS.has(ctx.path ?? ""),
+        handler: createAuthMiddleware(async (ctx) => {
+          const session = await getSessionFromCtx(ctx)
+          if (!session) return
+          const lock = await activeLock(session.user.id)
+          if (!lock) return
+          await db.transaction((tx) => revokeAllAccess(tx, session.user.id))
+          deleteSessionCookie(ctx, true)
+          const headers = ctx.request?.headers ?? ctx.headers
+          await audit("login.failed", { userId: session.user.id, success: false, ipAddress: requestIp(headers), userAgent: headers?.get("user-agent"), meta: { method: "session", code: ACCOUNT_LOCKED } })
+          if (ctx.path === "/oauth2/authorize") throw ctx.redirect(accountLockedUrl(lock.until))
+          throw accountLockedError(lock.until)
+        }),
+      },
+      {
         // Disconnecting Discord, Google, Apple or Steam: only while another way to sign in remains.
         matcher: (ctx) => ctx.path === "/unlink-account",
         handler: createAuthMiddleware(async (ctx) => {
@@ -228,6 +274,14 @@ const tretu = (): BetterAuthPlugin => ({
           const base = { ipAddress: requestIp(headers), userAgent: headers?.get("user-agent") ?? null }
           const path = ctx.path
           const sessionUserId = ctx.context.session?.user.id ?? null
+
+          // A sign-in refused because the account is locked: already in the activity log (see the session hook).
+          if (isLockRefusal(returned)) return
+
+          if (path === "/passkey/verify-authentication" && !failed) {
+            const credentialId = (ctx.body as { response?: { id?: unknown } } | undefined)?.response?.id
+            if (typeof credentialId === "string") await db.update(schema.passkey).set({ lastUsedAt: new Date() }).where(eq(schema.passkey.credentialID, credentialId))
+          }
 
           if (path === "/sign-in/email" || path === "/sign-in/username") {
             const userId = await userFromBody(ctx.body)
@@ -490,6 +544,23 @@ export const auth = betterAuth({
     },
     session: {
       create: {
+        // Locked accounts get no session, whatever the sign-in method (see accountLockedError).
+        before: async (session, context) => {
+          const lock = await activeLock(session.userId)
+          if (!lock) return
+          const path = context?.path ?? ""
+          const headers = context?.request?.headers ?? context?.headers
+          await audit("login.failed", {
+            userId: session.userId,
+            success: false,
+            ipAddress: requestIp(headers),
+            userAgent: headers?.get("user-agent"),
+            meta: { method: signInMethod(path, context?.params), code: ACCOUNT_LOCKED },
+          })
+          // Page loads (provider callbacks, email links) go to the login page; the provider callbacks pass a redirect on.
+          if (context && (context.request?.method ?? context.method) === "GET") throw context.redirect(accountLockedUrl(lock.until))
+          throw accountLockedError(lock.until)
+        },
         after: async (session, context) => {
           const path = context?.path ?? ""
           if (isSecondFactorBypass(path)) {

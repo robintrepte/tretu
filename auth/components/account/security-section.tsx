@@ -442,6 +442,25 @@ function ActivityCard({ activity }: { activity: Props["activity"] }) {
   const t = useTranslations("security")
   const ta = useTranslations("audit")
   const format = useFormatter()
+  const methodName = (method: string) => (ta.has(`methods.${method}` as "via") ? ta(`methods.${method}` as "via") : method)
+  const text = (meta: Record<string, unknown> | null, key: string) => (typeof meta?.[key] === "string" ? (meta[key] as string) : null)
+
+  function activityTitle(a: Props["activity"][number]): string {
+    const key = a.event.replace(/\./g, "_")
+    if (a.event === "login.failed" && a.meta?.code === "ACCOUNT_LOCKED") return ta("login_locked")
+    if (a.event === "admin.locked" && text(a.meta, "until")) {
+      return ta("admin_locked_until", { until: format.dateTime(new Date(text(a.meta, "until")!), { dateStyle: "medium", timeStyle: "short" }) })
+    }
+    if (a.event === "admin.link_removed") return ta("admin_link_removed", { provider: methodName(text(a.meta, "provider") ?? "other") })
+    if (a.event === "admin.performed") {
+      const action = text(a.meta, "action") ?? ""
+      return ta("admin_performed", {
+        target: text(a.meta, "targetUsername") ?? text(a.meta, "targetSub") ?? "–",
+        action: ta.has(`adminActions.${action}` as "via") ? ta(`adminActions.${action}` as "via") : action,
+      })
+    }
+    return ta.has(key as "login") ? ta(key as "login") : a.event
+  }
   return (
     <Card>
       <CardHeader title={t("activityTitle")} description={t("activityDescription")} />
@@ -450,14 +469,16 @@ function ActivityCard({ activity }: { activity: Props["activity"] }) {
       ) : (
         <ol className="space-y-3">
           {activity.map((a) => {
-            const method = typeof a.meta?.method === "string" ? a.meta.method : typeof a.meta?.provider === "string" ? a.meta.provider : null
+            const admin = a.event.startsWith("admin.")
+            // Admin entries name the provider in their own text; the admin and the reason are not shown here.
+            const method = admin ? null : typeof a.meta?.method === "string" ? a.meta.method : typeof a.meta?.provider === "string" ? a.meta.provider : null
             return (
               <li key={a.id} className="flex gap-3 text-sm">
                 <span className={`mt-1.5 size-2 shrink-0 rounded-full ${a.success ? "bg-success" : "bg-danger"}`} aria-hidden />
                 <div className="min-w-0">
                   <div className="font-medium">
-                    {ta.has(a.event.replace(/\./g, "_") as "login") ? ta(a.event.replace(/\./g, "_") as "login") : a.event}
-                    {method && <span className="font-normal text-muted-foreground"> · {ta("via", { method: ta.has(`methods.${method}` as "via") ? ta(`methods.${method}` as "via") : method })}</span>}
+                    {activityTitle(a)}
+                    {method && <span className="font-normal text-muted-foreground"> · {ta("via", { method: methodName(method) })}</span>}
                     {!a.success && <span className="font-normal text-danger"> · {t("failed")}</span>}
                   </div>
                   <div className="text-muted-foreground">
