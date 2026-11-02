@@ -36,6 +36,8 @@ const child = spawn(process.execPath, [path.join(root, "node_modules/next/dist/b
     AUTH_HIBP: "off",
     STEAM_LOGIN: "true",
     STEAM_OPENID_ENDPOINT: steam.endpoint,
+    // The admin API, called by e2e/admin-lock.spec.ts as tretu.de would.
+    TRETU_APPS_JSON: JSON.stringify({ "tretu-web": { secret: process.env.E2E_TRETU_WEB_SECRET ?? "e2e-tretu-web-secret-0123456789abcdef" } }),
   },
 })
 for (const signal of ["SIGINT", "SIGTERM"] as const)
