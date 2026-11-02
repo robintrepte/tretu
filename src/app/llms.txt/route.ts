@@ -25,6 +25,7 @@ ${DEFAULT_DESCRIPTION}
 - Impressum (Legal): ${SITE_URL}/impressum
 - Datenschutz (Privacy): ${SITE_URL}/datenschutz
 - AGB (Terms of use, Tretu-Credits): ${SITE_URL}/agb
+- Status of all Tretu services: ${SITE_URL}/status (JSON: ${SITE_URL}/api/status)
 
 ## Sitemap
 ${SITE_URL}/sitemap.xml

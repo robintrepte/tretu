@@ -41,7 +41,8 @@
     },
     "toggleTheme": "Farbschema umschalten",
     "lightMode": "Zu Hellmodus wechseln",
-    "darkMode": "Zu Dunkelmodus wechseln"
+    "darkMode": "Zu Dunkelmodus wechseln",
+    "status": "Status"
   },
   "meta": {
     "defaultDescription": "Willkommen auf der Webseite von Tretu! Unser Ziel ist es, das Community-Erlebnis auf ein neues Level zu bringen. Von Gamern, für Gamer. Teamspeak, Discord, Livestreams, Minecraft-Map und mehr.",
@@ -97,6 +98,10 @@
     "notFound": {
       "title": "Seite nicht gefunden",
       "description": "Die angeforderte Seite existiert nicht. Zurück zur Startseite von Tretu."
+    },
+    "status": {
+      "title": "Status",
+      "description": "Aktueller Status aller Tretu-Dienste: Website, Tretu-Konto, Saga, Play, Hollowmere und Minecraft-Dashboard, mit Verfügbarkeit der letzten 24 Stunden und 90 Tage."
     }
   },
   "notFound": {
@@ -770,5 +775,51 @@
     "retry": "Erneut versuchen",
     "home": "Zur Startseite",
     "reference": "Fehlercode: {digest}"
+  },
+  "status": {
+    "title": "Status",
+    "intro": "Ob unsere Dienste gerade laufen – geprüft jede Minute von unserem Server aus.",
+    "overall": {
+      "up": "Alle Dienste laufen",
+      "degraded": "Einige Dienste sind gestört",
+      "down": "Mindestens ein Dienst ist ausgefallen",
+      "unknown": "Noch keine Prüfergebnisse",
+      "unavailable": "Der Status kann gerade nicht geladen werden"
+    },
+    "updated": "Stand: {time} Uhr",
+    "neverChecked": "Es liegen noch keine Prüfungen vor.",
+    "stale": "Die Prüfungen laufen gerade nicht. Angezeigt wird der Stand von {time} Uhr.",
+    "autoRefresh": "Die Seite aktualisiert sich jede Minute.",
+    "notice": "Hinweis",
+    "state": {
+      "up": "Läuft",
+      "degraded": "Gestört",
+      "down": "Ausgefallen",
+      "unknown": "Keine Daten"
+    },
+    "responseTime": "Antwortzeit",
+    "responseMs": "{ms} ms",
+    "since": "seit {time} Uhr",
+    "last24h": "Letzte 24 Stunden",
+    "last90d": "Letzte 90 Tage",
+    "uptime": "{percent} verfügbar",
+    "noData": "keine Daten",
+    "hoursAgo": "vor 24 Std.",
+    "daysAgo": "vor 90 Tagen",
+    "now": "jetzt",
+    "today": "heute",
+    "bucket": "{label}: {summary}",
+    "bucketSummary": "{percent} verfügbar ({checks, plural, one {# Prüfung} other {# Prüfungen}})",
+    "bucketIssues": "{degraded} × gestört, {down} × ausgefallen",
+    "hourLabel": "{time} Uhr",
+    "legend": {
+      "up": "läuft",
+      "degraded": "zeitweise gestört",
+      "down": "ausgefallen",
+      "none": "keine Daten"
+    },
+    "explanation": "„Gestört“ heißt: Der Dienst antwortet, meldet aber ein Problem oder antwortet sehr langsam. „Ausgefallen“ heißt: keine Antwort innerhalb von 5 Sekunden oder eine Fehlerseite. Verfügbarkeit ist der Anteil der Prüfungen, bei denen der Dienst nicht ausgefallen war.",
+    "api": "Dieselben Daten als JSON: <link>/api/status</link>.",
+    "legendLabel": "Legende"
   }
 }

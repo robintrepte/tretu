@@ -465,6 +465,71 @@ export const platformPushSubscriptions = pgTable(
   ]
 );
 
+/* -------------------------------------------------------------------------- */
+/* Status page (tretu.de/status): health checks of every service              */
+/* -------------------------------------------------------------------------- */
+
+/** One row per check (every 60 s per service, written by the platform worker). Kept 7 days. */
+export const platformStatusChecks = pgTable(
+  "platform_status_checks",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    /** Target id from TRETU_STATUS_TARGETS_JSON, e.g. `saga`. */
+    service: text("service").notNull(),
+    checkedAt: tz("checked_at").notNull(),
+    /** up | degraded | down */
+    state: text("state").notNull(),
+    /** Null when there was no answer. */
+    responseMs: integer("response_ms"),
+    httpStatus: integer("http_status"),
+    /** Short machine code, e.g. `timeout`, `http_502`, `checks:db` (never response bodies). */
+    error: text("error"),
+  },
+  (t) => [
+    index("platform_status_checks_service_idx").on(t.service, t.checkedAt),
+    index("platform_status_checks_checked_at_idx").on(t.checkedAt),
+  ]
+);
+
+/** Per-service counts per hour and per day (Europe/Berlin), updated with every check. Kept 90 days. */
+export const platformStatusRollups = pgTable(
+  "platform_status_rollups",
+  {
+    service: text("service").notNull(),
+    /** hour | day */
+    period: text("period").notNull(),
+    bucketStart: tz("bucket_start").notNull(),
+    checks: integer("checks").notNull().default(0),
+    up: integer("up").notNull().default(0),
+    degraded: integer("degraded").notNull().default(0),
+    down: integer("down").notNull().default(0),
+    /** Sum and count of the response times of checks that got an answer (average = sum / count). */
+    responseMsSum: bigint("response_ms_sum", { mode: "number" }).notNull().default(0),
+    responseCount: integer("response_count").notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.service, t.period, t.bucketStart] }),
+    index("platform_status_rollups_period_idx").on(t.period, t.bucketStart),
+  ]
+);
+
+/** Current state per service and the state last announced on Discord (alerts only on changes). */
+export const platformStatusServices = pgTable("platform_status_services", {
+  service: text("service").primaryKey(),
+  /** State of the latest check: up | degraded | down */
+  state: text("state").notNull(),
+  /** First check of the current run of identical states. */
+  since: tz("since").notNull(),
+  /** Number of consecutive checks with `state`. */
+  consecutive: integer("consecutive").notNull().default(1),
+  /** Last state announced (or assumed at the start): up | degraded | down */
+  alertedState: text("alerted_state").notNull().default("up"),
+  alertedAt: tz("alerted_at"),
+  lastCheckedAt: tz("last_checked_at").notNull(),
+  lastResponseMs: integer("last_response_ms"),
+  lastError: text("last_error"),
+});
+
 /** Every table in this file (tests use it to reset the database). */
 export const PLATFORM_TABLE_NAMES = [
   "platform_users",
@@ -491,4 +556,7 @@ export const PLATFORM_TABLE_NAMES = [
   "platform_notifications",
   "platform_notification_settings",
   "platform_push_subscriptions",
+  "platform_status_checks",
+  "platform_status_rollups",
+  "platform_status_services",
 ] as const;

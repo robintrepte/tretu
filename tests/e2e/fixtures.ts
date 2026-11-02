@@ -10,3 +10,21 @@ export const USERS = {
 } as const;
 
 export const TS_UID = "e2eTeamSpeakUid+/AAAA=";
+
+/** Services on the e2e status page (URLs are never requested by the page) and their seeded state. */
+export const STATUS_TARGETS = [
+  { id: "tretu-web", url: "http://127.0.0.1:9/tretu-web" },
+  { id: "auth", url: "http://127.0.0.1:9/auth" },
+  { id: "saga", url: "http://127.0.0.1:9/saga" },
+  { id: "play", url: "http://127.0.0.1:9/play" },
+  { id: "hollowmere", url: "http://127.0.0.1:9/hollowmere" },
+  { id: "mc-dashboard", url: "http://127.0.0.1:9/mc" },
+];
+/** mc-dashboard has no data on purpose ("Keine Daten"). */
+export const STATUS_SEED: Record<string, { now: "up" | "degraded" | "down"; badDay?: boolean }> = {
+  "tretu-web": { now: "up" },
+  auth: { now: "up" },
+  saga: { now: "degraded" },
+  play: { now: "down", badDay: true },
+  hollowmere: { now: "up" },
+};
