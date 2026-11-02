@@ -174,9 +174,10 @@ certbot --nginx -d tretu.de -d www.tretu.de        # then once per host: auth, s
 nginx -t && systemctl reload nginx && certbot renew --dry-run
 ```
 
-`check-nginx.sh` runs `nginx -t` on the files with a throwaway certificate. Ubuntu 24.04 ships nginx 1.24, which
-does not know the `http2 on;` directive (1.25.1+): a site file that uses it fails here; use
-`listen 443 ssl http2;` in that file or install nginx mainline from nginx.org.
+`check-nginx.sh` runs `nginx -t` on the files with a throwaway certificate. The site files enable HTTP/2 with
+`http2 on;` and therefore need **nginx 1.25.1 or newer** on the server (the Tretu server has it; Ubuntu 24.04's own
+package is 1.24, so there install nginx from nginx.org). On an older nginx, `check-nginx.sh` checks the files with the
+equivalent `listen … ssl http2` instead and says so.
 
 **Rollback:** remove the link in `sites-enabled`, `systemctl reload nginx`.
 
@@ -262,6 +263,11 @@ Review merges, username and email conflicts; fix what needs fixing in the old ap
 the report is clean. Then `systemctl start tretu-pg-backup && npm run import:legacy` (idempotent; announces
 `user.created` to the platform). Check: the import's summary matches the dry run, and imported users have profiles
 on `https://tretu.de/u/<name>`.
+
+Old admins: the summary lists "Accounts with roles in the old apps" with the target Tretu username and user ID per
+entry plus the command to run (also in the report JSON, `legacyRoles[].grant`), e.g.
+`saga:3  robin  admin → robin [<id>]` / `npm run admin -- grant robin admin`. Run it after the real import for
+everyone who should be a Tretu admin (they must turn on 2FA); `admin grant` accepts a username, email or user ID.
 
 Users cannot connect old accounts themselves. Review the report, then merge the remaining old accounts by hand:
 

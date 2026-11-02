@@ -83,7 +83,22 @@ export function formatReport(report: ImportReport): string {
     for (const c of usernameConflicts.slice(0, 20)) lines.push(`  ${c.detail}   (${c.records.join(", ")})`)
   }
   if (report.legacyRoles.length) {
-    lines.push("", `Accounts with roles in the old apps (grant global roles by hand: npm run admin -- grant <user> admin): ${report.legacyRoles.length}`)
+    lines.push(
+      "",
+      `Accounts with roles in the old apps (${report.legacyRoles.length}; global roles are granted by hand${report.dryRun ? ", after the real import" : ""}):`,
+    )
+    const shown = report.legacyRoles.slice(0, 50)
+    const width = Math.max(...shown.map((e) => e.record.length))
+    for (const e of shown) {
+      const old = `${e.record.padEnd(width)}  ${(e.legacyUsername ?? "–").padEnd(20)} ${e.roles.join(",").padEnd(16)}`
+      if (!e.userId) {
+        lines.push(`  ${old} → not imported (see skipped/conflicts)`)
+        continue
+      }
+      const target = `${e.username ?? "(no username)"}${e.usernamePending ? " (rename pending)" : ""} [${e.userId}]`
+      lines.push(`  ${old} → ${target}`, `      ${e.grant}`)
+    }
+    if (report.legacyRoles.length > shown.length) lines.push(`  … ${report.legacyRoles.length - shown.length} more in the report JSON (legacyRoles)`)
   }
   return lines.join("\n")
 }

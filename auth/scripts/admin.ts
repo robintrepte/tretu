@@ -4,23 +4,23 @@ import { db, sqlClient } from "@/lib/db"
 import { closeMatches, findUser, formatAccount, formatLegacyList, formatMatches, formatMergePlan, listLegacyAccounts } from "@/lib/legacy/admin"
 
 /**
- * npm run admin -- roles <username|email>                     show roles
- * npm run admin -- grant <username|email> <role>              add a global role (e.g. admin; admins must turn on 2FA)
- * npm run admin -- revoke <username|email> <role>             remove a global role (never from the last admin)
- * npm run admin -- lock <username|email> [--until=<ISO date>] lock the account (no sign-in, signed out everywhere)
- * npm run admin -- unlock <username|email>                    lift the lock
+ * npm run admin -- roles <username|email|id>                     show roles
+ * npm run admin -- grant <username|email|id> <role>              add a global role (e.g. admin; admins must turn on 2FA)
+ * npm run admin -- revoke <username|email|id> <role>             remove a global role (never from the last admin)
+ * npm run admin -- lock <username|email|id> [--until=<ISO date>] lock the account (no sign-in, signed out everywhere)
+ * npm run admin -- unlock <username|email|id>                    lift the lock
  * npm run admin -- legacy                                     imported old accounts no merge touched yet, with possible matches
- * npm run admin -- merge <from> <into> [--yes]                merge account <from> into <into> (username|email); dry run without --yes
+ * npm run admin -- merge <from> <into> [--yes]                merge account <from> into <into> (username|email|id); dry run without --yes
  *
  * Changes take an optional --reason="…" for the activity log (default "CLI"). The same library functions serve the
  * admin API of tretu.de (lib/admin/actions.ts), with the same guards.
  */
 const USAGE = [
-  "usage: npm run admin -- roles|grant|revoke <username|email> [role] [--reason=…]",
-  "       npm run admin -- lock <username|email> [--until=<ISO date>] [--reason=…]",
-  "       npm run admin -- unlock <username|email> [--reason=…]",
+  "usage: npm run admin -- roles|grant|revoke <username|email|id> [role] [--reason=…]",
+  "       npm run admin -- lock <username|email|id> [--until=<ISO date>] [--reason=…]",
+  "       npm run admin -- unlock <username|email|id> [--reason=…]",
   "       npm run admin -- legacy",
-  "       npm run admin -- merge <from: username|email> <into: username|email> [--yes] [--reason=…]",
+  "       npm run admin -- merge <from: username|email|id> <into: username|email|id> [--yes] [--reason=…]",
 ].join("\n")
 
 const REFUSALS: Record<string, string> = {

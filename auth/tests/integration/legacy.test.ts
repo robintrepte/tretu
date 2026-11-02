@@ -8,7 +8,7 @@ import postgres from "postgres"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { createDb } from "@/lib/db"
 import * as s from "@/lib/db/schema"
-import { adminMerge, listLegacyAccounts } from "@/lib/legacy/admin"
+import { adminMerge, findUser, listLegacyAccounts } from "@/lib/legacy/admin"
 import { runImport } from "@/lib/legacy/run"
 import { hashPassword, isNativeHash } from "@/lib/passwords"
 import { ADMIN_DATABASE_URL, TEST_DATABASE_URL } from "./env"
@@ -109,6 +109,8 @@ afterAll(async () => {
 const linkFor = (app: string, legacyUserId: string) =>
   db.query.legacyLink.findFirst({ where: and(eq(s.legacyLink.app, app as "saga"), eq(s.legacyLink.legacyUserId, legacyUserId)) })
 
+let dryRunAdminId: string | null = null
+
 describe("legacy import", () => {
   it("dry run reports merges and conflicts without writing anything", async () => {
     const before = (await db.select({ id: s.user.id }).from(s.user)).length
@@ -137,6 +139,11 @@ describe("legacy import", () => {
     expect(report.conflicts).toContainEqual(expect.objectContaining({ kind: "username", detail: "max → max_2", records: ["play:p-max"] }))
     expect(report.conflicts.filter((c) => c.kind === "email").map((c) => c.records)).toEqual([["hollowmere:22222222-2222-4222-8222-222222222222"]])
     expect(report.legacyRoles.map((r) => r.record).sort()).toEqual(["saga:1", "tretu-web:1"])
+    // Both old roles belong to robin's future Tretu account: same ID, the username and a ready grant command.
+    const roleTargets = report.legacyRoles.map((r) => [r.userId, r.username, r.grant])
+    expect(new Set(roleTargets.map((t) => t[0])).size).toBe(1)
+    expect(roleTargets[0]).toEqual([expect.any(String), "Robin_T", "npm run admin -- grant Robin_T admin"])
+    dryRunAdminId = report.legacyRoles[0]!.userId
   })
 
   it("imports, links and is idempotent", async () => {
@@ -159,6 +166,12 @@ describe("legacy import", () => {
     expect(maxPlay).toMatchObject({ username: "max_2", usernamePending: true })
     const discordOnly = await db.query.user.findFirst({ where: eq(s.user.id, (await linkFor("tretu-web", "2"))!.userId) })
     expect(discordOnly!.email).toMatch(/@users\.tretu\.invalid$/)
+
+    // The dry run's target ID is the real one, and the printed grant target finds the account (username or ID).
+    expect(robin!.id).toBe(dryRunAdminId)
+    expect((await findUser(db, "Robin_T"))!.id).toBe(robin!.id)
+    expect((await findUser(db, robin!.id))!.id).toBe(robin!.id)
+    expect(first.report.legacyRoles.every((r) => r.userId === robin!.id)).toBe(true)
 
     const second = await runImport(db, sources, { dryRun: false, reportDir })
     expect(second.written).toEqual({ created: 0, joined: 0 })

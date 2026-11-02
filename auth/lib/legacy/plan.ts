@@ -298,7 +298,49 @@ export interface ImportReport {
   merges: { into: string; username: string; reasons: MergeReason[]; records: string[] }[]
   conflicts: Conflict[]
   skipped: { record: string; reason: string }[]
-  legacyRoles: { record: string; roles: string[] }[]
+  legacyRoles: LegacyRoleEntry[]
+}
+
+/** An old-app account with roles, and the Tretu account it becomes (global roles are granted by hand). */
+export interface LegacyRoleEntry {
+  record: string
+  app: LegacyApp
+  legacyUsername: string | null
+  roles: string[]
+  /** Target Tretu account; null when the record was skipped (see `skipped` / `conflicts`). */
+  userId: string | null
+  username: string | null
+  /** The username is only a suggestion until the first login (free rename): the command then uses the ID. */
+  usernamePending: boolean
+  /** Ready to run after the (real) import, e.g. `npm run admin -- grant robin admin`; null when skipped. */
+  grant: string | null
+}
+
+const isAppRole = (role: string) => role !== "player" && role !== "user"
+
+function legacyRoleEntries(plan: ImportPlan, records: LegacyRecord[]): LegacyRoleEntry[] {
+  const groupOf = new Map<string, PlannedGroup>()
+  for (const group of plan.groups) for (const record of group.records) groupOf.set(recordKey(record), group)
+  return records
+    .filter((r) => r.roles.some(isAppRole))
+    .map((r) => {
+      const group = groupOf.get(recordKey(r))
+      const userId = group ? (group.anchorUserId ?? group.newUserId) : null
+      const username = group?.username || null
+      const pending = Boolean(group?.usernamePending)
+      // `admin grant` takes a username, email or user ID: the username when it is final, else the stable ID.
+      const target = username && !pending ? username : userId
+      return {
+        record: recordKey(r),
+        app: r.app,
+        legacyUsername: r.username,
+        roles: r.roles,
+        userId,
+        username,
+        usernamePending: pending,
+        grant: target ? `npm run admin -- grant ${target} admin` : null,
+      }
+    })
 }
 
 export function buildReport(plan: ImportPlan, sources: ImportReport["sources"], dryRun: boolean, records: LegacyRecord[]): ImportReport {
@@ -318,6 +360,6 @@ export function buildReport(plan: ImportPlan, sources: ImportReport["sources"], 
     merges: merged.map((g) => ({ into: g.anchorUserId ?? g.newUserId!, username: g.username, reasons: g.reasons, records: g.records.map(recordKey) })),
     conflicts: plan.conflicts,
     skipped: plan.skipped,
-    legacyRoles: records.filter((r) => r.roles.some((role) => role !== "player" && role !== "user")).map((r) => ({ record: recordKey(r), roles: r.roles })),
+    legacyRoles: legacyRoleEntries(plan, records),
   }
 }
