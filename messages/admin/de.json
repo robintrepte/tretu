@@ -111,7 +111,8 @@
       "up": "Läuft",
       "degraded": "Eingeschränkt",
       "down": "Ausgefallen",
-      "unknown": "Unbekannt"
+      "unknown": "Unbekannt",
+      "maintenance": "Wartung"
     },
     "linksTitle": "Verwaltung der Apps",
     "linksDescription": "Jede App verwaltet ihre eigenen Inhalte selbst.",

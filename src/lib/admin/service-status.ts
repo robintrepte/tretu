@@ -29,6 +29,7 @@ export type ServiceStatusReport =
     };
 
 function detail(service: StatusOverview["services"][number]): string | null {
+  if (service.state === "maintenance") return service.maintenance?.note ?? null;
   if (service.state === "unknown") return null;
   if (service.usersOnline !== null) return service.usersMax !== null ? `${service.usersOnline}/${service.usersMax} online` : `${service.usersOnline} online`;
   return service.responseMs !== null ? `${service.responseMs} ms` : null;

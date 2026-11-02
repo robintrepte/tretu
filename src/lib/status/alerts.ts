@@ -2,7 +2,8 @@
  * Outage alerts for tretu.de/status: a short German message to a Discord webhook
  * (`TRETU_STATUS_DISCORD_WEBHOOK_URL`) only when a service changes state. A service counts as down or disturbed
  * after 2 consecutive checks with that state (a single blip never alerts) and as recovered with the first good
- * check after an announced problem.
+ * check after an announced problem. A service in maintenance (src/lib/status/targets.ts) never alerts: its checks are
+ * stored, but the alert bookkeeping stands still, so a problem that outlasts the maintenance is announced afterwards.
  */
 import { log } from "@/lib/observability/logger";
 import type { CheckResult, ServiceState } from "@/lib/status/check";
@@ -29,8 +30,16 @@ function isState(value: string): value is ServiceState {
   return value === "up" || value === "degraded" || value === "down";
 }
 
-/** Pure state machine: the service row after one check and the alert to send, if any. */
-export function nextServiceState(prev: ServiceRow | null, result: CheckResult, at: Date): { row: ServiceRow; change: StateChange | null } {
+/**
+ * Pure state machine: the service row after one check and the alert to send, if any. `silent` (maintenance): the
+ * state is tracked, but nothing is announced and the announced state stays as it was.
+ */
+export function nextServiceState(
+  prev: ServiceRow | null,
+  result: CheckResult,
+  at: Date,
+  options: { silent?: boolean } = {}
+): { row: ServiceRow; change: StateChange | null } {
   const same = prev !== null && prev.state === result.state;
   const row: ServiceRow = {
     state: result.state,
@@ -41,6 +50,7 @@ export function nextServiceState(prev: ServiceRow | null, result: CheckResult, a
     alertedAt: prev?.alertedAt ?? null,
   };
   let change: StateChange | null = null;
+  if (options.silent) return { row, change };
   if (result.state === "up") {
     if (row.alertedState !== "up") {
       change = { kind: "recovered", problemSince: row.alertedAt, error: null };

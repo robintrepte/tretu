@@ -16,11 +16,12 @@ import { getAuthIssuer } from "@/lib/platform/env";
 
 export const dynamic = "force-dynamic";
 
-const STATE_TONE: Record<ServiceState, "success" | "warning" | "danger" | "neutral"> = {
+const STATE_TONE: Record<ServiceState, "success" | "warning" | "danger" | "neutral" | "accent"> = {
   up: "success",
   degraded: "warning",
   down: "danger",
   unknown: "neutral",
+  maintenance: "accent",
 };
 
 export default async function AdminOverviewPage() {

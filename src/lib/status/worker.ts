@@ -9,7 +9,7 @@ import { checkTarget, type CheckResult } from "@/lib/status/check";
 import { checkMinecraft, checkTcp, checkTeamspeakQuery, type TsStatusClient } from "@/lib/status/game";
 import { runCertTick } from "@/lib/status/certs";
 import { recordCheck } from "@/lib/status/store";
-import { statusTargets, type StatusTarget } from "@/lib/status/targets";
+import { maintenanceActive, statusTargets, type StatusTarget } from "@/lib/status/targets";
 import { SITE_URL } from "@/lib/env";
 
 export const STATUS_CHECK_EVERY_MS = 60_000;
@@ -39,7 +39,10 @@ export function runCheck(target: StatusTarget, deps: StatusTickDeps = {}): Promi
   }
 }
 
-/** Checks every service once. Returns the number of services checked (0 = checks switched off). */
+/**
+ * Checks every service once. Returns the number of services checked (0 = checks switched off). Services in
+ * maintenance are checked and stored as usual, but never alert.
+ */
 export async function runStatusTick(now: Date = new Date(), deps: StatusTickDeps = {}): Promise<number> {
   const targets = statusTargets();
   if (!targets.length) return 0;
@@ -53,7 +56,7 @@ export async function runStatusTick(now: Date = new Date(), deps: StatusTickDeps
   if (deps.signal?.aborted) return 0;
   const webhook = discordWebhookUrl();
   for (const { target, result } of results) {
-    const change = await recordCheck(platformDb, target.id, result, now);
+    const change = await recordCheck(platformDb, target.id, result, now, { silent: maintenanceActive(target.maintenance, now) });
     if (!change) continue;
     log(change.kind === "recovered" ? "info" : "warn", "status.changed", { service: target.id, kind: change.kind, error: change.error });
     if (webhook) await postDiscord(webhook, alertMessage(target, change, now, `${SITE_URL}/status`), deps.fetchImpl);
@@ -61,7 +64,8 @@ export async function runStatusTick(now: Date = new Date(), deps: StatusTickDeps
   return targets.length;
 }
 
-/** Hourly: certificate expiry warnings for every HTTPS target (src/lib/status/certs.ts). */
+/** Hourly: certificate expiry warnings for every HTTPS target not in maintenance (src/lib/status/certs.ts). */
 export function runCertificateTick(now: Date = new Date(), deps: StatusTickDeps = {}): Promise<number> {
-  return runCertTick(platformDb, statusTargets(), now, { timeoutMs: deps.timeoutMs, signal: deps.signal, fetchImpl: deps.fetchImpl });
+  const targets = statusTargets().filter((t) => !maintenanceActive(t.maintenance, now));
+  return runCertTick(platformDb, targets, now, { timeoutMs: deps.timeoutMs, signal: deps.signal, fetchImpl: deps.fetchImpl });
 }

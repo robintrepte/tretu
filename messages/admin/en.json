@@ -111,7 +111,8 @@
       "up": "Up",
       "degraded": "Degraded",
       "down": "Down",
-      "unknown": "Unknown"
+      "unknown": "Unknown",
+      "maintenance": "Maintenance"
     },
     "linksTitle": "App admins",
     "linksDescription": "Every app manages its own content.",

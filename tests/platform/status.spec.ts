@@ -289,3 +289,61 @@ test("game servers: TeamSpeak users (ServerQuery stub) and Minecraft down are st
     ]
   );
 });
+
+test("maintenance: no Discord alerts while it lasts, shown as maintenance, excluded from the overall status", async () => {
+  const until = new Date(Date.UTC(2026, 10, 2, 12, 5));
+  process.env.TRETU_STATUS_TARGETS_JSON = JSON.stringify([
+    { id: "saga", url: "https://saga.test/api/health", maintenance: "Umzug auf einen neuen Server", until: until.toISOString() },
+    { id: "play", url: "https://play.test/api/health", excludeFromOverall: true },
+    { id: "auth", url: "https://auth.test/api/health" },
+  ]);
+  process.env.TRETU_STATUS_DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1/token";
+  const answers: Record<string, "up" | "down" | "degraded"> = {
+    "https://saga.test/api/health": "down",
+    "https://play.test/api/health": "down",
+    "https://auth.test/api/health": "up",
+  };
+  const posts: { url: string; body: { content: string; allowed_mentions: unknown } }[] = [];
+  const fetchImpl = fakeFetch(answers, posts);
+  const minute = (n: number) => new Date(Date.UTC(2026, 10, 2, 12, n));
+
+  for (let m = 0; m < 4; m++) await runStatusTick(minute(m), { fetchImpl });
+  // play (only excluded from the overall status) still alerts; saga (maintenance) does not.
+  assert.deepEqual(posts.map((p) => p.body.content.split(" ")[0]), ["**Play**"]);
+
+  const overview = await loadStatusOverview(platformDb, minute(4));
+  assert.equal(overview.status, "up", "saga in maintenance and play excluded: only auth counts");
+  const byId = Object.fromEntries(overview.services.map((s) => [s.id, s]));
+  assert.deepEqual(
+    [byId.saga!.state, byId.saga!.checkState, byId.saga!.inOverall, byId.saga!.maintenance],
+    ["maintenance", "down", false, { note: "Umzug auf einen neuen Server", until: until.toISOString() }]
+  );
+  assert.deepEqual([byId.play!.state, byId.play!.inOverall, byId.play!.maintenance], ["down", false, null]);
+  assert.equal(byId.saga!.uptime24h, 0, "checks during maintenance are still recorded");
+
+  // The same in /api/status.
+  const { GET } = await import("../../src/app/api/status/route");
+  clearStatusCache();
+  const body = (await (await GET()).json()) as { services: { id: string; state: string; maintenance: unknown }[] };
+  assert.deepEqual(
+    body.services.map((s) => [s.id, s.state]),
+    [
+      ["saga", "maintenance"],
+      ["play", "down"],
+      ["auth", "up"],
+    ]
+  );
+
+  // The maintenance ends at `until` while saga is still down: announced right away, counted again.
+  await runStatusTick(minute(5), { fetchImpl });
+  assert.equal(posts.length, 2);
+  assert.match(posts[1]!.body.content, /^\*\*Saga\*\* \(saga\.tretu\.de\) ist ausgefallen/);
+  const after = await loadStatusOverview(platformDb, minute(5));
+  assert.equal(after.status, "down");
+  assert.equal(after.services[0]!.state, "down");
+  assert.equal(after.services[0]!.maintenance, null);
+
+  // Everything in maintenance: the overall status says so.
+  process.env.TRETU_STATUS_TARGETS_JSON = JSON.stringify([{ id: "saga", url: "https://saga.test/api/health", maintenance: true }]);
+  assert.equal((await loadStatusOverview(platformDb, minute(6))).status, "maintenance");
+});

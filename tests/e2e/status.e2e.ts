@@ -1,11 +1,15 @@
 import { expect, test } from "@playwright/test";
 
+import { MAINTENANCE_NOTE } from "./fixtures";
+
 test("status page: one row per service with state, response time and 24 h / 90 day bars", async ({ page }) => {
   const res = await page.goto("/status");
   expect(res?.status()).toBe(200);
   await expect(page.getByRole("heading", { level: 1, name: "Status" })).toBeVisible();
-  await expect(page.getByTestId("status-overall")).toHaveAttribute("data-state", "down");
-  await expect(page.getByTestId("status-overall")).toContainText("Mindestens ein Dienst ist ausgefallen");
+  // Play is down but excluded from the overall status, Hollowmere is in maintenance: Saga (degraded) decides.
+  await expect(page.getByTestId("status-overall")).toHaveAttribute("data-state", "degraded");
+  await expect(page.getByTestId("status-overall")).toContainText("Einige Dienste sind gestört");
+  await expect(page.getByTestId("status-maintenance-count")).toHaveText("1 Dienst ist gerade in Wartung");
   await expect(page.getByTestId("status-updated")).toHaveText(/^Stand: .+ Uhr$/);
   await expect(page.getByTestId("status-stale")).toHaveCount(0);
   await expect(page.getByTestId("status-notice")).toContainText("Wartung am Sonntag ab 22 Uhr");
@@ -15,7 +19,7 @@ test("status page: one row per service with state, response time and 24 h / 90 d
     ["auth", "Tretu-Konto", "Läuft"],
     ["saga", "Saga", "Gestört"],
     ["play", "Play", "Ausgefallen"],
-    ["hollowmere", "Hollowmere", "Läuft"],
+    ["hollowmere", "Hollowmere", "Wartung"],
     ["mc-dashboard", "Minecraft-Dashboard", "Keine Daten"],
     ["minecraft", "Minecraft-Server", "Läuft"],
     ["teamspeak", "TeamSpeak", "Läuft"],
@@ -39,6 +43,13 @@ test("status page: one row per service with state, response time and 24 h / 90 d
   const downHour = play.locator('[data-testid="status-hours-play"] [data-tone="down"]').first();
   await expect(downHour).toHaveAttribute("title", /Uhr: .*verfügbar .*× ausgefallen/);
 
+  const hollowmere = page.getByTestId("status-service-hollowmere");
+  await expect(hollowmere).toHaveAttribute("data-state", "maintenance");
+  await expect(hollowmere.getByTestId("status-maintenance-note")).toHaveText(MAINTENANCE_NOTE);
+  await expect(hollowmere).toContainText(/Wartung bis .+ Uhr/);
+  await expect(play.getByTestId("status-excluded")).toHaveText("Zählt nicht zum Gesamtstatus");
+  await expect(page.getByTestId("status-service-saga").getByTestId("status-excluded")).toHaveCount(0);
+
   const mc = page.getByTestId("status-service-mc-dashboard");
   await expect(mc.getByTestId("status-hours-mc-dashboard")).toContainText("keine Daten");
   await expect(mc.locator('[data-testid="status-hours-mc-dashboard"] [data-tone="none"]')).toHaveCount(24);
@@ -57,7 +68,8 @@ test("status page in English via the NEXT_LOCALE cookie, usable on a phone", asy
   await context.addCookies([{ name: "NEXT_LOCALE", value: "en", url: baseURL! }]);
   await page.setViewportSize({ width: 375, height: 800 });
   await page.goto("/status");
-  await expect(page.getByTestId("status-overall")).toContainText("At least one service is down");
+  await expect(page.getByTestId("status-overall")).toContainText("Some services are degraded");
+  await expect(page.getByTestId("status-service-hollowmere").getByTestId("status-state")).toHaveText("Maintenance");
   await expect(page.getByTestId("status-updated")).toHaveText(/^As of /);
   await expect(page.getByTestId("status-service-saga").getByTestId("status-state")).toHaveText("Degraded");
   await expect(page.getByTestId("status-service-tretu-web").getByTestId("status-state")).toHaveText("Running");
@@ -77,9 +89,21 @@ test("GET /api/status: the same data as JSON, public and cached", async ({ reque
     status: string;
     stale: boolean;
     notice: string;
-    services: { id: string; name: string; state: string; uptime90d: number | null; usersOnline: number | null; usersMax: number | null; hours: unknown[]; days: unknown[] }[];
+    services: {
+      id: string;
+      name: string;
+      state: string;
+      checkState: string;
+      inOverall: boolean;
+      maintenance: { note: string | null; until: string | null } | null;
+      uptime90d: number | null;
+      usersOnline: number | null;
+      usersMax: number | null;
+      hours: unknown[];
+      days: unknown[];
+    }[];
   };
-  expect(body.status).toBe("down");
+  expect(body.status).toBe("degraded");
   expect(body.stale).toBe(false);
   expect(body.notice).toBe("Wartung am Sonntag ab 22 Uhr");
   expect(body.services.map((s) => [s.id, s.state])).toEqual([
@@ -87,7 +111,7 @@ test("GET /api/status: the same data as JSON, public and cached", async ({ reque
     ["auth", "up"],
     ["saga", "degraded"],
     ["play", "down"],
-    ["hollowmere", "up"],
+    ["hollowmere", "maintenance"],
     ["mc-dashboard", "unknown"],
     ["minecraft", "up"],
     ["teamspeak", "up"],
@@ -97,6 +121,9 @@ test("GET /api/status: the same data as JSON, public and cached", async ({ reque
     expect(service.days).toHaveLength(90);
   }
   expect(body.services.find((s) => s.id === "play")!.uptime90d).toBeLessThan(100);
+  const hollowmere = body.services.find((s) => s.id === "hollowmere")!;
+  expect([hollowmere.checkState, hollowmere.inOverall, hollowmere.maintenance?.note]).toEqual(["up", false, MAINTENANCE_NOTE]);
+  expect(body.services.find((s) => s.id === "play")!.inOverall).toBe(false);
   const minecraft = body.services.find((s) => s.id === "minecraft")!;
   expect([minecraft.usersOnline, minecraft.usersMax]).toEqual([3, 20]);
   expect(JSON.stringify(body)).not.toContain("127.0.0.1:9");

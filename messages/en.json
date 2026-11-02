@@ -1025,7 +1025,8 @@
       "degraded": "Some services are degraded",
       "down": "At least one service is down",
       "unknown": "No check results yet",
-      "unavailable": "The status cannot be loaded right now"
+      "unavailable": "The status cannot be loaded right now",
+      "maintenance": "Maintenance in progress"
     },
     "updated": "As of {time}",
     "neverChecked": "There are no checks yet.",
@@ -1036,7 +1037,8 @@
       "up": "Running",
       "degraded": "Degraded",
       "down": "Down",
-      "unknown": "No data"
+      "unknown": "No data",
+      "maintenance": "Maintenance"
     },
     "responseTime": "Response time",
     "responseMs": "{ms} ms",
@@ -1059,11 +1061,14 @@
       "down": "down",
       "none": "no data"
     },
-    "explanation": "“Degraded” means the service answers but reports a problem or answers very slowly. “Down” means no answer within 5 seconds or an error page. Availability is the share of checks in which the service was not down.",
+    "explanation": "“Degraded” means the service answers but reports a problem or answers very slowly. “Down” means no answer within 5 seconds or an error page. Availability is the share of checks in which the service was not down. “Maintenance” means planned work; the service does not count for the overall status meanwhile.",
     "api": "The same data as JSON: <link>/api/status</link>.",
     "legendLabel": "Legend",
     "playersOf": "{online} / {max} players online",
     "players": "{online, plural, one {# player} other {# players}} online",
-    "users": "{online, plural, one {# user} other {# users}} online"
+    "users": "{online, plural, one {# user} other {# users}} online",
+    "maintenanceUntil": "Maintenance until {time}",
+    "maintenanceCount": "{count, plural, one {# service is} other {# services are}} under maintenance",
+    "notInOverall": "Not part of the overall status"
   }
 }

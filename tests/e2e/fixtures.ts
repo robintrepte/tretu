@@ -12,12 +12,14 @@ export const USERS = {
 export const TS_UID = "e2eTeamSpeakUid+/AAAA=";
 
 /** Services on the e2e status page (URLs are never requested by the page) and their seeded state. */
+/** Play (down) does not count for the overall status; Hollowmere is in maintenance for two more days. */
+export const MAINTENANCE_NOTE = "Umzug auf einen neuen Server";
 export const STATUS_TARGETS = [
   { id: "tretu-web", url: "http://127.0.0.1:9/tretu-web" },
   { id: "auth", url: "http://127.0.0.1:9/auth" },
   { id: "saga", url: "http://127.0.0.1:9/saga" },
-  { id: "play", url: "http://127.0.0.1:9/play" },
-  { id: "hollowmere", url: "http://127.0.0.1:9/hollowmere" },
+  { id: "play", url: "http://127.0.0.1:9/play", excludeFromOverall: true },
+  { id: "hollowmere", url: "http://127.0.0.1:9/hollowmere", maintenance: MAINTENANCE_NOTE, until: new Date(Date.now() + 2 * 24 * 3600_000).toISOString() },
   { id: "mc-dashboard", url: "http://127.0.0.1:9/mc" },
 ];
 /**

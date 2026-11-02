@@ -31,6 +31,7 @@ const TONE: Record<DisplayState | "unavailable", { badge: string; dot: string; p
     panel: "border-amber-500/40 bg-amber-500/10",
   },
   down: { badge: "bg-red-500/15 text-red-700 dark:text-red-300", dot: "bg-red-500", panel: "border-red-500/40 bg-red-500/10" },
+  maintenance: { badge: "bg-sky-500/15 text-sky-700 dark:text-sky-300", dot: "bg-sky-500", panel: "border-sky-500/40 bg-sky-500/10" },
   unknown: { badge: "bg-muted text-muted-foreground", dot: "bg-muted-foreground/60", panel: "border-border/70 bg-muted/40" },
   unavailable: { badge: "bg-muted text-muted-foreground", dot: "bg-muted-foreground/60", panel: "border-border/70 bg-muted/40" },
 };
@@ -48,6 +49,7 @@ export default async function StatusPage() {
 
   const overall: DisplayState | "unavailable" = overview.available ? overview.status : "unavailable";
   const updated = overview.updatedAt ? new Date(overview.updatedAt) : null;
+  const inMaintenance = overview.services.filter((s) => s.maintenance).length;
 
   const summary = (buckets: Bucket[]): string => {
     const checks = buckets.reduce((n, b) => n + b.checks, 0);
@@ -67,7 +69,7 @@ export default async function StatusPage() {
   };
   const dayLabel = (date: string) => day.format(new Date(`${date}T12:00:00Z`));
   const usersLabel = (service: ServiceStatus): string | null => {
-    if (service.state !== "up" || service.usersOnline === null) return null;
+    if (service.checkState !== "up" || service.usersOnline === null) return null;
     if (service.kind === "teamspeak") return t("users", { online: service.usersOnline });
     if (service.kind !== "minecraft") return null;
     return service.usersMax !== null
@@ -98,7 +100,14 @@ export default async function StatusPage() {
         >
           <div className="flex items-center gap-3">
             <span className={cn("inline-flex size-3 shrink-0 rounded-full", TONE[overall].dot)} aria-hidden />
-            <h2 className="text-xl font-semibold text-foreground">{t(`overall.${overall}`)}</h2>
+            <div>
+              <h2 className="text-xl font-semibold text-foreground">{t(`overall.${overall}`)}</h2>
+              {inMaintenance && overall !== "maintenance" ? (
+                <p className="text-sm text-muted-foreground" data-testid="status-maintenance-count">
+                  {t("maintenanceCount", { count: inMaintenance })}
+                </p>
+              ) : null}
+            </div>
           </div>
           <div className="text-sm text-muted-foreground" data-testid="status-updated">
             {updated ? t("updated", { time: dateTime.format(updated) }) : t("neverChecked")}
@@ -120,7 +129,17 @@ export default async function StatusPage() {
               responseLabel={service.responseMs !== null ? t("responseMs", { ms: number.format(service.responseMs) }) : null}
               responseTitle={t("responseTime")}
               usersLabel={usersLabel(service)}
-              sinceLabel={service.since && service.state !== "unknown" ? t("since", { time: dateTime.format(new Date(service.since)) }) : null}
+              sinceLabel={
+                service.maintenance
+                  ? service.maintenance.until
+                    ? t("maintenanceUntil", { time: dateTime.format(new Date(service.maintenance.until)) })
+                    : null
+                  : service.since && service.state !== "unknown"
+                    ? t("since", { time: dateTime.format(new Date(service.since)) })
+                    : null
+              }
+              maintenanceNote={service.maintenance?.note ?? null}
+              excludedLabel={!service.maintenance && !service.inOverall ? t("notInOverall") : null}
               hours={
                 <StatusBars
                   testId={`status-hours-${service.id}`}
@@ -180,6 +199,8 @@ function ServiceCard({
   responseTitle,
   usersLabel,
   sinceLabel,
+  maintenanceNote,
+  excludedLabel,
   hours,
   days,
 }: {
@@ -189,6 +210,8 @@ function ServiceCard({
   responseTitle: string;
   usersLabel: string | null;
   sinceLabel: string | null;
+  maintenanceNote: string | null;
+  excludedLabel: string | null;
   hours: ReactNode;
   days: ReactNode;
 }) {
@@ -206,6 +229,16 @@ function ServiceCard({
           {usersLabel ? (
             <p className="mt-1 text-sm font-medium text-foreground/80 tabular-nums" data-testid="status-users">
               {usersLabel}
+            </p>
+          ) : null}
+          {maintenanceNote ? (
+            <p className="mt-1 text-sm text-foreground/90" data-testid="status-maintenance-note">
+              {maintenanceNote}
+            </p>
+          ) : null}
+          {excludedLabel ? (
+            <p className="mt-1 text-xs text-muted-foreground" data-testid="status-excluded">
+              {excludedLabel}
             </p>
           ) : null}
         </div>
