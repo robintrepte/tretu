@@ -3,6 +3,11 @@ import { db as defaultDb, type Db } from "@/lib/db"
 import { account, externalLink, user } from "@/lib/db/schema"
 import { normalizeLocale, type ClaimSource, type UserLinks } from "@/lib/oidc/claims"
 
+/** Whether an admin lock is in force at `now` (a lock whose `lockedUntil` has passed is not, even before it is lifted). */
+export function isLockActive(row: { locked: boolean; lockedUntil: Date | null } | null | undefined, now: Date = new Date()): boolean {
+  return Boolean(row?.locked && (!row.lockedUntil || row.lockedUntil.getTime() > now.getTime()))
+}
+
 /** The user shape of contract §2 (admin API, events). */
 export interface UserShape {
   sub: string
@@ -11,6 +16,8 @@ export interface UserShape {
   picture: string | null
   locale: "de" | "en"
   roles: string[]
+  /** Locked by an admin (lib/admin/lock.ts): apps end the user's sessions and refuse new ones until unlocked. */
+  locked: boolean
   links: UserLinks
   createdAt: string
 }
@@ -20,20 +27,30 @@ export interface UserShape {
  * TeamSpeak are linked by other Tretu services through the admin API (`external_link`).
  */
 export async function getUserLinks(userId: string, db: Db = defaultDb): Promise<UserLinks> {
-  const identities = await db
-    .select({ providerId: account.providerId, accountId: account.accountId })
-    .from(account)
-    .where(and(eq(account.userId, userId), inArray(account.providerId, ["discord", "steam"])))
-  const external = await db
-    .select({ provider: externalLink.provider, id: externalLink.providerAccountId, displayName: externalLink.displayName })
-    .from(externalLink)
-    .where(and(eq(externalLink.userId, userId), inArray(externalLink.provider, ["minecraft", "teamspeak"])))
-  const links: UserLinks = {}
+  return (await getUserLinksMany([userId], db)).get(userId) ?? {}
+}
+
+/** The links of several users in two queries (admin user list). */
+export async function getUserLinksMany(userIds: string[], db: Db = defaultDb): Promise<Map<string, UserLinks>> {
+  const result = new Map<string, UserLinks>(userIds.map((id) => [id, {}]))
+  if (!userIds.length) return result
+  const [identities, external] = await Promise.all([
+    db
+      .select({ userId: account.userId, providerId: account.providerId, accountId: account.accountId })
+      .from(account)
+      .where(and(inArray(account.userId, userIds), inArray(account.providerId, ["discord", "steam"]))),
+    db
+      .select({ userId: externalLink.userId, provider: externalLink.provider, id: externalLink.providerAccountId, displayName: externalLink.displayName })
+      .from(externalLink)
+      .where(and(inArray(externalLink.userId, userIds), inArray(externalLink.provider, ["minecraft", "teamspeak"]))),
+  ])
   for (const identity of identities) {
+    const links = result.get(identity.userId)!
     if (identity.providerId === "discord") links.discord = identity.accountId
     else if (identity.providerId === "steam") links.steam = identity.accountId
   }
   for (const link of external) {
+    const links = result.get(link.userId)!
     if (link.provider === "minecraft") {
       links.minecraft = link.id
       if (link.displayName) links.minecraftName = link.displayName
@@ -42,7 +59,7 @@ export async function getUserLinks(userId: string, db: Db = defaultDb): Promise<
       if (link.displayName) links.teamspeakName = link.displayName
     }
   }
-  return links
+  return result
 }
 
 export async function getClaimSource(userId: string, db: Db = defaultDb): Promise<ClaimSource | null> {
@@ -71,6 +88,7 @@ export async function getUserShape(userId: string, db: Db = defaultDb): Promise<
     picture: row.image,
     locale: normalizeLocale(row.locale),
     roles: row.roles,
+    locked: isLockActive(row),
     links: await getUserLinks(row.id, db),
     createdAt: row.createdAt.toISOString(),
   }

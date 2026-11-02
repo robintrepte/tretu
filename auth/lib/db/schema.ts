@@ -38,10 +38,25 @@ export const user = pgTable(
     usernamePending: boolean().notNull().default(false),
     usernameChangedAt: timestamp({ withTimezone: true }),
     lastLoginAt: timestamp({ withTimezone: true }),
+    /**
+     * Locked by an admin (lib/admin/lock.ts): no sign-in, no sessions, no OIDC codes. `lockedUntil` ends the lock
+     * by itself (null = until unlocked); `lockedReason` is the admin's note, never shown to the user.
+     */
+    locked: boolean().notNull().default(false),
+    lockedReason: text(),
+    lockedUntil: timestamp({ withTimezone: true }),
+    lockedAt: timestamp({ withTimezone: true }),
     createdAt,
     updatedAt,
   },
-  (t) => [index("user_created_idx").on(t.createdAt)],
+  (t) => [
+    index("user_created_idx").on(t.createdAt),
+    // Admin search (lib/admin/search.ts): substring matches through trigram indexes (pg_trgm).
+    index("user_username_trgm_idx").using("gin", t.username.op("gin_trgm_ops")),
+    index("user_name_trgm_idx").using("gin", t.name.op("gin_trgm_ops")),
+    index("user_email_trgm_idx").using("gin", t.email.op("gin_trgm_ops")),
+    index("user_locked_idx").on(t.lockedUntil).where(sql`${t.locked}`),
+  ],
 )
 
 export const session = pgTable(
@@ -83,7 +98,12 @@ export const account = pgTable(
     createdAt,
     updatedAt,
   },
-  (t) => [index("account_user_idx").on(t.userId), uniqueIndex("account_provider_account_idx").on(t.providerId, t.accountId)],
+  (t) => [
+    index("account_user_idx").on(t.userId),
+    uniqueIndex("account_provider_account_idx").on(t.providerId, t.accountId),
+    // Admin search by a provider's account id (Discord ID, SteamID64) without knowing the provider.
+    index("account_account_id_idx").on(t.accountId),
+  ],
 )
 
 export const verification = pgTable(
@@ -128,6 +148,8 @@ export const passkey = pgTable(
     transports: text(),
     createdAt: timestamp({ withTimezone: true }),
     aaguid: text(),
+    /** Tretu: the last sign-in with this passkey (set by the tretu plugin in lib/auth.ts). */
+    lastUsedAt: timestamp({ withTimezone: true }),
   },
   (t) => [index("passkey_user_idx").on(t.userId), uniqueIndex("passkey_credential_idx").on(t.credentialID)],
 )
@@ -322,6 +344,8 @@ export const externalLink = pgTable(
   (t) => [
     uniqueIndex("external_link_provider_account_idx").on(t.provider, t.providerAccountId),
     uniqueIndex("external_link_user_provider_idx").on(t.userId, t.provider),
+    // Admin search by Minecraft name or TeamSpeak nickname.
+    index("external_link_display_name_trgm_idx").using("gin", t.displayName.op("gin_trgm_ops")),
   ],
 )
 
@@ -358,7 +382,11 @@ export const auditLog = pgTable(
     meta: jsonb().$type<Record<string, unknown>>(),
     createdAt,
   },
-  (t) => [index("audit_log_user_created_idx").on(t.userId, t.createdAt)],
+  (t) => [
+    index("audit_log_user_created_idx").on(t.userId, t.createdAt),
+    // Admin stats: sign-ins per day.
+    index("audit_log_event_created_idx").on(t.event, t.createdAt),
+  ],
 )
 
 /** Platform events (contract §4) waiting for delivery; `id` is the envelope id and idempotency key. */

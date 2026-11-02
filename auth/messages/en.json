@@ -56,7 +56,9 @@
       "steam_failed": "Signing in with Steam didn't work. Please try again.",
       "state_mismatch": "The sign-in was started in another tab or browser, or took too long. Please try again.",
       "signup_disabled": "There is no Tretu account for this login yet.",
-      "cancelled": "The sign-in was cancelled."
+      "cancelled": "The sign-in was cancelled.",
+      "accountLocked": "Your Tretu account is locked. If you have questions about this, please contact the Tretu team.",
+      "accountLockedUntil": "Your Tretu account is locked until {until}. If you have questions about this, please contact the Tretu team."
     },
     "notices": {
       "verified": "Your email address is confirmed. Welcome to Tretu!",
@@ -318,10 +320,34 @@
       "other": "other",
       "steam": "Steam",
       "backup-code": "Backup code",
-      "totp": "Authenticator app"
+      "totp": "Authenticator app",
+      "minecraft": "Minecraft",
+      "teamspeak": "TeamSpeak",
+      "session": "existing session"
     },
     "2fa_challenge": "Code requested at sign-in",
-    "2fa_backup_code_used": "Backup code used"
+    "2fa_backup_code_used": "Backup code used",
+    "login_locked": "Sign-in refused: account locked",
+    "lock_expired": "Lock ended",
+    "admin_roles_changed": "Roles changed by the Tretu team",
+    "admin_sessions_revoked": "Signed out everywhere by the Tretu team",
+    "admin_locked": "Account locked by the Tretu team",
+    "admin_locked_until": "Account locked by the Tretu team until {until}",
+    "admin_unlocked": "Account unlocked by the Tretu team",
+    "admin_two_factor_reset": "Two-step verification reset by the Tretu team",
+    "admin_link_removed": "{provider} link removed by the Tretu team",
+    "admin_email_verified": "Email address confirmed by the Tretu team",
+    "admin_performed": "Admin action on {target}: {action}",
+    "adminActions": {
+      "roles_changed": "roles changed",
+      "sessions_revoked": "signed out everywhere",
+      "locked": "account locked",
+      "unlocked": "account unlocked",
+      "two_factor_reset": "two-step verification reset",
+      "link_removed": "link removed",
+      "email_verified": "email address confirmed",
+      "merge": "account merged"
+    }
   },
   "connections": {
     "title": "Connected accounts",

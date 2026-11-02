@@ -73,13 +73,50 @@ App IDs: `tretu-web`, `auth`, `saga`, `play`, `hollowmere`, `mc-dashboard`.
 ### Auth admin API (server-to-server, signed per §3)
 - `POST ${issuer}/api/v1/links` `{ "sub", "provider": "minecraft"|"steam"|"teamspeak", "providerAccountId", "displayName" }` → `200 {"ok":true}` (replaces that sub's existing link of the provider); `409` if that providerAccountId is linked to another sub.
 - `DELETE ${issuer}/api/v1/links` `{ "sub", "provider" }` → `200` (`404` = nothing linked, treated as done by callers).
-- `GET ${issuer}/api/v1/users/{sub}` → `{ sub, username, name, picture, locale, roles, links:{discord?,minecraft?,minecraftName?,steam?,teamspeak?}, createdAt }`.
+- `GET ${issuer}/api/v1/users/{sub}` → `{ sub, username, name, picture, locale, roles, locked, links:{discord?,minecraft?,minecraftName?,steam?,teamspeak?}, createdAt }`.
+  `locked` (boolean): the Tretu-Konto is locked by an admin (see "Account lock" below).
 - **TeamSpeak** links are proven on tretu.de only (nickname code on `https://tretu.de/einstellungen#teamspeak`): tretu.de
   (app `tretu-web`) registers them with `provider:"teamspeak"`, `providerAccountId` = the TeamSpeak unique identifier,
   `displayName` = nickname, and deletes them on unlink. Mein Konto shows the link and links to `/einstellungen#teamspeak`;
   unlinking in Mein Konto emits `user.updated` without `links.teamspeak`, and tretu.de then unlinks locally.
 - `GET ${issuer}/api/v1/users?username=<name>` → same shape or `404`.
-Auth emits events to the platform (§4): `user.created`, `user.updated` (profile, locale, roles or links changed), `user.deleted`, each with `data` = the user shape above (deleted: `{}`).
+Auth emits events to the platform (§4): `user.created`, `user.updated` (profile, locale, roles, links or lock changed), `user.deleted`, each with `data` = the user shape above (deleted: `{}`).
+
+### Account lock
+- An admin can lock a Tretu-Konto (optionally until a date). While locked, auth refuses every sign-in (all methods,
+  also an app sign-in with an existing session), issues no OIDC codes, and has revoked all its sessions and refresh
+  tokens. Auth emits `user.updated` with `locked: true` on lock and `locked: false` on unlock or when the lock ends.
+- Apps on `user.updated` with `locked: true`: end that user's local sessions and refuse new ones until a
+  `user.updated` with `locked: false` arrives.
+
+### Central admin API (server-to-server, signed per §3, caller MUST be app `tretu-web`)
+The ecosystem's account admin lives on tretu.de; these endpoints exist only for it (any other app: `403 forbidden_app`).
+Every mutation body carries `actorSub` (the admin doing it) and `reason` (3–500 chars); auth checks that the actor
+holds `admin` now, is not locked and has 2FA on (`403 actor_not_admin` / `actor_two_factor_required`), and records the
+action in the activity log of the target (`admin.<action>`) and of the actor (`admin.performed`). GETs accept an
+optional `?actorSub=` checked the same way.
+- `GET ${issuer}/api/v1/admin/users?q=&limit=50&cursor=` → `{ items:[user], nextCursor }`, `user` =
+  `{ sub, username, name, email|null, picture, createdAt, lastSignInAt|null, roles, twoFactor, locked, links }`
+  (`links` as in the user shape, plus `teamspeakName` when known). `q` matches username, name, email, sub, provider
+  account ids (Discord, Steam, …), Minecraft UUID/name, TeamSpeak UID/nickname; exact matches first, then newest.
+- `GET ${issuer}/api/v1/admin/users/{sub}` → `user` + `emailVerified, locale, lockedReason, lockedUntil, lockedAt,
+  providers:[{provider ("password"|"discord"|"google"|"apple"|"steam"), accountId|null, displayName, createdAt}],
+  passkeys:[{id,name,createdAt,lastUsedAt}], sessions:[{id,createdAt,expiresAt,ipAddress,userAgent,client}],
+  legacyLinks:[{app,legacyUserId,legacyUsername,importedAt,method}], audit:[{id,event,success,ipAddress,userAgent,meta,createdAt}] (50)`
+- `GET ${issuer}/api/v1/admin/stats` → `{ users:{total,verified,withTwoFactor,locked,admins}, signUpsPerDay:[{day,count}],
+  signInsPerDay:[{day,count}], providers:{password,discord,google,apple,steam,passkey} }` (90 Europe/Berlin days, oldest
+  first; sign-ins = accounts that signed in that day)
+- `GET ${issuer}/api/v1/admin/legacy` → `{ items }` (the data of `npm run admin -- legacy`)
+- `POST …/admin/users/{sub}/roles` `{ actorSub, reason, add?, remove? }`, `…/sessions/revoke`, `…/lock` `{ …, until? }`,
+  `…/unlock`, `…/two-factor/reset`, `…/links/remove` `{ …, provider: discord|google|apple|steam|minecraft|teamspeak }`,
+  `…/email/verify` → `200 { ok:true, changed, user, … }` (`changed:false` = nothing to do, not recorded)
+- `POST ${issuer}/api/v1/admin/merge` `{ actorSub, reason, from, into, dryRun }` → `{ ok, dryRun:true, plan }` or
+  `{ ok, dryRun:false, merged:true, plan, user }`
+- Guards: no self-demotion or self-lock (`403 self_action`), never demote or lock the last usable admin (`409 last_admin`),
+  never remove the last sign-in method (`409 last_sign_in_method`). Errors: 400 `invalid_request`, 401 `unauthorized`,
+  404 `not_found`, 409 `no_email` / `merge_refused`.
+- Signing GETs with a query: sign the query exactly as sent; auth accepts it encoded like `URLSearchParams` (space `+`)
+  or like `encodeURIComponent` (space `%20`).
 
 ## 3. Signed server-to-server requests (platform API, auth admin API, webhooks)
 

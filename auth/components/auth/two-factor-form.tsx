@@ -11,6 +11,7 @@ import { errorCode, isRateLimited } from "@/lib/client/errors"
 export function TwoFactorForm({ next }: { next: string }) {
   const t = useTranslations("twoFactor")
   const tc = useTranslations("common")
+  const tl = useTranslations("login")
   const [mode, setMode] = useState<"totp" | "backup">("totp")
   const [code, setCode] = useState("")
   const [trust, setTrust] = useState(false)
@@ -29,7 +30,17 @@ export function TwoFactorForm({ next }: { next: string }) {
     if (result.error) {
       setBusy(false)
       const c = errorCode(result.error)
-      setError(isRateLimited(result.error) ? tc("rateLimited") : c === "INVALID_TWO_FACTOR_COOKIE" || c === "TWO_FACTOR_NOT_ENABLED" ? t("expired") : c === "TOTP_CODE_REUSED" ? t("reused") : t("invalid"))
+      setError(
+        isRateLimited(result.error)
+          ? tc("rateLimited")
+          : c === "ACCOUNT_LOCKED"
+            ? tl("errors.accountLocked")
+            : c === "INVALID_TWO_FACTOR_COOKIE" || c === "TWO_FACTOR_NOT_ENABLED"
+              ? t("expired")
+              : c === "TOTP_CODE_REUSED"
+                ? t("reused")
+                : t("invalid"),
+      )
       return
     }
     // Inside an app sign-in the response redirects to the app (client plugin); otherwise on to `next`.

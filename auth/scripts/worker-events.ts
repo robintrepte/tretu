@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm"
+import { liftExpiredLocks } from "@/lib/admin/lock"
 import { db, sqlClient } from "@/lib/db"
 import { platformEnabled } from "@/lib/env"
 import { deliverPending } from "@/lib/tretu/events"
@@ -6,6 +7,7 @@ import { deliverPending } from "@/lib/tretu/events"
 /**
  * npm run worker:events — delivers the event outbox to the platform (contract §4), forever.
  * PM2 process `tretu-auth-events`. Idle while TRETU_PLATFORM_URL / TRETU_APP_SECRET are missing.
+ * It also lifts account locks whose `lockedUntil` has passed (user.updated with `locked: false`).
  */
 const INTERVAL_MS = 5000
 let stopping = false
@@ -15,6 +17,8 @@ if (!platformEnabled) console.info("[events] TRETU_PLATFORM_URL / TRETU_APP_SECR
 let lastCleanup = 0
 while (!stopping) {
   try {
+    const lifted = await liftExpiredLocks(db)
+    if (lifted.length) console.info(`[locks] lifted ${lifted.length} expired lock(s)`)
     if (platformEnabled) {
       let result
       do result = await deliverPending(db, { limit: 100 })

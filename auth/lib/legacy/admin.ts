@@ -1,5 +1,5 @@
 import { eq, or, sql } from "drizzle-orm"
-import { audit } from "@/lib/audit"
+import { CLI_ACTOR, recordAdminAction, type AdminActor } from "@/lib/admin/audit"
 import type { Db } from "@/lib/db"
 import * as s from "@/lib/db/schema"
 import { isPlaceholderEmail } from "@/lib/oidc/claims"
@@ -165,32 +165,36 @@ export async function planMerge(db: Db, fromId: string, intoId: string): Promise
 
 /**
  * Merges `from` into `into` (mergeUsers: user.updated for `into`, user.deleted `{ mergedInto }` for `from`, so the
- * platform moves wallet and stats and the apps clean up) and records `admin.merge` in the target's activity log.
+ * platform moves wallet and stats and the apps clean up) and records `admin.merge` in the target's activity log
+ * (and `admin.performed` in the acting admin's).
  */
-export async function adminMerge(db: Db, from: UserRow, into: UserRow): Promise<{ plan: MergePlan; after: AccountSummary }> {
+export async function adminMerge(
+  db: Db,
+  from: UserRow,
+  into: UserRow,
+  by: { actor: AdminActor; reason: string } = { actor: CLI_ACTOR, reason: "CLI" },
+): Promise<{ plan: MergePlan; after: AccountSummary }> {
   const refusal = mergeRefusal(from, into)
   if (refusal) throw new Error(`merge refused: ${refusal}`)
   const plan = await planMerge(db, from.id, into.id)
   await mergeUsers(db, from.id, into.id)
-  await audit(
-    "admin.merge",
-    {
-      userId: into.id,
-      meta: {
-        by: "cli",
-        from: from.id,
-        fromUsername: plan.from.username,
-        moved: {
-          providers: plan.move.providers.map((p) => p.providerId),
-          gameLinks: plan.move.gameLinks.map((g) => g.provider),
-          passkeys: plan.move.passkeys.length,
-          legacy: plan.move.legacy.map((l) => `${l.app}:${l.legacyUserId}`),
-        },
-        dropped: { providers: plan.drop.providers.map((p) => p.providerId), gameLinks: plan.drop.gameLinks.map((g) => g.provider) },
+  await recordAdminAction(db, {
+    action: "merge",
+    actor: by.actor,
+    target: { id: into.id, username: plan.into.username },
+    reason: by.reason,
+    details: {
+      from: from.id,
+      fromUsername: plan.from.username,
+      moved: {
+        providers: plan.move.providers.map((p) => p.providerId),
+        gameLinks: plan.move.gameLinks.map((g) => g.provider),
+        passkeys: plan.move.passkeys.length,
+        legacy: plan.move.legacy.map((l) => `${l.app}:${l.legacyUserId}`),
       },
+      dropped: { providers: plan.drop.providers.map((p) => p.providerId), gameLinks: plan.drop.gameLinks.map((g) => g.provider) },
     },
-    db,
-  )
+  })
   const after = await accountSummary(db, into.id)
   if (!after) throw new Error("target account vanished during the merge")
   return { plan, after }
