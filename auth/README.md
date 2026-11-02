@@ -21,14 +21,15 @@ Amazon SES v2 · Vitest, openid-client, Playwright.
   authorization code + PKCE (S256), refresh tokens (`offline_access`), userinfo, RP-initiated logout,
   RS256 ID tokens. Scopes `openid profile email offline_access tretu`; claims `sub`, `preferred_username`,
   `name`, `picture`, `email`, `email_verified`, `locale`, and with `tretu`: `roles`, `discord_id`,
-  `minecraft_uuid`, `minecraft_name`, `steam_id`. First-party clients skip the consent screen.
+  `minecraft_uuid`, `minecraft_name`, `steam_id`, `teamspeak_uid`. First-party clients skip the consent screen.
 - **Sign-in** — email/username + password (email verification, reset, breached-password check via Have I
   Been Pwned k-anonymity, failing open), passkeys (RP ID `tretu.de`, so they work on every subdomain),
-  Discord / Google / Apple (each only when configured), magic links, TOTP 2FA with backup codes (required for
-  admins), optional Cloudflare Turnstile on registration. Rate limits on every auth endpoint.
+  Discord / Google / Apple and Steam (OpenID 2.0, `STEAM_LOGIN=true`; each only when configured), magic links,
+  TOTP 2FA with backup codes (required for admins, asked after every sign-in except passkeys), optional Cloudflare
+  Turnstile on registration. Rate limits on every auth endpoint.
 - **Mein Konto** (`/konto`) — profile (username shared across Tretu, display name, avatar), security
   (password, passkeys, 2FA, sessions, sign out everywhere, activity log), connected accounts (Discord, Google,
-  Apple; Minecraft/Steam links), language (→ `locale` claim), privacy (JSON data export, account deletion),
+  Apple; Steam connected right there; Minecraft and TeamSpeak linked by those services), language (→ `locale` claim), privacy (JSON data export, account deletion),
   "Alte Konten verbinden" (claim old accounts), app overview.
 - **Admin API** for the other services, signed per contract §3 (`TRETU_APPS_JSON`).
 - **Events** `user.created` / `user.updated` / `user.deleted` to the platform through an outbox table.
@@ -47,7 +48,8 @@ Amazon SES v2 · Vitest, openid-client, Playwright.
 | Revocation / introspection | `/api/auth/oauth2/revoke`, `/api/auth/oauth2/introspect` |
 | Health | `/api/health` |
 | Account page | `/konto` |
-| Admin API (signed) | `POST/DELETE /api/v1/links`, `GET /api/v1/users/{sub}`, `GET /api/v1/users?username=` |
+| Admin API (signed) | `POST/DELETE /api/v1/links` (`minecraft`, `steam`, `teamspeak`), `GET /api/v1/users/{sub}`, `GET /api/v1/users?username=` |
+| Steam (OpenID 2.0) | `POST /api/auth/sign-in/steam`, `POST /api/auth/steam/link`, `GET /api/auth/steam/callback` (return_to) |
 
 Clients must use discovery, not these paths.
 
@@ -95,10 +97,11 @@ Useful: `npm run admin -- grant <username|email> admin`, `npm run clients:sync`,
 ```bash
 npm run lint
 npm run typecheck
-npm test                        # unit tests (signing vectors §3, claims, legacy matching, passwords, …)
+npm test                        # unit tests (signing vectors §3, claims, Steam OpenID checks, redirects, legacy matching, …)
 npm run build
-npm run test:integration        # starts the built app on :3121 against tretu_auth_test (+ fixture DBs)
-npm run test:e2e                # Playwright on :3131 against tretu_auth_test_e2e (needs a build)
+npm run test:integration        # the built app on :3121 against tretu_auth_test, with mocked Discord/Google/Apple and a Steam stub
+npm run test:e2e                # Playwright on :3131 against tretu_auth_test_e2e (needs a build): passkeys, Steam, Mein Konto
+npm run secrets                 # prints fresh BETTER_AUTH_SECRET and OIDC client secrets (stores nothing)
 ```
 
 Integration and e2e tests reset their own databases (`tretu_auth_test*`) on the local Postgres; they never
@@ -111,14 +114,28 @@ touch `tretu_auth`.
 - **Passwords**: native Better Auth scrypt. Imported Saga/Nakama bcrypt hashes are stored as `bcrypt:<hash>`,
   several old passwords of one person as `multi:<…>`; after the first successful sign-in the password is
   re-hashed natively (`lib/passwords.ts`).
-- **Two-factor accounts** sign in with password + code or a passkey; Discord/Google/Apple and email links are
-  refused for them (Better Auth's 2FA check does not cover those).
+- **Two-factor accounts**: Better Auth's two-factor plugin only challenges password sign-ins. For Discord, Google,
+  Apple, Steam, magic links and email confirmation links the tretu plugin does the same with the plugin's own
+  mechanism (`lib/two-factor-challenge.ts`): the new session is deleted before anything can use it, a signed
+  10-minute `two_factor` challenge cookie is set and the browser goes to `/2fa?next=…` (for app sign-ins `next` is
+  the authorization endpoint again). Passkeys (user verification) count as two factors.
+- **Steam** (`lib/steam/`): `checkid_setup` to Steam with realm/return_to on the issuer; the answer is accepted only
+  after a strict field check (namespace, `op_endpoint`, `claimed_id` = `identity` =
+  `https://steamcommunity.com/openid/id/<17 digits>`, exact `return_to`, signed field list, fresh nonce, no repeated
+  parameters), `check_authentication` with Steam (`is_valid:true`) and an unused `response_nonce` (table
+  `openid_nonce`). A signed `steam_state` cookie binds the one-time state to the browser. The Steam ID is an
+  `account` row (provider `steam`), like other providers; Steam sign-ups get a placeholder email and a unique
+  username from the persona name. The admin API's `steam` links use the same rows.
+- **Redirect parameters** (`next`, `callbackURL`, `errorCallbackURL`, `newUserCallbackURL`, `redirectTo`) must stay
+  on this site (`lib/redirects.ts`): relative paths or the issuer origin, never whitespace, backslashes or `//`.
+- **Unlinking** a provider (incl. Steam) is allowed while another way to sign in remains: password, another provider
+  or a passkey.
 - **Usernames** are unique across Tretu (`[A-Za-z0-9_-]{3,24}`, case-insensitive), changeable every 30 days.
 - **Events** are written to `event_outbox` in the same database and delivered by the `tretu-auth-events`
   worker (and right away by the web process); deliveries are signed as app `auth`. `user.deleted` carries
   `{ "mergedInto": "<sub>" }` when an imported account was merged into another one through the claim flow.
-- **Legacy import** merges only on the same Discord ID, the same Google/Apple ID, or the same email verified on
-  both sides. The older account keeps a contested username; the other one gets `name_2` and a free rename
+- **Legacy import** merges only on the same Discord ID, the same Google/Apple/Steam ID (Nakama's `steam_id`), or the
+  same email verified on both sides; imported Steam IDs can sign in with Steam. The older account keeps a contested username; the other one gets `name_2` and a free rename
   after its first sign-in (`/weiter` and "Mein Konto").
 
 See [DEPLOY.md](DEPLOY.md) for production.
