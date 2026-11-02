@@ -68,7 +68,7 @@ export async function enqueueJob(
 
 export async function runDueJobs(
   handlers: Partial<Record<JobType, JobHandler>>,
-  options: { now?: Date; limit?: number; types?: JobType[] } = {}
+  options: { now?: Date; limit?: number; types?: JobType[]; shouldStop?: () => boolean } = {}
 ): Promise<{ done: number; retried: number; failed: number }> {
   const now = options.now ?? new Date();
   const types = options.types ?? (Object.keys(handlers) as JobType[]);
@@ -100,7 +100,15 @@ export async function runDueJobs(
   });
 
   // Sequential on purpose: Discord/TeamSpeak rate limits.
-  for (const job of rows) {
+  for (const [index, job] of rows.entries()) {
+    if (options.shouldStop?.()) {
+      // Shutting down (SIGTERM): hand the rest back right away instead of waiting for the lock to expire.
+      await platformDb
+        .update(platformJobs)
+        .set({ lockedUntil: null })
+        .where(inArray(platformJobs.id, rows.slice(index).map((j) => j.id)));
+      break;
+    }
     const handler = handlers[job.type as JobType];
     let outcome: JobOutcome;
     try {

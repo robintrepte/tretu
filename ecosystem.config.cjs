@@ -63,7 +63,9 @@ module.exports = {
       instances: 1,
       exec_mode: "fork",
       env: { NODE_ENV: "production" },
+      // SIGTERM finishes the current job and hands the rest back (scripts/platform-worker.ts); 78 = no DATABASE_URL.
       kill_timeout: 15_000,
+      stop_exit_codes: [78],
       exp_backoff_restart_delay: 5_000,
       max_memory_restart: "400M",
       time: true,
