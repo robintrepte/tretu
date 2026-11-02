@@ -55,6 +55,11 @@ pm2 reload ecosystem.config.cjs --update-env
 Migrations are additive. `0001_steam_login` adds `account.display_name` and the `openid_nonce` table, and moves
 Steam IDs linked earlier through the admin API from `external_link` into `account` (provider `steam`), so they can
 sign in with Steam. `0002_totp_replay` adds `two_factor.last_totp_counter` (TOTP codes are accepted only once).
+`0003_admin_lock_search` adds the account lock (`user.locked`, `locked_reason`, `locked_until`, `locked_at`),
+`passkey.last_used_at`, and the indexes of the central admin's search and stats. It runs
+`CREATE EXTENSION IF NOT EXISTS pg_trgm` (trigram indexes): pg_trgm ships with PostgreSQL and is a trusted extension
+since PostgreSQL 13, so the database owner may create it; if the app's role does not own the database, run
+`sudo -u postgres psql tretu_auth -c 'create extension if not exists pg_trgm'` once before `npm run db:migrate`.
 
 `npm start` (PM2 `tretu-auth`) syncs `TRETU_OAUTH_CLIENTS_JSON` into the database at boot; run
 `npm run clients:sync` by hand after changing it without a restart. Clients removed from the variable are
@@ -93,8 +98,19 @@ Global roles (`roles` claim) are granted on the server:
 ```bash
 npm run admin -- grant robin admin      # admins must turn on 2FA before any app accepts their sign-in
 npm run admin -- roles robin
-npm run admin -- revoke robin admin
+npm run admin -- revoke robin admin     # refused for the last admin who is not locked
 ```
+
+Day to day, admins manage accounts in the central admin on tretu.de (README → Central admin API), which calls this
+service as app `tretu-web`: its secret must be in `TRETU_APPS_JSON`. The CLI uses the same functions and rules
+and records `--reason="…"` (default `CLI`) in the activity log:
+
+```bash
+npm run admin -- lock robin --until=2026-12-31T12:00:00Z --reason="Spam"   # without --until: until unlocked
+npm run admin -- unlock robin
+```
+
+Locks with an end date are lifted by the `tretu-auth-events` worker (keep it running).
 
 ## Legacy import (once, before switching the apps to Tretu login)
 

@@ -32,6 +32,11 @@ Amazon SES v2 · Vitest, openid-client, Playwright.
   Apple; Steam connected right there; Minecraft and TeamSpeak linked by those services), language (→ `locale` claim), privacy (JSON data export, account deletion),
   app overview.
 - **Admin API** for the other services, signed per contract §3 (`TRETU_APPS_JSON`).
+- **Central admin API** (`/api/v1/admin/**`) for the account admin on tretu.de: search, account details, stats, roles,
+  sign out everywhere, lock/unlock, 2FA reset, removing links, confirming an email, merging accounts. Only app
+  `tretu-web` may call it; every change names the acting admin and a reason and is recorded in both activity logs.
+- **Account lock** — a locked Tretu-Konto cannot sign in by any method (password, passkey, magic link, Discord, Google,
+  Apple, Steam, email links, two-factor, an app sign-in with an existing session); locking signs it out everywhere.
 - **Events** `user.created` / `user.updated` / `user.deleted` to the platform through an outbox table.
 - **Legacy import** of Saga, Play, tretu.de and Hollowmere (Nakama) accounts. There is no self-service claim:
   old accounts the import could not join are merged by an admin (`npm run admin -- legacy` / `merge`).
@@ -50,6 +55,7 @@ Amazon SES v2 · Vitest, openid-client, Playwright.
 | Health | `/api/health` |
 | Account page | `/konto` |
 | Admin API (signed) | `POST/DELETE /api/v1/links` (`minecraft`, `steam`, `teamspeak`), `GET /api/v1/users/{sub}`, `GET /api/v1/users?username=` |
+| Central admin API (signed, `tretu-web` only) | see [Central admin API](#central-admin-api) |
 | Steam (OpenID 2.0) | `POST /api/auth/sign-in/steam`, `POST /api/auth/steam/link`, `GET /api/auth/steam/callback` (return_to) |
 
 Clients must use discovery, not these paths.
@@ -91,8 +97,8 @@ npm run db:migrate
 npm run dev                     # http://localhost:3021 — emails are printed to the console
 ```
 
-Useful: `npm run admin -- grant <username|email> admin`, `npm run admin -- legacy`,
-`npm run admin -- merge <from> <into> [--yes]`, `npm run clients:sync`, `npm run worker:events`.
+Useful: `npm run admin -- grant <username|email> admin`, `npm run admin -- lock|unlock <username|email>`,
+`npm run admin -- legacy`, `npm run admin -- merge <from> <into> [--yes]`, `npm run clients:sync`, `npm run worker:events`.
 
 ## Checks
 
@@ -145,5 +151,45 @@ touch `tretu_auth`.
 - **Legacy import** merges only on the same Discord ID, the same Google/Apple/Steam ID (Nakama's `steam_id`), or the
   same email verified on both sides; imported Steam IDs can sign in with Steam. The older account keeps a contested username; the other one gets `name_2` and a free rename
   after its first sign-in (`/weiter` and "Mein Konto").
+
+## Central admin API
+
+The account admin of the ecosystem lives on tretu.de (`src/app/(internal)/dashboard/…`); auth.tretu.de serves it
+this API. Requests are signed per contract §3 **by app `tretu-web`** (any other app: `403 forbidden_app`). Every
+change carries `actorSub` (the admin doing it) and `reason` (3–500 characters); the actor must hold `admin` right now,
+not be locked and have 2FA on (`403 actor_not_admin` / `actor_two_factor_required`). Reads accept an optional
+`?actorSub=` that is checked the same way. Code: `app/api/v1/admin/**`, `lib/admin/*` (shared with `npm run admin`).
+
+| Request | Answer |
+|---|---|
+| `GET /api/v1/admin/users?q=&limit=50&cursor=` | `{ items: [user], nextCursor }` — `q` matches username, display name, email (substring), sub, any provider account id (Discord ID, SteamID64, …), Minecraft UUID (with or without dashes) or name, TeamSpeak UID or nickname; exact matches first, then newest; `limit` 1–100 |
+| `GET /api/v1/admin/users/{sub}` | `user` plus `emailVerified`, `locale`, `lockedReason`, `lockedUntil`, `lockedAt`, `providers`, `passkeys`, `sessions`, `legacyLinks`, `audit` (newest 50) |
+| `GET /api/v1/admin/stats` | `{ users: { total, verified, withTwoFactor, locked, admins }, signUpsPerDay, signInsPerDay, providers }` (90 Europe/Berlin days) |
+| `GET /api/v1/admin/legacy` | `{ items }` — the data of `npm run admin -- legacy` |
+| `POST /api/v1/admin/users/{sub}/roles` `{ add?, remove? }` | an admin cannot remove their own `admin`; never from the last usable admin |
+| `POST /api/v1/admin/users/{sub}/sessions/revoke` | sessions, app access/refresh tokens, pending codes and 2FA challenges |
+| `POST /api/v1/admin/users/{sub}/lock` `{ until? }` / `…/unlock` | not yourself, not the last usable admin |
+| `POST /api/v1/admin/users/{sub}/two-factor/reset` | removes TOTP and backup codes, signs out everywhere |
+| `POST /api/v1/admin/users/{sub}/links/remove` `{ provider }` | `discord`, `google`, `apple`, `steam` (never the last way to sign in) or `minecraft`, `teamspeak` |
+| `POST /api/v1/admin/users/{sub}/email/verify` | `409 no_email` for accounts without an address |
+| `POST /api/v1/admin/merge` `{ from, into, dryRun }` | `{ dryRun: true, plan }` or `{ dryRun: false, merged: true, plan, user }` |
+
+`user` = `{ sub, username, name, email (null without a real address), picture, createdAt, lastSignInAt, roles,
+twoFactor, locked, links }`. User actions answer `{ ok: true, changed, user, … }`; a request that changes nothing
+answers `changed: false` and is not recorded. Errors: `{ error, message? }` with 400 `invalid_request`,
+401 `unauthorized`, 403 (`forbidden_app`, `actor_not_admin`, `actor_two_factor_required`, `self_action`),
+404 `not_found`, 409 (`last_admin`, `last_sign_in_method`, `no_email`, `merge_refused`).
+
+Every change is recorded as `admin.<action>` in the account's activity log (with the admin and the reason; "Mein
+Konto" shows it as "… vom Tretu-Team" without either) and as `admin.performed` in the admin's own log. Roles, lock,
+unlock and link changes emit `user.updated`; merges emit `user.updated` + `user.deleted { mergedInto }`.
+
+**Account lock.** `locked`, `locked_reason`, `locked_until`, `locked_at` on `user`. Every new session of a locked
+account is refused (`databaseHooks.session.create` in `lib/auth.ts`): JSON sign-ins answer `403 { code:
+"ACCOUNT_LOCKED", lockedUntil }`, page loads (provider callbacks, email links) go to `/login?error=ACCOUNT_LOCKED`,
+and the OIDC authorize/continue/consent endpoints refuse a session that survived a lock. Locking deletes sessions,
+app tokens and authorization codes not yet exchanged. A lock with `lockedUntil` ends by itself: the event worker
+lifts it (activity `lock.expired`, `user.updated { locked: false }`), and a sign-in after the date lifts it on the
+spot. The user shape (`GET /api/v1/users/{sub}`, events) carries `locked`.
 
 See [DEPLOY.md](DEPLOY.md) for production.
