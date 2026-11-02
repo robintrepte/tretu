@@ -1,0 +1,1 @@
+ALTER TABLE "two_factor" ADD COLUMN "last_totp_counter" bigint;

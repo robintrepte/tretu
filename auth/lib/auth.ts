@@ -4,10 +4,12 @@ import { getCurrentAuthEndpointContext } from "@better-auth/core/context"
 import { betterAuth, type BetterAuthPlugin } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { APIError, createAuthMiddleware, getOAuthState, getSessionFromCtx, isAPIError } from "better-auth/api"
+import { symmetricDecrypt } from "better-auth/crypto"
 import { nextCookies } from "better-auth/next-js"
 import { captcha, jwt, magicLink, twoFactor, username } from "better-auth/plugins"
 import { and, eq, ne, or, sql } from "drizzle-orm"
 import type { AppleOptions, AppleProfile } from "@better-auth/core/social-providers"
+import { base32 } from "@better-auth/utils/base32"
 import { createRemoteJWKSet, jwtVerify } from "jose"
 import { localeFromHeaders, type Locale } from "@/i18n/locales"
 import { audit, requestIp, type AuditEvent } from "@/lib/audit"
@@ -19,6 +21,7 @@ import { buildClaims, normalizeLocale, TRETU_CLAIMS, TRETU_SCOPES } from "@/lib/
 import { hashPassword, isBreachedPassword, needsRehash, verifyStoredPassword } from "@/lib/passwords"
 import { authorizeContinuation, REDIRECT_PARAMS, toSafePath } from "@/lib/redirects"
 import { steam } from "@/lib/steam/plugin"
+import { claimTotpCounter, matchingCounter } from "@/lib/totp-replay"
 import { challengeUserId, consumeTrustedDevice, replaceSessionWithChallenge } from "@/lib/two-factor-challenge"
 import { emitUserEvent } from "@/lib/tretu/events"
 import { isValidUsername, normalizeUsername, pickUsername, USERNAME_MAX, USERNAME_MIN } from "@/lib/usernames"
@@ -169,6 +172,32 @@ const tretu = (): BetterAuthPlugin => ({
           if (!isValidUsername(name)) throw new APIError("BAD_REQUEST", { message: "Invalid username.", code: "INVALID_USERNAME" })
           if (await usernameTaken(normalizeUsername(name))) {
             throw new APIError("BAD_REQUEST", { message: "Username is already taken.", code: "USERNAME_IS_ALREADY_TAKEN" })
+          }
+        }),
+      },
+      {
+        // TOTP replay protection (lib/totp-replay.ts): every verification of a TOTP goes through this endpoint.
+        matcher: (ctx) => ctx.path === "/two-factor/verify-totp",
+        handler: createAuthMiddleware(async (ctx) => {
+          const code = String((ctx.body as { code?: unknown } | undefined)?.code ?? "").replace(/\s/g, "")
+          const session = await getSessionFromCtx(ctx)
+          const userId = session?.user.id ?? (await challengeUserId(ctx))
+          if (!userId) return // Better Auth answers INVALID_TWO_FACTOR_COOKIE
+          const row = await db.query.twoFactor.findFirst({ where: eq(schema.twoFactor.userId, userId), columns: { secret: true } })
+          if (!row) return
+          let secret: string | Uint8Array
+          try {
+            secret = await symmetricDecrypt({ key: ctx.context.secretConfig, data: row.secret })
+            if (secret.startsWith("base32:")) secret = base32.decode(secret.slice(7).toUpperCase())
+          } catch {
+            return
+          }
+          const counter = await matchingCounter(secret, code)
+          if (counter === null) return // a wrong code: Better Auth counts and refuses it
+          if (!(await claimTotpCounter(db, userId, counter))) {
+            const headers = ctx.request?.headers ?? ctx.headers
+            await audit("2fa.failed", { userId, success: false, ipAddress: requestIp(headers), userAgent: headers?.get("user-agent"), meta: { method: "totp", code: "TOTP_CODE_REUSED" } })
+            throw new APIError("UNAUTHORIZED", { message: "This code was already used. Please wait for the next one.", code: "TOTP_CODE_REUSED" })
           }
         }),
       },

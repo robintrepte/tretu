@@ -6,6 +6,7 @@ import { SAGA_SECRET, TEST_DATABASE_URL } from "./env"
 import {
   discover,
   enableTwoFactor,
+  type TotpDevice,
   finishSocial,
   Jar,
   linkIn,
@@ -33,13 +34,12 @@ afterAll(async () => {
 })
 
 let user: Awaited<ReturnType<typeof registerVerifiedUser>>
-let code: () => Promise<string>
-let backupCodes: string[]
+let device: TotpDevice
 const ids = { discord: `${Date.now()}7001`, google: `g-${Date.now()}`, apple: `001.${Date.now()}.apple`, steam: String(76561198200000000n + BigInt(Date.now() % 1_000_000)) }
 
 beforeAll(async () => {
   user = await registerVerifiedUser("twofa")
-  ;({ code, backupCodes } = await enableTwoFactor(user.jar, user.password))
+  device = await enableTwoFactor(user.jar, user.password)
   for (const [provider, accountId] of Object.entries(ids)) {
     await sql`insert into account (id, account_id, provider_id, user_id, created_at, updated_at) values (${randomUUID()}, ${accountId}, ${provider}, ${user.id}, now(), now())`
   }
@@ -77,9 +77,15 @@ async function expectChallenge(res: Response, browser: Jar): Promise<string> {
   return next
 }
 
-/** Enters the code, follows `next` and checks that the app now gets a code for this user. */
-async function passAndExpectApp(browser: Jar, next: string, config: oidc.Configuration, flow: ReturnType<typeof startAuthorization>) {
-  const verify = await request(browser, "/api/auth/two-factor/verify-totp", { method: "POST", json: { code: await code() } })
+/**
+ * Enters the second factor, follows `next` and checks that the app now gets a code for this user. TOTP codes work
+ * once per 30 s step (replay protection), so most flows use backup codes to keep the suite fast.
+ */
+async function passAndExpectApp(browser: Jar, next: string, config: oidc.Configuration, flow: ReturnType<typeof startAuthorization>, factor: "totp" | "backup" = "backup") {
+  const verify =
+    factor === "totp"
+      ? await request(browser, "/api/auth/two-factor/verify-totp", { method: "POST", json: { code: await device.code() } })
+      : await request(browser, "/api/auth/two-factor/verify-backup-code", { method: "POST", json: { code: device.backupCode() } })
   expect(verify.status).toBe(200)
   expect((await sessionOf(browser))?.user.id).toBe(user.id)
   const callback = locationOf(await request(browser, next))
@@ -101,7 +107,7 @@ describe("two-factor accounts inside an app sign-in", () => {
     it(`${provider}: ends at /2fa, no code before the second factor`, async () => {
       const { config, flow, browser, oauthQuery } = await appFlow()
       const next = await expectChallenge(await viaProvider(browser, provider, oauthQuery), browser)
-      await passAndExpectApp(browser, next, config, flow)
+      await passAndExpectApp(browser, next, config, flow, provider === "discord" ? "totp" : "backup")
       const [challenge] = await sql`select meta from audit_log where user_id = ${user.id} and event = '2fa.challenge' order by created_at desc limit 1`
       expect(challenge?.meta).toMatchObject({ method: provider })
     })
@@ -128,7 +134,7 @@ describe("two-factor accounts inside an app sign-in", () => {
     const signIn = await request(browser, "/api/auth/sign-in/email", { method: "POST", json: { email: user.email, password: user.password, oauth_query: oauthQuery } })
     expect(await signIn.json()).toMatchObject({ twoFactorRedirect: true })
     expect(await sessionOf(browser)).toBeNull()
-    const verify = await request(browser, "/api/auth/two-factor/verify-totp", { method: "POST", json: { code: await code(), oauth_query: oauthQuery } })
+    const verify = await request(browser, "/api/auth/two-factor/verify-backup-code", { method: "POST", json: { code: device.backupCode(), oauth_query: oauthQuery } })
     const body = (await verify.json()) as { redirect: boolean; url: string }
     expect(body.redirect).toBe(true)
     const callback = new URL(body.url)
@@ -147,7 +153,7 @@ describe("two-factor accounts outside an app sign-in", () => {
     const link = linkIn(await waitForMail(user.email, /Bestätige deine E-Mail/, 10_000, since))
     const next = await expectChallenge(await request(browser, link), browser)
     expect(next).toBe("/konto?verified=1")
-    expect((await request(browser, "/api/auth/two-factor/verify-totp", { method: "POST", json: { code: await code() } })).status).toBe(200)
+    expect((await request(browser, "/api/auth/two-factor/verify-backup-code", { method: "POST", json: { code: device.backupCode() } })).status).toBe(200)
     expect((await sessionOf(browser))?.user.id).toBe(user.id)
   })
 
@@ -156,7 +162,7 @@ describe("two-factor accounts outside an app sign-in", () => {
     await expectChallenge(await viaProvider(browser, "discord"), browser)
     expect((await request(browser, "/api/auth/two-factor/verify-totp", { method: "POST", json: { code: "000000" } })).status).toBe(401)
     expect(await sessionOf(browser)).toBeNull()
-    const backup = await request(browser, "/api/auth/two-factor/verify-backup-code", { method: "POST", json: { code: backupCodes[0], trustDevice: true } })
+    const backup = await request(browser, "/api/auth/two-factor/verify-backup-code", { method: "POST", json: { code: device.backupCode(), trustDevice: true } })
     expect(backup.status).toBe(200)
     expect((await sessionOf(browser))?.user.id).toBe(user.id)
     const audits = await sql`select event from audit_log where user_id = ${user.id} and event in ('2fa.failed', '2fa.backup_code_used')`
@@ -175,7 +181,7 @@ describe("signed-in two-factor accounts", () => {
     const browser = new Jar()
     const signIn = await request(browser, "/api/auth/sign-in/email", { method: "POST", json: { email: user.email, password: user.password } })
     expect(await signIn.json()).toMatchObject({ twoFactorRedirect: true })
-    expect((await request(browser, "/api/auth/two-factor/verify-totp", { method: "POST", json: { code: await code() } })).status).toBe(200)
+    expect((await request(browser, "/api/auth/two-factor/verify-backup-code", { method: "POST", json: { code: device.backupCode() } })).status).toBe(200)
     const newEmail = `moved.${Date.now().toString(36)}@example.test`
     const since = Date.now()
     expect((await request(browser, "/api/auth/change-email", { method: "POST", json: { newEmail, callbackURL: "/konto?tab=profil" } })).status).toBe(200)

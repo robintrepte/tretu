@@ -180,16 +180,53 @@ export async function loginPageQuery(jar: Jar, authorizeUrl: URL): Promise<strin
 
 /* ───────────── Two-factor ───────────── */
 
-/** Turns on TOTP for a signed-in user (enable + first code) and returns a code generator. */
-export async function enableTwoFactor(jar: Jar, password?: string): Promise<{ code: () => Promise<string>; backupCodes: string[] }> {
+export interface TotpDevice {
+  /** A code for a time step not handed out before: codes are accepted once, so this waits for the next 30 s step if needed. */
+  code: () => Promise<string>
+  /** The code of a given time step (unix time / 30 s), and the current step. */
+  codeAt: (step: number) => Promise<string>
+  step: () => number
+  /** The newest step handed out (or claimed through codeAt by the caller). */
+  lastStep: () => number
+  markUsed: (step: number) => void
+  /** One unused backup code per call. */
+  backupCode: () => string
+  backupCodes: string[]
+}
+
+/** Turns on TOTP for a signed-in user (enable + first code) and returns the "authenticator app". */
+export async function enableTwoFactor(jar: Jar, password?: string): Promise<TotpDevice> {
   const enable = await request(jar, "/api/auth/two-factor/enable", { method: "POST", json: password ? { password } : {} })
   if (!enable.ok) throw new Error(`2fa enable failed: ${enable.status} ${await enable.text()}`)
   const { totpURI, backupCodes } = (await enable.json()) as { totpURI: string; backupCodes: string[] }
   const secret = new TextDecoder().decode(base32.decode(new URL(totpURI).searchParams.get("secret")!))
-  const code = () => createOTP(secret, { digits: 6 }).totp()
-  const verify = await request(jar, "/api/auth/two-factor/verify-totp", { method: "POST", json: { code: await code() } })
+  const otp = createOTP(secret, { digits: 6 })
+  const step = () => Math.floor(Date.now() / 30_000)
+  let last = -1
+  let backup = 0
+  const device: TotpDevice = {
+    step,
+    codeAt: (s) => otp.hotp(s),
+    lastStep: () => last,
+    markUsed: (s) => {
+      last = Math.max(last, s)
+    },
+    code: async () => {
+      // Waiting for the clock (not for the server): a new time step starts at most 30 s from now.
+      while (step() <= last) await new Promise((r) => setTimeout(r, 250))
+      last = step()
+      return otp.hotp(last)
+    },
+    backupCode: () => {
+      const value = backupCodes[backup++]
+      if (!value) throw new Error("out of backup codes")
+      return value
+    },
+    backupCodes,
+  }
+  const verify = await request(jar, "/api/auth/two-factor/verify-totp", { method: "POST", json: { code: await device.code() } })
   if (!verify.ok) throw new Error(`2fa verify failed: ${verify.status} ${await verify.text()}`)
-  return { code, backupCodes }
+  return device
 }
 
 /* ───────────── Provider mock and Steam stub ───────────── */

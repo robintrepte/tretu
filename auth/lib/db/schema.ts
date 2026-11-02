@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm"
-import { boolean, customType, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core"
+import { bigint, boolean, customType, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core"
 
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => "bytea" })
 
@@ -144,6 +144,8 @@ export const twoFactor = pgTable(
     verified: boolean().default(true),
     failedVerificationCount: integer().default(0),
     lockedUntil: timestamp({ withTimezone: true }),
+    /** Tretu: the TOTP time step (unix time / 30 s) last accepted, so no code is accepted twice (lib/totp-replay.ts). */
+    lastTotpCounter: bigint({ mode: "number" }),
   },
   (t) => [index("two_factor_user_idx").on(t.userId)],
 )
