@@ -1,0 +1,16 @@
+# Weekly restore test of the newest dumps (scratch databases <db>_restore_test, dropped afterwards).
+[Unit]
+Description=Tretu Postgres restore test
+After=postgresql.service tretu-pg-backup.service
+Requires=postgresql.service
+
+[Service]
+Type=oneshot
+User=postgres
+Group=postgres
+EnvironmentFile=-/etc/tretu/pg-backup.env
+ExecStart=/srv/tretu/deploy/scripts/pg-restore-test.sh
+Nice=10
+PrivateTmp=true
+ProtectSystem=full
+NoNewPrivileges=true

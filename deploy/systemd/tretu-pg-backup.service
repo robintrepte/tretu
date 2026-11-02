@@ -1,0 +1,22 @@
+# Nightly dump of every Tretu database. Install:
+#   sudo cp deploy/systemd/tretu-pg-backup.* deploy/systemd/tretu-pg-restore-test.* /etc/systemd/system/
+#   sudo install -d -m 700 -o postgres /var/backups/tretu-postgres
+#   sudo systemctl daemon-reload && sudo systemctl enable --now tretu-pg-backup.timer tretu-pg-restore-test.timer
+# Settings (remote copy, Uptime Kuma push URL): /etc/tretu/pg-backup.env (chmod 600), see pg-backup.sh.
+[Unit]
+Description=Tretu Postgres backup (pg_dump of every app database)
+After=postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=oneshot
+User=postgres
+Group=postgres
+EnvironmentFile=-/etc/tretu/pg-backup.env
+ExecStart=/srv/tretu/deploy/scripts/pg-backup.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+PrivateTmp=true
+ProtectSystem=full
+NoNewPrivileges=true

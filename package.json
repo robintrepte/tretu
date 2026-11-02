@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test --test-concurrency=1 \"tests/**/*.test.ts\"",
     "test:e2e": "playwright test",
+    "test:deploy": "node --test --test-concurrency=1 deploy/scripts/*.test.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node --import tsx --import ./src/lib/env/load-local-env.ts ./scripts/db-migrate.ts",
     "db:migrate-sqlite": "node --import tsx --import ./src/lib/env/load-local-env.ts ./scripts/migrate-sqlite-to-postgres.ts",
