@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest"
 import de from "@/messages/de.json"
 import en from "@/messages/en.json"
-import { readClaim, signClaim } from "@/lib/account"
 import { buildCsp } from "@/lib/csp"
-import { claimWindowOpen } from "@/lib/legacy/claim"
 import { toDate } from "@/lib/legacy/sources"
 import { isValidUsername, pickUsername, slugifyUsername } from "@/lib/usernames"
 
@@ -42,22 +40,7 @@ describe("usernames", () => {
   })
 })
 
-describe("claim helpers", () => {
-  it("signs and checks the OAuth claim cookie", () => {
-    const now = Date.now()
-    const payload = `user-1.${now + 60_000}`
-    const value = `${payload}.${signClaim(payload)}`
-    expect(readClaim(value, now)).toBe("user-1")
-    expect(readClaim(value, now + 120_000)).toBeNull()
-    expect(readClaim(`user-2.${now + 60_000}.${signClaim(payload)}`, now)).toBeNull()
-    expect(readClaim("garbage", now)).toBeNull()
-    expect(readClaim(undefined, now)).toBeNull()
-  })
-  it("keeps the claim window open for the configured days", () => {
-    const imported = new Date("2026-01-01T00:00:00Z")
-    expect(claimWindowOpen(imported, 90, new Date("2026-03-31T00:00:00Z"))).toBe(true)
-    expect(claimWindowOpen(imported, 90, new Date("2026-04-02T00:00:00Z"))).toBe(false)
-  })
+describe("legacy sources", () => {
   it("reads legacy timestamps in every format", () => {
     expect(toDate(1767225600).toISOString()).toBe("2026-01-01T00:00:00.000Z")
     expect(toDate("1767225600000").toISOString()).toBe("2026-01-01T00:00:00.000Z")

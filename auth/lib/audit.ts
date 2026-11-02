@@ -28,9 +28,8 @@ export type AuditEvent =
   | "username.changed"
   | "locale.changed"
   | "data.exported"
-  | "legacy.claimed"
-  | "legacy.claim_failed"
   | "roles.changed"
+  | "admin.merge"
 
 export interface AuditInput {
   userId?: string | null

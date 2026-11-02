@@ -379,7 +379,7 @@ export const eventOutbox = pgTable(
   (t) => [index("event_outbox_pending_idx").on(t.deliveredAt, t.nextAttemptAt)],
 )
 
-/** Which old account of which app belongs to which Tretu ID (written by the legacy import and the claim flow). */
+/** Which old account of which app belongs to which Tretu ID (written by the legacy import, moved by `npm run admin -- merge`). */
 export const legacyLink = pgTable(
   "legacy_link",
   {
@@ -391,10 +391,12 @@ export const legacyLink = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     legacyUsername: text(),
     legacyEmail: text(),
-    /** The old password hash in the stored format of lib/passwords.ts, for the claim flow. */
+    /** Unused since the self-service claim was removed (sign-in uses the hash in `account`); kept, migrations are additive. */
     passwordHash: text(),
-    method: text().$type<"import" | "merge" | "claim">().notNull().default("import"),
+    /** `import`: an account of its own; `merge`: joined with others by the import; `admin`: moved by `npm run admin -- merge`. */
+    method: text().$type<"import" | "merge" | "admin">().notNull().default("import"),
     importedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    /** When an admin merge moved the link to its current account. */
     claimedAt: timestamp({ withTimezone: true }),
     createdAt,
   },

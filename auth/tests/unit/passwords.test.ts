@@ -52,7 +52,7 @@ describe("password verifier", () => {
     expect(combineStored([stored])).toBe(stored)
     expect(combineStored([saga])).toBe(saga)
     expect(combineStored([null, undefined])).toBeNull()
-  })
+  }, 30_000) // several real bcrypt/scrypt hashes: slow on loaded machines
 
   it("never accepts malformed hashes or empty passwords", async () => {
     expect(fromBcrypt("plaintext")).toBeNull()

@@ -5,7 +5,6 @@ import { AccountHeader } from "@/components/account/account-header"
 import { AppsOverview } from "@/components/account/apps-overview"
 import { ConnectionsSection } from "@/components/account/connections-section"
 import { LanguageSection } from "@/components/account/language-section"
-import { LegacySection } from "@/components/account/legacy-section"
 import { PrivacySection } from "@/components/account/privacy-section"
 import { ProfileSection } from "@/components/account/profile-section"
 import { SecuritySection } from "@/components/account/security-section"
@@ -22,7 +21,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations("account"))("title") }
 }
 
-const TABS = ["profil", "sicherheit", "konten", "sprache", "datenschutz", "alte-konten"] as const
+const TABS = ["profil", "sicherheit", "konten", "sprache", "datenschutz"] as const
 type Tab = (typeof TABS)[number]
 
 export default async function AccountPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
@@ -35,7 +34,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const weiter = typeof params.weiter === "string" ? params.weiter : null
   const resume = weiter && (await readOAuthRequest(Object.fromEntries(new URLSearchParams(weiter))))?.valid ? `/weiter?${weiter}` : null
 
-  const { gameLinks, passkeys, activity, legacy, hasPassword, providers, admin, renameAt, firstImport, claimOpen, claimUntil } = await loadAccountData(user, tab === "sicherheit")
+  const { gameLinks, passkeys, activity, hasPassword, providers, admin, renameAt } = await loadAccountData(user, tab === "sicherheit")
   return (
     <div className="flex min-h-dvh flex-col">
       <AccountHeader name={user.name} image={user.image} username={user.displayUsername ?? user.username ?? ""} />
@@ -129,15 +128,6 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
             )}
             {tab === "sprache" && <LanguageSection locale={user.locale === "en" ? "en" : "de"} />}
             {tab === "datenschutz" && <PrivacySection username={user.displayUsername ?? user.username ?? ""} hasPassword={hasPassword} />}
-            {tab === "alte-konten" && (
-              <LegacySection
-                connected={legacy.map((l) => ({ app: l.app, name: l.legacyUsername ?? l.legacyEmail ?? "–" }))}
-                until={firstImport ? claimUntil : null}
-                open={claimOpen}
-                providers={[...enabledSocialProviders.filter((p) => p !== "apple"), ...(steamEnabled ? (["steam"] as const) : [])]}
-                notice={typeof params.claim === "string" ? params.claim : null}
-              />
-            )}
           </div>
         </div>
       </main>

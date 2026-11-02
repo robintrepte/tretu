@@ -7,9 +7,8 @@ import { audit, requestIp } from "@/lib/audit"
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import * as s from "@/lib/db/schema"
-import { env, isHttps, issuer, socialProviders, steamEnabled } from "@/lib/env"
-import { CLAIM_COOKIE, RENAME_INTERVAL_DAYS, signClaim } from "@/lib/account"
-import { claimWithPassword, CLAIMABLE_APPS } from "@/lib/legacy/claim"
+import { isHttps, issuer } from "@/lib/env"
+import { RENAME_INTERVAL_DAYS } from "@/lib/account"
 import { composeMail, sendMail } from "@/lib/mail"
 import { isPlaceholderEmail, normalizeLocale } from "@/lib/oidc/claims"
 import { verifyStoredPassword } from "@/lib/passwords"
@@ -216,27 +215,4 @@ export async function deleteAccount(input: { confirm: string; password?: string 
   const store = await cookies()
   for (const cookie of store.getAll()) if (cookie.name.includes("tretu.")) store.delete(cookie.name)
   return { ok: true }
-}
-
-const claimInput = z.object({ app: z.enum(CLAIMABLE_APPS), identifier: z.string().max(200), password: z.string().max(200) })
-
-export async function claimLegacyAccount(input: { app: string; identifier: string; password: string }) {
-  const parsed = claimInput.safeParse(input)
-  if (!parsed.success) return { ok: false as const, error: "notFound" as const }
-  const { user } = await currentUser()
-  if (!rateLimit(`claim:${user.id}`, 8, 15 * 60_000)) return { ok: false as const, error: "rateLimited" as const }
-  const result = await claimWithPassword(db, { userId: user.id, ...parsed.data, claimDays: env.LEGACY_CLAIM_DAYS })
-  const meta = { app: parsed.data.app, ...(result.ok ? { legacy: result.legacyName } : { reason: result.error }) }
-  await audit(result.ok ? "legacy.claimed" : "legacy.claim_failed", { userId: user.id, success: result.ok, ...(await requestMeta()), meta })
-  return result
-}
-
-/** Starts the "prove with Discord/Google" claim: remembers who wants the account, for 10 minutes. */
-export async function startOAuthClaim(provider: string) {
-  const { user } = await currentUser()
-  const enabled = provider === "steam" ? steamEnabled : provider in socialProviders && socialProviders[provider as keyof typeof socialProviders]
-  if (!enabled) return { ok: false as const }
-  const payload = `${user.id}.${Date.now() + 10 * 60_000}`
-  ;(await cookies()).set(CLAIM_COOKIE, `${payload}.${signClaim(payload)}`, { httpOnly: true, secure: isHttps, sameSite: "lax", path: "/", maxAge: 600 })
-  return { ok: true as const }
 }

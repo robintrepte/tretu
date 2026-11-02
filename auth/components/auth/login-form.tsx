@@ -19,7 +19,7 @@ interface Props {
   oauth: { clientName: string; valid: boolean } | null
   signedIn: { name: string } | null
   error?: string
-  notice?: "verified" | "reset" | "claimed" | "deleted" | "signedOut"
+  notice?: "verified" | "reset" | "deleted" | "signedOut"
   next: string
   query: string
 }
@@ -29,7 +29,6 @@ const PROVIDER_NAMES: Record<string, string> = { discord: "Discord", google: "Go
 export function LoginForm({ providers, steam, oauth, signedIn, error: initialError, notice, next, query }: Props) {
   const t = useTranslations("login")
   const tc = useTranslations("common")
-  const tl = useTranslations("legacy")
   const [identifier, setIdentifier] = useState("")
   const [password, setPassword] = useState("")
   const [busy, setBusy] = useState<"password" | "passkey" | "magic" | "continue" | null>(null)
@@ -46,8 +45,6 @@ export function LoginForm({ providers, steam, oauth, signedIn, error: initialErr
     if (code === "two_factor_required" || code === "invalid_token" || code === "steam_failed" || code === "state_mismatch" || code === "signup_disabled") return t(`errors.${code}`)
     if (code === "access_denied") return t("errors.cancelled")
     if (code === "account_already_linked_to_different_user" || code === "account_not_linked") return t("errors.account_not_linked")
-    if (code === "claim_inUse" || code === "claim_expired") return tl(`errors.${code.slice(6) as "inUse" | "expired"}`)
-    if (code.startsWith("claim_")) return tl("errors.oauthFailed")
     if (code.startsWith("provider_")) return t("errors.provider", { provider: PROVIDER_NAMES[code.slice(9)] ?? code.slice(9) })
     return tc("genericError")
   }
