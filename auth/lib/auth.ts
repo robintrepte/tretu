@@ -27,7 +27,7 @@ import { claimTotpCounter, matchingCounter } from "@/lib/totp-replay"
 import { challengeUserId, consumeTrustedDevice, replaceSessionWithChallenge } from "@/lib/two-factor-challenge"
 import { emitUserEvent } from "@/lib/tretu/events"
 import { isValidUsername, normalizeUsername, pickUsername, USERNAME_MAX, USERNAME_MIN } from "@/lib/usernames"
-import { getClaimSource, getUserLinks, isAdmin } from "@/lib/users"
+import { getClaimSource, getLegacyIds, getUserLinks, isAdmin } from "@/lib/users"
 
 /** Paths whose new passwords are checked against Have I Been Pwned. */
 const BREACH_CHECKED_PATHS = new Set(["/sign-up/email", "/change-password", "/reset-password", "/set-password"])
@@ -665,8 +665,9 @@ export const auth = betterAuth({
 async function claimsFor(userId: string, scopes: readonly string[]) {
   const source = await getClaimSource(userId)
   if (!source) return {}
-  const links = scopes.includes("tretu") ? await getUserLinks(userId) : {}
-  return buildClaims(source, links, scopes)
+  if (!scopes.includes("tretu")) return buildClaims(source, {}, scopes)
+  const [links, legacyIds] = await Promise.all([getUserLinks(userId), getLegacyIds(userId)])
+  return buildClaims(source, links, scopes, legacyIds)
 }
 
 export type Session = typeof auth.$Infer.Session

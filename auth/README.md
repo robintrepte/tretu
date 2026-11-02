@@ -21,7 +21,8 @@ Amazon SES v2 · Vitest, openid-client, Playwright.
   authorization code + PKCE (S256), refresh tokens (`offline_access`), userinfo, RP-initiated logout,
   RS256 ID tokens. Scopes `openid profile email offline_access tretu`; claims `sub`, `preferred_username`,
   `name`, `picture`, `email`, `email_verified`, `locale`, and with `tretu`: `roles`, `discord_id`,
-  `minecraft_uuid`, `minecraft_name`, `steam_id`, `teamspeak_uid`. First-party clients skip the consent screen.
+  `minecraft_uuid`, `minecraft_name`, `steam_id`, `teamspeak_uid`, `legacy_ids` (the old app accounts from the legacy
+  import, see below). First-party clients skip the consent screen.
 - **Sign-in** — email/username + password (email verification, reset, breached-password check via Have I
   Been Pwned k-anonymity, failing open), passkeys (RP ID `tretu.de`, so they work on every subdomain),
   Discord / Google / Apple and Steam (OpenID 2.0, `STEAM_LOGIN=true`; each only when configured), magic links,
@@ -151,6 +152,12 @@ touch `tretu_auth`.
 - **Legacy import** merges only on the same Discord ID, the same Google/Apple/Steam ID (Nakama's `steam_id`), or the
   same email verified on both sides; imported Steam IDs can sign in with Steam. The older account keeps a contested username; the other one gets `name_2` and a free rename
   after its first sign-in (`/weiter` and "Mein Konto").
+- **`legacy_ids` claim** (scope `tretu`, ID token and userinfo; `legacyIds` in the user shape of `GET /api/v1/users/{sub}`,
+  events and the admin detail) — `{ "saga"?, "play"?, "hollowmere"?, "tretu-web"? }` from `legacy_link`: per app the id
+  of the old app account as a string (Hollowmere: the Nakama user id), only apps with a link; the claim is absent when
+  there is none. The apps use it to find the user's existing local account on the first Tretu sign-in. Merges move the
+  links, so the surviving account carries them from then on; when it then holds two old accounts of one app, its own
+  import wins over the merged one (`legacyIdsFromLinks` in `lib/oidc/claims.ts`).
 
 ## Central admin API
 

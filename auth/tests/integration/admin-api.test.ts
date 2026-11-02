@@ -412,6 +412,7 @@ describe("GET /users/{sub}", () => {
       links: { discord: discordId },
       passkeys: [{ id: passkeyId, name: "Laptop", lastUsedAt: lastUsed.toISOString() }],
       legacyLinks: [{ app: "play", legacyUserId: "p-1", legacyUsername: "oldplayer", method: "import" }],
+      legacyIds: { play: "p-1" },
     })
     const providers = res.body.providers as { provider: string; accountId: string | null }[]
     expect(providers.map((p) => p.provider).sort()).toEqual(["discord", "password"])

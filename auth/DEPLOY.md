@@ -113,6 +113,10 @@ Locks with an end date are lifted by the `tretu-auth-events` worker (keep it run
 
 ## Legacy import (once, before switching the apps to Tretu login)
 
+The apps sign people in **only** with the Tretu-Konto and find their existing local accounts through the `legacy_ids`
+claim this import produces. Run it (and the merges below) **before** any app gets its Tretu-only version
+(deploy/GO-LIVE.md).
+
 Read-only connections to the old databases (a read-only Postgres role is recommended):
 
 ```bash
@@ -139,7 +143,8 @@ npm run admin -- merge <from> <into> --yes       # merge (username or email for 
 
 A merge moves `<from>`'s sign-in methods, Minecraft/TeamSpeak links, passkeys and old-app links to `<into>` (where
 `<into>` already has one of a kind, e.g. a password, `<into>`'s stays and `<from>`'s is dropped), deletes `<from>`,
-emits `user.updated` for `<into>` and `user.deleted { mergedInto }` for `<from>` (the platform moves wallet and
+emits `user.updated` for `<into>` (its `legacyIds` now include the moved links, as does the `legacy_ids` claim from the
+next sign-in) and `user.deleted { mergedInto }` for `<from>` (the platform moves wallet and
 stats; the apps drop the old local user) and writes `admin.merge` to `<into>`'s activity log. It refuses merging an
 account into itself and an account with the `admin` role as `<from>`.
 
