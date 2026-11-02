@@ -29,6 +29,15 @@ if [ "$(id -u)" != "0" ]; then
   remap=(-e 's/(listen[[:space:]]+(\[::\]:)?)80([[:space:];])/\118080\3/' -e 's/(listen[[:space:]]+(\[::\]:)?)443([[:space:];])/\118443\3/')
 fi
 
+# The site files use `http2 on;` (nginx 1.25.1+, like the server). An older nginx here (Ubuntu 24.04 ships 1.24) does
+# not know that directive: for the check only, it becomes the equivalent `listen … ssl http2` parameter.
+legacy_http2=()
+version="$(nginx -v 2>&1 | sed -E 's#.*nginx/([0-9.]+).*#\1#')"
+if [ "$(printf '%s\n' 1.25.1 "$version" | sort -V | head -n1)" != "1.25.1" ]; then
+  echo "note: nginx $version has no 'http2 on;' — checking with 'listen … ssl http2' instead (the server needs 1.25.1+)" >&2
+  legacy_http2=(-e '/^[[:space:]]*http2[[:space:]]+on;/d' -e 's/(listen[[:space:]]+[^;]*[[:space:]]ssl)([[:space:];])/\1 http2\2/')
+fi
+
 for f in "${files[@]}"; do
   name="$(basename "$f")"
   sed -E \
@@ -37,7 +46,7 @@ for f in "${files[@]}"; do
     -e "s#/etc/letsencrypt/options-ssl-nginx.conf#$tmp/options-ssl.conf#g" \
     -e "s#/etc/letsencrypt/ssl-dhparams.pem#$tmp/dh.pem#g" \
     -e "s#/var/log/nginx/#$tmp/logs/#g" \
-    "${strip_v6[@]}" "${remap[@]}" \
+    "${strip_v6[@]}" "${remap[@]}" "${legacy_http2[@]}" \
     "$f" > "$tmp/sites/$name"
 done
 

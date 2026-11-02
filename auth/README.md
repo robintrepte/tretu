@@ -98,7 +98,7 @@ npm run db:migrate
 npm run dev                     # http://localhost:3021 — emails are printed to the console
 ```
 
-Useful: `npm run admin -- grant <username|email> admin`, `npm run admin -- lock|unlock <username|email>`,
+Useful: `npm run admin -- grant <username|email|id> admin`, `npm run admin -- lock|unlock <username|email|id>`,
 `npm run admin -- legacy`, `npm run admin -- merge <from> <into> [--yes]`, `npm run clients:sync`, `npm run worker:events`.
 
 ## Checks

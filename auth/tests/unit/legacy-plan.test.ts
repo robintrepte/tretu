@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { isPlaceholderEmail } from "@/lib/oidc/claims"
 import { buildReport, planImport, type Anchor, type LegacyRecord } from "@/lib/legacy/plan"
+import { formatReport } from "@/lib/legacy/run"
 
 let seq = 0
 function rec(partial: Partial<LegacyRecord> & Pick<LegacyRecord, "app">): LegacyRecord {
@@ -152,5 +153,51 @@ describe("legacy matching rules", () => {
   it("produces stable Tretu IDs for dry runs", () => {
     const r = rec({ app: "saga", username: "stable" })
     expect(planImport([r], []).groups[0]!.newUserId).toBe(planImport([r], []).groups[0]!.newUserId)
+  })
+})
+
+describe("legacy roles in the report", () => {
+  const sources = { saga: { read: 1, skipped: 0 } }
+
+  it("names the target Tretu account and the grant command for every old-app role", () => {
+    const admin = rec({ app: "saga", username: "Robin", roles: ["admin"], identities: [discord("501")] })
+    const sameDiscord = rec({ app: "play", username: "robin_play", roles: ["moderator"], identities: [discord("501")] })
+    const player = rec({ app: "saga", username: "nobody", roles: ["player"] })
+    const plan = planImport([admin, sameDiscord, player], [])
+    const report = buildReport(plan, sources, true, [admin, sameDiscord, player])
+    const id = groupOf(plan, admin).newUserId!
+    expect(report.legacyRoles).toEqual([
+      { record: `saga:${admin.legacyUserId}`, app: "saga", legacyUsername: "Robin", roles: ["admin"], userId: id, username: "Robin", usernamePending: false, grant: "npm run admin -- grant Robin admin" },
+      { record: `play:${sameDiscord.legacyUserId}`, app: "play", legacyUsername: "robin_play", roles: ["moderator"], userId: id, username: "Robin", usernamePending: false, grant: "npm run admin -- grant Robin admin" },
+    ])
+    const text = formatReport(report)
+    expect(text).toContain(`Accounts with roles in the old apps (2; global roles are granted by hand, after the real import):`)
+    expect(text).toContain(`→ Robin [${id}]`)
+    expect(text).toContain("      npm run admin -- grant Robin admin")
+  })
+
+  it("uses the existing account for records joining it, and the ID while a username is pending", () => {
+    const anchor: Anchor = { userId: "existing-1", email: "boss@x.test", emailVerified: true, username: "boss", identities: [discord("7")], legacy: [], hasPassword: true }
+    const joining = rec({ app: "tretu-web", username: "Boss", roles: ["operator"], identities: [discord("7")] })
+    const taken = rec({ app: "saga", username: "boss", roles: ["admin"] })
+    const plan = planImport([joining, taken], [anchor])
+    const report = buildReport(plan, sources, false, [joining, taken])
+    const [first, second] = report.legacyRoles
+    expect(first).toMatchObject({ userId: "existing-1", username: "boss", usernamePending: false, grant: "npm run admin -- grant boss admin" })
+    const pendingId = groupOf(plan, taken).newUserId!
+    expect(second).toMatchObject({ userId: pendingId, usernamePending: true, grant: `npm run admin -- grant ${pendingId} admin` })
+    expect(second!.username).not.toBe("boss")
+    const text = formatReport(report)
+    expect(text).not.toContain("after the real import")
+    expect(text).toContain(`(rename pending) [${pendingId}]`)
+  })
+
+  it("marks records that were not imported", () => {
+    const a: Anchor = { userId: "a", email: "a@x.test", emailVerified: true, username: "a", identities: [discord("1")], legacy: [], hasPassword: false }
+    const b: Anchor = { userId: "b", email: "b@x.test", emailVerified: true, username: "b", identities: [], legacy: [], hasPassword: false }
+    const both = rec({ app: "saga", username: "both", roles: ["admin"], identities: [discord("1")], email: "b@x.test", emailVerified: true })
+    const report = buildReport(planImport([both], [a, b]), sources, true, [both])
+    expect(report.legacyRoles[0]).toMatchObject({ userId: null, username: null, grant: null })
+    expect(formatReport(report)).toContain("→ not imported (see skipped/conflicts)")
   })
 })

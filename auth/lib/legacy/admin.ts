@@ -14,10 +14,12 @@ import { isUnusedAccount, mergeUsers } from "./merge"
 type UserRow = typeof s.user.$inferSelect
 
 /** A user by username or email (case-insensitive). */
+/** A Tretu account by username, email or user ID (the import report prints the ID for pending usernames). */
 export async function findUser(db: Db, who: string): Promise<UserRow | null> {
-  const key = who.trim().toLowerCase()
+  const raw = who.trim()
+  const key = raw.toLowerCase()
   if (!key) return null
-  return (await db.query.user.findFirst({ where: or(eq(s.user.username, key), sql`lower(${s.user.email}) = ${key}`) })) ?? null
+  return (await db.query.user.findFirst({ where: or(eq(s.user.username, key), sql`lower(${s.user.email}) = ${key}`, eq(s.user.id, raw)) })) ?? null
 }
 
 export interface UserMatch {
