@@ -220,6 +220,7 @@ function specs(domain, s) {
         ["AUTH_PASSKEY_RP_ID", domain],
         "# OIDC clients (contract §2), synced at boot",
         ["TRETU_OAUTH_CLIENTS_JSON", json(oauthClientsJson(domain, s))],
+        ["TRETU_CORS_ORIGINS", X("optional, comma-separated; default: the https origins of the public clients")],
         "# Sign-in providers (each only active when both values are set)",
         ["DISCORD_CLIENT_ID", X(`redirect ${u.auth}/api/auth/callback/discord`)],
         ["DISCORD_CLIENT_SECRET", X()],
