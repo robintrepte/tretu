@@ -250,10 +250,13 @@ Notifications
   Idempotency keys are unique per calling app; reusing one for a different sub returns
   `409 idempotency_conflict`. History may also show the platform's own kinds `welcome`, `daily`, `reward`.
 - **Stat prefixes.** `mc-dashboard` may also send keys starting with `minecraft.`.
-- **Merged accounts.** `user.deleted` from auth may carry `{"mergedInto":"<sub>"}` when an admin joined Tretu-Konto A
+- **Merged accounts.** `user.deleted` from auth may carry `{"mergedInto":"<sub>","intoLegacyIds":{…}}` when an admin joined Tretu-Konto A
   (the event's `sub`) into Tretu-Konto B (`mergedInto`); the platform moves A's wallet balance and stats to B before
   erasing A, and auth moves A's links (`legacy_ids`, Discord, Minecraft, …) to B. A and B are the same person, so an
   app MUST NOT delete the app account linked to A. Every app that keeps accounts applies this rule:
+  The platform forwards both fields unchanged to every app. `intoLegacyIds` is B's `legacy_ids` after the merge (same
+  shape as the claim): an app treats "B already has an account" as true when a local account is linked to B **or** its
+  id equals `intoLegacyIds[<this app>]` (an imported account B hasn't signed into yet).
   1. **B has no account in this app yet:** re-link the account to B (`tretu_sub = B`, plus any per-provider row the app
      keeps for the Tretu login), end its sessions (the person signs in again as B and lands in the same account), and
      keep all its data unchanged (Saga: the credits migration state too, since the platform moved the wallet).
