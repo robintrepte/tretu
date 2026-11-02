@@ -81,7 +81,6 @@ minimum:
 | `TRETU_APPS_JSON` | the same value as on tretu.de (every app's secret; `tretu-web` is needed for its TeamSpeak links) |
 | `TRETU_PLATFORM_URL`, `TRETU_APP_SECRET` | `https://tretu.de`, the secret of app `auth` in `TRETU_APPS_JSON` |
 | `TURNSTILE_SITE_KEY/SECRET_KEY` | optional bot check on registration |
-| `NEXT_PUBLIC_UMAMI_SRC/WEBSITE_ID` | optional, set **before** `npm run build` |
 
 Without `TRETU_PLATFORM_URL`/`TRETU_APP_SECRET` the event worker idles and events stay in `event_outbox`;
 once set, it delivers the backlog in order.

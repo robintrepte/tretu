@@ -20,7 +20,7 @@ export type HealthReport = {
     migrations: "ok" | "pending" | "error";
     /**
      * Platform worker: `off` without TRETU_APPS_JSON, `stale` when webhooks/jobs are overdue. Informational
-     * (does not turn `status` into an error: the site itself works); Uptime Kuma watches it separately.
+     * (does not turn `status` into an error: the site itself works); /status shows when its checks stop.
      */
     worker: "ok" | "stale" | "off" | "error";
   };

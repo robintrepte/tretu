@@ -3,18 +3,6 @@ import createNextIntlPlugin from "next-intl/plugin";
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
-/** Origin of the self-hosted Umami script (only when analytics is configured). */
-function umamiOrigin(): string | null {
-  const src = process.env.NEXT_PUBLIC_UMAMI_SRC;
-  if (!src || !process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID) return null;
-  try {
-    return new URL(src).origin;
-  } catch {
-    return null;
-  }
-}
-const umami = umamiOrigin();
-
 /** auth.tretu.de origin (sign-in and logout redirects), from TRETU_AUTH_ISSUER at build time. */
 function authOrigin(): string {
   try {
@@ -65,11 +53,11 @@ const securityHeaders = [
       "default-src 'self'",
       // 'unsafe-inline': Next.js inline bootstrap scripts (no nonce setup). 'unsafe-eval': the WebGL shader library of the
       // home page feature-detects `new Function`. Everything else is limited to these hosts.
-      `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.tsviewer.com https://www.tsviewer.com${umami ? ` ${umami}` : ""}`,
+      `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.tsviewer.com https://www.tsviewer.com`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https: blob:",
       "font-src 'self' data:",
-      `connect-src 'self' https://www.googleapis.com${umami ? ` ${umami}` : ""}`,
+      "connect-src 'self' https://www.googleapis.com",
       "frame-src 'self' https://embed.twitch.tv https://discord.com https://www.youtube.com https://www.youtube-nocookie.com https://map.tretu.de https://www.tsviewer.com",
       "manifest-src 'self'",
       "media-src 'self' https:",

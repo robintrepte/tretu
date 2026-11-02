@@ -35,10 +35,6 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-/** Self-hosted Umami (cookie-free); only rendered when both env vars are set. */
-const UMAMI_SRC = process.env.NEXT_PUBLIC_UMAMI_SRC;
-const UMAMI_WEBSITE_ID = process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID;
-
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("meta");
   const locale = resolveLocale(await getLocale());
@@ -105,7 +101,6 @@ export default async function RootLayout({
             <Toaster richColors />
           </ThemeProvider>
         </NextIntlClientProvider>
-        {UMAMI_SRC && UMAMI_WEBSITE_ID ? <script defer src={UMAMI_SRC} data-website-id={UMAMI_WEBSITE_ID} /> : null}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{

@@ -9,7 +9,6 @@ export function proxy(request: NextRequest) {
     dev: process.env.NODE_ENV === "development",
     https: (process.env.TRETU_AUTH_ISSUER ?? "").startsWith("https://"),
     turnstile: Boolean(process.env.TURNSTILE_SITE_KEY && process.env.TURNSTILE_SECRET_KEY),
-    umamiSrc: process.env.NEXT_PUBLIC_UMAMI_SRC && process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID ? process.env.NEXT_PUBLIC_UMAMI_SRC : undefined,
   })
   const headers = new Headers(request.headers)
   headers.set("x-nonce", nonce)
