@@ -112,7 +112,7 @@ touch `tretu_auth`.
 ## Design notes
 
 - **Cookies**: over HTTPS every cookie is host-only `__Host-tretu.*` (Secure, Path=/, SameSite=Lax).
-- **CSP**: nonce-based `script-src` with `strict-dynamic`; only Turnstile and Umami are allowed when configured.
+- **CSP**: nonce-based `script-src` with `strict-dynamic`; only Turnstile is allowed when configured.
 - **Passwords**: native Better Auth scrypt. Imported Saga/Nakama bcrypt hashes are stored as `bcrypt:<hash>`,
   several old passwords of one person as `multi:<…>`; after the first successful sign-in the password is
   re-hashed natively (`lib/passwords.ts`).

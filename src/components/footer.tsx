@@ -33,6 +33,9 @@ export function Footer() {
             <Link href="/agb/" className={linkClass}>
               {t("terms")}
             </Link>
+            <Link href="/status" className={linkClass}>
+              {t("status")}
+            </Link>
           </nav>
           <LanguageSwitcher />
         </div>

@@ -5,22 +5,26 @@
 # One custom-format dump per database (`pg_dump -Fc`, restorable per table) plus the roles (globals), each
 # verified with `pg_restore --list` and a SHA-256 file, written atomically (.partial → final) with mode 600.
 # Old dumps are removed after RETENTION_DAYS. With BACKUP_REMOTE set, the directory is copied off the machine
-# with rsync over SSH (e.g. a Hetzner Storage Box). With BACKUP_PING_URL set (Uptime Kuma push monitor), a
-# successful run pings it, so a missing backup raises an alert.
+# with rsync over SSH (e.g. a Hetzner Storage Box). With BACKUP_ALERT_WEBHOOK_URL set (a Discord webhook), a
+# failed run posts a short message there; a backup that silently stops running is caught by the weekly restore
+# test (pg-restore-test.sh, MAX_AGE_HOURS), which alerts the same way.
 #
 # Env (all optional):
 #   BACKUP_DIR        /var/backups/tretu-postgres
-#   BACKUP_DATABASES  "tretu_web tretu_auth saga play mc_dashboard nakama umami"
+#   BACKUP_DATABASES  "tretu_web tretu_auth saga play mc_dashboard nakama"
 #   RETENTION_DAYS    14
 #   BACKUP_REMOTE     e.g. u123456@u123456.your-storagebox.de:tretu-postgres/  (rsync -e "ssh -p 23")
 #   BACKUP_RSYNC_SSH  ssh -p 23 -i /var/lib/postgresql/.ssh/backup_ed25519
-#   BACKUP_PING_URL   https://status.tretu.de/api/push/<token>
+#   BACKUP_ALERT_WEBHOOK_URL  https://discord.com/api/webhooks/<id>/<token>
 #   libpq: PGHOST, PGPORT, PGUSER (default: local socket as the calling user)
 set -euo pipefail
 umask 077
+# shellcheck source=alert.sh
+source "$(dirname "${BASH_SOURCE[0]}")/alert.sh"
+trap 'alert_on_failure $? "Tretu-Backup"' EXIT
 
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/tretu-postgres}"
-BACKUP_DATABASES="${BACKUP_DATABASES:-tretu_web tretu_auth saga play mc_dashboard nakama umami}"
+BACKUP_DATABASES="${BACKUP_DATABASES:-tretu_web tretu_auth saga play mc_dashboard nakama}"
 RETENTION_DAYS="${RETENTION_DAYS:-14}"
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 
@@ -73,8 +77,5 @@ fi
 if [ "$failed" -gt 0 ]; then
   echo "$failed backup step(s) FAILED" >&2
   exit 1
-fi
-if [ -n "${BACKUP_PING_URL:-}" ]; then
-  curl -fsS --max-time 10 "${BACKUP_PING_URL}?status=up&msg=OK" >/dev/null || echo "warning: could not ping BACKUP_PING_URL" >&2
 fi
 echo "backup finished ($stamp)"

@@ -41,7 +41,8 @@
     },
     "toggleTheme": "Toggle colour scheme",
     "lightMode": "Switch to light mode",
-    "darkMode": "Switch to dark mode"
+    "darkMode": "Switch to dark mode",
+    "status": "Status"
   },
   "meta": {
     "defaultDescription": "Welcome to Tretu! Our goal is to take the community experience to a new level. By gamers, for gamers. Teamspeak, Discord, livestreams, a Minecraft map and more.",
@@ -97,6 +98,10 @@
     "notFound": {
       "title": "Page not found",
       "description": "The requested page does not exist. Back to the Tretu home page."
+    },
+    "status": {
+      "title": "Status",
+      "description": "Current status of every Tretu service: website, Tretu account, Saga, Play, Hollowmere and the Minecraft dashboard, with availability over the last 24 hours and 90 days."
     }
   },
   "notFound": {
@@ -1009,5 +1014,54 @@
     "retry": "Try again",
     "home": "Back to the home page",
     "reference": "Error code: {digest}"
+  },
+  "status": {
+    "title": "Status",
+    "intro": "Whether our services are running right now – checked every minute from our server.",
+    "overall": {
+      "up": "All services are running",
+      "degraded": "Some services are degraded",
+      "down": "At least one service is down",
+      "unknown": "No check results yet",
+      "unavailable": "The status cannot be loaded right now"
+    },
+    "updated": "As of {time}",
+    "neverChecked": "There are no checks yet.",
+    "stale": "The checks are not running at the moment. Showing the state as of {time}.",
+    "autoRefresh": "This page refreshes every minute.",
+    "notice": "Notice",
+    "state": {
+      "up": "Running",
+      "degraded": "Degraded",
+      "down": "Down",
+      "unknown": "No data"
+    },
+    "responseTime": "Response time",
+    "responseMs": "{ms} ms",
+    "since": "since {time}",
+    "last24h": "Last 24 hours",
+    "last90d": "Last 90 days",
+    "uptime": "{percent} available",
+    "noData": "no data",
+    "hoursAgo": "24 h ago",
+    "daysAgo": "90 days ago",
+    "now": "now",
+    "today": "today",
+    "bucket": "{label}: {summary}",
+    "bucketSummary": "{percent} available ({checks, plural, one {# check} other {# checks}})",
+    "bucketIssues": "{degraded} × degraded, {down} × down",
+    "hourLabel": "{time}",
+    "legend": {
+      "up": "running",
+      "degraded": "partly degraded",
+      "down": "down",
+      "none": "no data"
+    },
+    "explanation": "“Degraded” means the service answers but reports a problem or answers very slowly. “Down” means no answer within 5 seconds or an error page. Availability is the share of checks in which the service was not down.",
+    "api": "The same data as JSON: <link>/api/status</link>.",
+    "legendLabel": "Legend",
+    "playersOf": "{online} / {max} players online",
+    "players": "{online, plural, one {# player} other {# players}} online",
+    "users": "{online, plural, one {# user} other {# users}} online"
   }
 }

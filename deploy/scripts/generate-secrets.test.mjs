@@ -28,7 +28,6 @@ function load(out) {
     play: env("play/.env"),
     hollowmere: env("hollowmere/server.env"),
     mc: env("mc-dashboard/.env"),
-    umami: env("umami/.env"),
     roles: env("postgres/roles.env"),
     nakamaYaml: readFileSync(path.join(out, "hollowmere/local.yml"), "utf8"),
   };
@@ -102,7 +101,6 @@ test("database URLs use one role per app with the passwords from roles.env", () 
     [files.saga.DATABASE_URL, "saga", "saga"],
     [files.play.DATABASE_URL, "play", "play"],
     [files.mc.DATABASE_URL, "mc_dashboard", "mc_dashboard"],
-    [files.umami.DATABASE_URL, "umami", "umami"],
     [files.auth.LEGACY_SAGA_DATABASE_URL, "tretu_legacy_reader", "saga"],
     [files.auth.LEGACY_PLAY_DATABASE_URL, "tretu_legacy_reader", "play"],
     [files.auth.LEGACY_TRETU_DATABASE_URL, "tretu_legacy_reader", "tretu_web"],
@@ -122,7 +120,7 @@ test("database URLs use one role per app with the passwords from roles.env", () 
 
 test("Nakama http_key equals NAKAMA_HTTP_KEY; session secrets are long and distinct", () => {
   assert.match(files.nakamaYaml, new RegExp(`http_key: "${files.hollowmere.NAKAMA_HTTP_KEY}"`));
-  const secrets = [files.web.AUTH_SECRET, files.auth.BETTER_AUTH_SECRET, files.saga.AUTH_SECRET, files.play.BETTER_AUTH_SECRET, files.umami.APP_SECRET];
+  const secrets = [files.web.AUTH_SECRET, files.auth.BETTER_AUTH_SECRET, files.saga.AUTH_SECRET, files.play.BETTER_AUTH_SECRET];
   for (const s of secrets) assert.ok(s.length >= 32);
   assert.equal(new Set(secrets).size, secrets.length);
 });
@@ -149,7 +147,7 @@ test("files are mode 600 in 700 directories; nothing secret is printed", () => {
   assert.equal(statSync(out).mode & 0o777, 0o700);
   const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(dir, e.name)) : [path.join(dir, e.name)]));
   const all = walk(out);
-  assert.equal(all.length, 10);
+  assert.equal(all.length, 9);
   for (const file of all) {
     assert.equal(statSync(file).mode & 0o777, 0o600, file);
     assert.equal(statSync(path.dirname(file)).mode & 0o777, 0o700, path.dirname(file));
@@ -199,7 +197,25 @@ test("other domains (staging) produce matching hosts", () => {
   const auth = parseEnv(built.find((f) => f.app === "auth").content);
   assert.equal(auth.TRETU_AUTH_ISSUER, "https://auth.staging.tretu.de");
   assert.deepEqual(JSON.parse(auth.TRETU_OAUTH_CLIENTS_JSON).saga.redirectUris, ["https://saga.staging.tretu.de/api/auth/oauth2/callback/tretu"]);
+  const web = parseEnv(built.find((f) => f.app === "tretu-web").content);
+  assert.deepEqual(
+    JSON.parse(web.TRETU_STATUS_TARGETS_JSON).map((t) => t.url),
+    ["https://staging.tretu.de", "https://auth.staging.tretu.de", "https://saga.staging.tretu.de", "https://play.staging.tretu.de", "https://hollowmere.staging.tretu.de", "https://mc.staging.tretu.de"].map((h) => `${h}/api/health`)
+  );
   assert.throws(() => main(["--out", tmp, "--domain", "not a domain"], () => {}));
+});
+
+test("status targets: one /api/health per service, no analytics or status host left", () => {
+  const targets = JSON.parse(files.web.TRETU_STATUS_TARGETS_JSON);
+  assert.deepEqual(targets.map((t) => t.id), ["tretu-web", "auth", "saga", "play", "hollowmere", "mc-dashboard"]);
+  for (const t of targets) assert.match(t.url, /^https:\/\/([a-z]+\.)?tretu\.de\/api\/health$/);
+  assert.equal(files.web.TRETU_STATUS_DISCORD_WEBHOOK_URL, "");
+  assert.equal(files.web.TRETU_STATUS_MINECRAFT, "mc.tretu.de:25565");
+  assert.equal(files.web.TRETU_STATUS_CERT_HOSTS, "map.tretu.de,mcp.hollowmere.tretu.de");
+  for (const env of [files.web, files.auth, files.saga, files.play, files.mc]) {
+    for (const key of Object.keys(env)) assert.doesNotMatch(key, /UMAMI/);
+    for (const value of Object.values(env)) assert.doesNotMatch(value, /stats\.tretu|status\.tretu/);
+  }
 });
 
 test("committed deploy/env templates are up to date and contain no secrets", () => {

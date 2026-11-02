@@ -1,7 +1,8 @@
 /**
  * Background work of the platform (run by scripts/platform-worker.ts, PM2 `tretu-platform-worker`):
  * webhook delivery, jobs (web push, Discord/TeamSpeak badge sync, user fetches), presence expiry,
- * badge sync reconciliation and housekeeping.
+ * badge sync reconciliation and housekeeping (including the status page's old checks; the checks themselves
+ * are in src/lib/status/worker.ts).
  */
 import { and, inArray, lt } from "drizzle-orm";
 
@@ -16,6 +17,7 @@ import { tsAuthLinkJob, tsAuthUnlinkJob } from "@/lib/platform/ts-auth-link";
 import { deliverDueWebhooks } from "@/lib/platform/outbox";
 import { expirePresence } from "@/lib/platform/presence";
 import { sendPushJob } from "@/lib/platform/push";
+import { pruneStatus } from "@/lib/status/store";
 
 async function userFetchJob(job: JobRow): Promise<JobOutcome> {
   try {
@@ -76,4 +78,5 @@ export async function runMaintenanceTick(now: Date = new Date()): Promise<void> 
   await platformDb.delete(platformJobs).where(and(inArray(platformJobs.status, ["done"]), lt(platformJobs.createdAt, weekAgo)));
   await platformDb.delete(platformJobs).where(and(inArray(platformJobs.status, ["failed"]), lt(platformJobs.createdAt, monthAgo)));
   await pruneNotifications(platformDb, 180);
+  await pruneStatus(platformDb, now);
 }

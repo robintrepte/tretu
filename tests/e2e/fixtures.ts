@@ -10,3 +10,26 @@ export const USERS = {
 } as const;
 
 export const TS_UID = "e2eTeamSpeakUid+/AAAA=";
+
+/** Services on the e2e status page (URLs are never requested by the page) and their seeded state. */
+export const STATUS_TARGETS = [
+  { id: "tretu-web", url: "http://127.0.0.1:9/tretu-web" },
+  { id: "auth", url: "http://127.0.0.1:9/auth" },
+  { id: "saga", url: "http://127.0.0.1:9/saga" },
+  { id: "play", url: "http://127.0.0.1:9/play" },
+  { id: "hollowmere", url: "http://127.0.0.1:9/hollowmere" },
+  { id: "mc-dashboard", url: "http://127.0.0.1:9/mc" },
+];
+/**
+ * mc-dashboard has no data on purpose ("Keine Daten"). The Minecraft row is the default target (mc.tretu.de:25565),
+ * the TeamSpeak row appears because serve.ts sets TS_QUERY_* (ServerQuery).
+ */
+export const STATUS_SEED: Record<string, { now: "up" | "degraded" | "down"; badDay?: boolean; users?: [number, number | null] }> = {
+  "tretu-web": { now: "up" },
+  auth: { now: "up" },
+  saga: { now: "degraded" },
+  play: { now: "down", badDay: true },
+  hollowmere: { now: "up" },
+  minecraft: { now: "up", users: [3, 20] },
+  teamspeak: { now: "up", users: [4, null] },
+};

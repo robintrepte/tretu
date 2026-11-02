@@ -43,8 +43,8 @@ export function ImpressumDe() {
         <P>
           Dieses Impressum gilt für tretu.de und für alle Dienste der Marke {OPERATOR.brand}, insbesondere das Tretu-Konto (
           {SERVICES.auth}), Saga ({SERVICES.saga}), Tretu Play ({SERVICES.play}), Hollowmere ({SERVICES.hollowmere} sowie die
-          Spiel-Apps), den Minecraft-Server mit Dashboard ({SERVICES.minecraft}), unsere Statistik- und Statusseiten (
-          {SERVICES.stats}, {SERVICES.status}) sowie unsere Community-Server auf TeamSpeak und Discord und unsere Profile in
+          Spiel-Apps), den Minecraft-Server mit Dashboard ({SERVICES.minecraft}), unsere Statusseite ({SERVICES.status}) sowie
+          unsere Community-Server auf TeamSpeak und Discord und unsere Profile in
           sozialen Netzwerken.
         </P>
       </Section>

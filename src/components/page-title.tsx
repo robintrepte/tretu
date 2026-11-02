@@ -1,5 +1,6 @@
 import Image from "next/image";
 import {
+  Activity,
   BarChart3,
   FileText,
   Scale,
@@ -17,7 +18,8 @@ export type PageIconName =
   | "map"
   | "impressum"
   | "datenschutz"
-  | "agb";
+  | "agb"
+  | "status";
 
 /** Icon size classes per variant (slightly smaller, vert-centered with title) */
 const iconSizeClass = {
@@ -104,6 +106,8 @@ export function PageTitle({
         return <Shield className={iconClass} strokeWidth={1.5} />;
       case "agb":
         return <Scale className={iconClass} strokeWidth={1.5} />;
+      case "status":
+        return <Activity className={iconClass} strokeWidth={1.5} />;
       default:
         return <MessageCircle className={iconClass} strokeWidth={1.5} />;
     }

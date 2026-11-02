@@ -18,7 +18,7 @@ export const DATENSCHUTZ_TOC_EN = [
   { id: "game-server", title: "Game server dashboard (team)" },
   { id: "email", title: "Email and contact" },
   { id: "zahlungen", title: "Payments and Tretu Credits" },
-  { id: "statistik", title: "Visitor statistics and status page" },
+  { id: "statistik", title: "Statistics and status page" },
   { id: "empfaenger", title: "Recipients and processors" },
   { id: "drittland", title: "Transfers to third countries" },
   { id: "speicherdauer", title: "Retention" },
@@ -58,7 +58,7 @@ export function DatenschutzEn() {
           <li>the browser game collection Tretu Play at {SERVICES.play},</li>
           <li>the game Hollowmere (website {SERVICES.hollowmere}, web version and desktop apps),</li>
           <li>the Tretu Minecraft server and its dashboard at {SERVICES.minecraft},</li>
-          <li>our visitor statistics ({SERVICES.stats}) and status page ({SERVICES.status}),</li>
+          <li>the status page of our services ({SERVICES.status}),</li>
           <li>our community servers on TeamSpeak and Discord and our social media profiles.</li>
         </UL>
         <P>
@@ -71,8 +71,8 @@ export function DatenschutzEn() {
         <UL>
           <li>We do not sell data, show no ads and do not track you across other websites.</li>
           <li>
-            Our servers are hosted by Hetzner in Germany. We run our statistics (Umami) and status page (Uptime Kuma) ourselves –
-            without cookies.
+            Our servers are hosted by Hetzner in Germany. We do not use analytics or tracking services; only Tretu Play counts page
+            views with its own statistics, without cookies, which only store daily totals.
           </li>
           <li>
             We only use strictly necessary cookies and storage. Content from Twitch, Discord and TSViewer only loads when you click
@@ -120,7 +120,7 @@ export function DatenschutzEn() {
         <Sub title="Hosting">
           <P>
             All services run on servers we operate at Hetzner Online GmbH, Industriestr. 25, 91710 Gunzenhausen, Germany. The
-            servers for websites, databases, the Tretu account, game backends and statistics are located in data centres in
+            servers for websites, databases, the Tretu account and game backends are located in data centres in
             Germany. Hetzner processes the data as a processor on our behalf (Art. 28 GDPR). The legal basis is our legitimate
             interest in secure and economical operation (Art. 6(1)(f) GDPR) and the performance of the contract of use (Art.
             6(1)(b) GDPR).
@@ -432,6 +432,28 @@ export function DatenschutzEn() {
           session expired more than 30 days ago. You can delete your account yourself in the settings; in other players’ past
           matches, only the display name used at the time remains, without a link to your account.
         </P>
+        <Sub title="Tretu Play visitor statistics">
+          <P>
+            Tretu Play counts page views with its own statistics on our server, without cookies and without external services.
+            Pages you open in your browser are counted; requests by recognisable bots and programs are not. Only details your
+            browser sends with every page request anyway are evaluated: the page requested (addresses of individual rooms and
+            profiles are combined into one entry each), the domain of the website you came from or a campaign tag in the address
+            (“utm_source”), the device type (smartphone, tablet or computer, derived from the browser identifier) and the language
+            (from the address, the language cookie or your browser’s language setting).
+          </P>
+          <P>
+            So that visitors are counted only once per day, the server calculates a shortened checksum (hash) from your IP
+            address, your browser identifier and a random value that is newly generated every day. The random value and the
+            checksums are only held in memory, are never stored and are discarded with the first page request after midnight
+            (German time) or when the server restarts; they cannot be traced across days or back to you. In the database we only
+            store daily totals – views and visitors per page, origin, device type and language – without reference to individual
+            persons. Only Tretu Play’s administrators see these totals; we keep them without a fixed time limit.
+          </P>
+          <P>
+            The legal basis is our legitimate interest in understanding how Tretu Play is used and improving it (Art. 6(1)(f)
+            GDPR). You can object to this at any time (<A href="#widerspruch">section 22</A>).
+          </P>
+        </Sub>
       </Section>
 
       <Section id="hollowmere" title="11. Hollowmere">
@@ -569,22 +591,24 @@ export function DatenschutzEn() {
         </P>
       </Section>
 
-      <Section id="statistik" title="17. Visitor statistics and status page">
-        <Sub title="Umami (self-hosted)">
+      <Section id="statistik" title="17. Statistics and status page">
+        <Sub title="No analytics or tracking services">
           <P>
-            On websites where we have activated it, we measure usage with Umami, which we run on our own server at {SERVICES.stats}.
-            Umami sets no cookies and stores nothing on your device. It records the page visited, the referring website, browser,
-            operating system, device type, screen size, language and the country derived from the IP address. The IP address itself
-            is not stored; to count visits, it is combined with the browser identifier and a regularly changing random value into an
-            identifier that does not allow conclusions about you. The data does not leave our server. The legal basis is our
-            legitimate interest in understanding and improving our services (Art. 6(1)(f) GDPR). Tretu Play additionally counts page
-            views with its own statistics, also without cookies, which only store daily totals.
+            On {SERVICES.hub}, {SERVICES.auth}, in Saga, Hollowmere and the Minecraft dashboard we do not use any analytics or
+            tracking tools (such as analytics scripts or tracking pixels), neither our own nor third-party ones. Tretu Play counts
+            page views with its own statistics without cookies, which only store daily totals (<A href="#play">section 10</A>).
+            Game statistics in Hollowmere are only collected with your consent (<A href="#hollowmere">section 11</A>).
           </P>
         </Sub>
-        <Sub title="Status page (Uptime Kuma, self-hosted)">
+        <Sub title="Status page">
           <P>
-            At {SERVICES.status} we show whether our services are reachable. We run the Uptime Kuma software ourselves; it regularly
-            checks our APIs and, when the status page is visited, only processes the log data described in section 4.
+            At {SERVICES.status} we show whether our services are reachable. For this, our own server requests the technical status
+            addresses of our services once a minute and stores whether and how fast they answered (individual checks 7 days,
+            hourly and daily values 90 days). For the Minecraft and TeamSpeak servers we also request how many players or
+            users are connected and show that number. For technical reasons the servers also return names or identifiers of
+            connected people; we do not evaluate or store them, only the number is stored. The legal basis is our legitimate
+            interest in informing about the availability of our services (Art. 6(1)(f) GDPR). When you visit the status page,
+            the information on server log files in <A href="#hosting">section 4</A> applies.
           </P>
         </Sub>
       </Section>
@@ -643,6 +667,14 @@ export function DatenschutzEn() {
             ["Presence (online/playing)", "2 minutes after the last sign of life"],
             ["Guest accounts (Play)", "automatically 30 days after the last session expired"],
             ["TeamSpeak usage / game server status data", "30 days or 2 days, without reference to persons"],
+            [
+              "Tretu Play visitor statistics",
+              "checksums only in memory until the day ends; daily totals without reference to persons without a fixed limit",
+            ],
+            [
+              "Results of the status checks",
+              "7 days (individual checks), 90 days (hourly and daily values); for game and TeamSpeak servers only the number connected",
+            ],
             ["Credit transactions, payment records", "10 years (§ 147 AO, § 257 HGB), then deleted"],
             ["Contact enquiries", "until resolved, then as long as obligations require"],
             ["Game server dashboard logs", "as long as the respective server exists"],

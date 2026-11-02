@@ -22,6 +22,13 @@
       "when": 1793590380446,
       "tag": "0002_badge_grants_steam_teamspeak",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793607675314,
+      "tag": "0003_status_page",
+      "breakpoints": true
     }
   ]
 }

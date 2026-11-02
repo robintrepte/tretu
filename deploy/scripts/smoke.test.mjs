@@ -11,7 +11,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const SECRET = "smoke-test-secret-0123456789abcdef";
 let server;
 let origin;
-const state = { sagaDown: false, seenSecretInHeaders: false };
+const state = { sagaDown: false, statusStale: false, seenSecretInHeaders: false };
 
 function signatureOk(req) {
   const ts = String(req.headers["x-tretu-timestamp"] ?? "");
@@ -34,8 +34,10 @@ before(async () => {
       if (name === "saga" && state.sagaDown) return send(503, { status: "error", app: "saga", version: "1.0.0", checks: { db: "error" } });
       return send(200, { status: "ok", app: name, version: "1.2.3", time: new Date().toISOString(), checks: { db: "ok" } });
     }
-    if (name === "stats" && p === "/api/heartbeat") return send(200, { ok: true });
-    if (name === "status" && p === "/") return send(302, {});
+    if (name === "web" && p === "/api/status") {
+      const updatedAt = new Date().toISOString();
+      return send(200, { status: "ok", updatedAt, stale: state.statusStale, services: [{ id: "tretu-web", state: "up" }, { id: "saga", state: "up" }] });
+    }
     if (name === "auth" && p === "/.well-known/openid-configuration") {
       const issuer = `${origin}/auth`;
       return send(200, {
@@ -60,7 +62,7 @@ before(async () => {
 after(() => server.close());
 
 function smoke(extraArgs = [], env = {}) {
-  const maps = ["web", "auth", "saga", "play", "hollowmere", "mc", "stats", "status"].flatMap((n) => ["--map", `${n}=${origin}/${n}`]);
+  const maps = ["web", "auth", "saga", "play", "hollowmere", "mc"].flatMap((n) => ["--map", `${n}=${origin}/${n}`]);
   return new Promise((resolve) => {
     const child = spawn("bash", [path.join(here, "smoke.sh"), ...maps, "--timeout", "5", ...extraArgs], { env: { ...process.env, ...env } });
     let out = "";
@@ -73,7 +75,7 @@ function smoke(extraArgs = [], env = {}) {
 test("all services healthy and the signed ping accepted → exit 0, table of PASS rows", async () => {
   const { code, out } = await smoke([], { SMOKE_APP_SECRET: SECRET });
   assert.equal(code, 0, out);
-  for (const check of ["health web", "health auth", "health saga", "health play", "health hollowmere", "health mc", "umami", "uptime kuma", "oidc discovery", "oidc jwks", "platform unsigned", "platform signed ping"]) {
+  for (const check of ["health web", "health auth", "health saga", "health play", "health hollowmere", "health mc", "status page", "oidc discovery", "oidc jwks", "platform unsigned", "platform signed ping"]) {
     assert.match(out, new RegExp(`^${check}\\s+PASS`, "m"), check);
   }
   assert.match(out, /all checks passed/);
@@ -83,12 +85,15 @@ test("all services healthy and the signed ping accepted → exit 0, table of PAS
 
 test("a failing service, a wrong secret and a missing secret show up in the table", async () => {
   state.sagaDown = true;
+  state.statusStale = true;
   const bad = await smoke([], { SMOKE_APP_SECRET: "wrong-secret-0123456789abcdef" });
   state.sagaDown = false;
+  state.statusStale = false;
   assert.equal(bad.code, 1);
   assert.match(bad.out, /^health saga\s+FAIL .*HTTP 503 status=error db=error/m);
   assert.match(bad.out, /^platform signed ping\s+FAIL .*secret differs/m);
-  assert.match(bad.out, /2 check\(s\) FAILED/);
+  assert.match(bad.out, /^status page\s+FAIL .*tretu-platform-worker running/m);
+  assert.match(bad.out, /3 check\(s\) FAILED/);
 
   const noSecret = await smoke(["--only", "web"]);
   assert.equal(noSecret.code, 0, noSecret.out);

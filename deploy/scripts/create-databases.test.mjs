@@ -55,7 +55,7 @@ test("creates one least-privileged role and database per app, idempotently", { s
   const first = sh(["--passwords", passwords, "--prefix", prefix]);
   assert.equal(first.status, 0, first.stderr);
   assert.match(first.stdout, new RegExp(`${prefix}saga\\s+${prefix}saga\\s+created, role created`));
-  for (const app of ["tretu_web", "tretu_auth", "saga", "play", "mc_dashboard", "nakama", "umami"]) {
+  for (const app of ["tretu_web", "tretu_auth", "saga", "play", "mc_dashboard", "nakama"]) {
     const name = `${prefix}${app}`;
     assert.equal(
       value(`select rolcanlogin, rolsuper, rolcreatedb, rolcreaterole, rolreplication, rolbypassrls from pg_roles where rolname = '${name}'`),
@@ -87,14 +87,14 @@ test("the legacy reader can read the old apps' tables but never write", { skip: 
   const write = psql("insert into things values (2)", { db: `${prefix}saga`, user: reader });
   assert.notEqual(write.status, 0);
   assert.match(write.stderr, /read-only transaction|permission denied/);
-  assert.notEqual(psql("select 1", { db: `${prefix}umami`, user: reader }).status, 0, "no access to non-legacy databases");
+  assert.notEqual(psql("select 1", { db: `${prefix}mc_dashboard`, user: reader }).status, 0, "no access to non-legacy databases");
 });
 
 test("an existing database of another owner is left alone; --drop needs a prefix; dry runs change nothing", { skip: !reachable && "no local Postgres" }, () => {
-  const other = `${prefix}umami`;
+  const other = `${prefix}mc_dashboard`;
   value(`drop database "${other}"`);
   value(`create database "${other}"`); // owned by the admin, like a hand-made database
-  const run = sh(["--passwords", passwords, "--prefix", prefix, "--only", "umami"]);
+  const run = sh(["--passwords", passwords, "--prefix", prefix, "--only", "mc_dashboard"]);
   assert.equal(run.status, 0, run.stderr);
   assert.match(run.stderr, /belongs to postgres/);
   assert.match(run.stdout, /SKIPPED \(owner postgres\)/);

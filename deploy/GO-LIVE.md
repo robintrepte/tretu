@@ -12,7 +12,7 @@ Every step says how to check it and how to roll it back. Each app's own deploy d
 | Play | play.tretu.de | [play DEPLOY.md](https://github.com/robintrepte/play/blob/main/DEPLOY.md) |
 | Hollowmere (Nakama + web + MCP relay) | hollowmere.tretu.de, mcp.hollowmere.tretu.de | [hollowmere HOSTING.md](https://github.com/robintrepte/hollowmere/blob/main/HOSTING.md) |
 | Minecraft dashboard + map | mc.tretu.de, map.tretu.de | [tretu-minecraft README.md](https://github.com/robintrepte/tretu-minecraft/blob/main/README.md) |
-| Umami, Uptime Kuma | stats.tretu.de, status.tretu.de | [deploy/README.md](README.md) |
+| Status page (part of tretu.de) | tretu.de/status | [DEPLOY.md](../DEPLOY.md#status-page-tretudestatus) |
 
 Tools used below (all in this repo, all tested in CI): `deploy/scripts/generate-secrets.mjs`,
 `create-databases.sh`, `smoke.sh`, `check-nginx.sh`, `pg-backup.sh`, `pg-restore-test.sh`. Run them from the
@@ -45,12 +45,15 @@ app runs as its own Unix user or the deploy user that owns `/srv/<repo>`.
 | Type | Name | Value |
 |---|---|---|
 | A / AAAA | `tretu.de`, `www` | `$IP` / `$IP6` |
-| A / AAAA | `auth`, `saga`, `play`, `hollowmere`, `mcp.hollowmere`, `mc`, `map`, `stats`, `status` | `$IP` / `$IP6` |
+| A / AAAA | `auth`, `saga`, `play`, `hollowmere`, `mcp.hollowmere`, `mc`, `map` | `$IP` / `$IP6` |
+
+There is no analytics or status host: remove old `stats` / `status` records if they exist (the status page is
+https://tretu.de/status).
 
 Check (every line must end in `$IP`):
 
 ```bash
-for h in tretu.de www auth saga play hollowmere mcp.hollowmere mc map stats status; do
+for h in tretu.de www auth saga play hollowmere mcp.hollowmere mc map; do
   [ "$h" = tretu.de ] || h="$h.tretu.de"; printf '%-26s %s\n' "$h" "$(dig +short A "$h" | tail -n 1)"
 done
 ```
@@ -81,10 +84,10 @@ node deploy/scripts/generate-secrets.mjs --out /root/tretu-secrets \
 ```
 
 - Writes `/root/tretu-secrets/` (mode 700, files 600): `tretu-web/.env.local`, `tretu-auth/.env`, `saga/.env`,
-  `play/.env`, `hollowmere/server.env` + `hollowmere/local.yml`, `mc-dashboard/.env`, `umami/.env`,
+  `play/.env`, `hollowmere/server.env` + `hollowmere/local.yml`, `mc-dashboard/.env`,
   `postgres/roles.env` and the state file `tretu-secrets.json`. Nothing secret is printed.
 - Templates of all of them: [deploy/env/](env/). Values marked `external` (Discord/Google/Apple OAuth apps, SES, OpenAI,
-  Replicate, ElevenLabs, TMDB, TeamSpeak ServerQuery, Discord bot, Umami website ids) are filled in by hand now.
+  Replicate, ElevenLabs, TMDB, TeamSpeak ServerQuery, Discord bot, status Discord webhook) are filled in by hand now.
 - **tretu-web:** keep the existing `AUTH_SECRET` (imported): it also decrypts the stored Hetzner/Cloudflare tokens.
 - Running it again is safe (same files, only missing values are added). `--fresh` would rotate everything.
 - Store `/root/tretu-secrets/tretu-secrets.json` in the password manager.
@@ -103,7 +106,7 @@ sudo -u postgres /srv/tretu/deploy/scripts/create-databases.sh --passwords /tmp/
 shred -u /tmp/tretu-roles.env
 ```
 
-- Creates `tretu_web`, `tretu_auth`, `saga`, `play`, `mc_dashboard`, `nakama`, `umami` (owner = same-named role,
+- Creates `tretu_web`, `tretu_auth`, `saga`, `play`, `mc_dashboard`, `nakama` (owner = same-named role,
   LOGIN only, CONNECT revoked from PUBLIC) and the read-only `tretu_legacy_reader` for auth's legacy import.
 - **Existing databases** owned by another role (e.g. Play's old `tretu` role) are reported as `SKIPPED`. Either keep
   that app's existing `DATABASE_URL` (edit the generated env file), or hand the data to the new role inside that
@@ -123,14 +126,15 @@ install -d -m 700 -o postgres /var/backups/tretu-postgres
 install -d -m 755 /etc/tretu && install -m 600 /dev/null /etc/tretu/pg-backup.env
 #   BACKUP_REMOTE=u123456@u123456.your-storagebox.de:tretu-postgres/
 #   BACKUP_RSYNC_SSH=ssh -p 23 -i /var/lib/postgresql/.ssh/backup_ed25519
-#   BACKUP_PING_URL=https://status.tretu.de/api/push/<token>    (after step 8)
+#   BACKUP_ALERT_WEBHOOK_URL=https://discord.com/api/webhooks/<id>/<token>   (a failed run posts there)
 cp /srv/tretu/deploy/systemd/tretu-pg-* /etc/systemd/system/ && systemctl daemon-reload
 systemctl enable --now tretu-pg-backup.timer tretu-pg-restore-test.timer
 systemctl start tretu-pg-backup.service && journalctl -u tretu-pg-backup -n 20
 ```
 
 Nightly `pg_dump -Fc` of every database + roles, 14 days retention, copied off the machine; weekly restore test
-into scratch databases (fails on missing, stale or corrupted dumps). Run `systemctl start tretu-pg-backup` by hand
+into scratch databases (fails on missing, stale or corrupted dumps). With `BACKUP_ALERT_WEBHOOK_URL` set, a failed
+backup or restore test posts a short message to that Discord channel. Run `systemctl start tretu-pg-backup` by hand
 before every migration below.
 
 Check: `sudo -u postgres /srv/tretu/deploy/scripts/pg-restore-test.sh` → `restore test passed`.
@@ -145,7 +149,7 @@ Check: `sudo -u postgres /srv/tretu/deploy/scripts/pg-restore-test.sh` → `rest
   /srv/saga/deploy/nginx/*.conf /srv/play/deploy/nginx/*.conf /srv/hollowmere/deploy/nginx/*.conf /srv/tretu-minecraft/deploy/nginx/*.conf
 cp <those files> /etc/nginx/sites-available/ && ln -s /etc/nginx/sites-available/<host>.conf /etc/nginx/sites-enabled/
 certbot --nginx -d tretu.de -d www.tretu.de        # then once per host: auth, saga, play, hollowmere,
-                                                   # mcp.hollowmere, mc, map, stats, status
+                                                   # mcp.hollowmere, mc, map
 nginx -t && systemctl reload nginx && certbot renew --dry-run
 ```
 
@@ -173,7 +177,9 @@ pm2 save
 deploy/scripts/smoke.sh --only web --env-file /srv/tretu/.env.local
 ```
 
-Check: `health web PASS … migrations=ok worker=ok`, `platform signed ping PASS`.
+Check: `health web PASS … migrations=ok worker=ok`, `platform signed ping PASS`, `status page PASS` (the worker's
+first status checks run right after its start; services not deployed yet show as "Ausgefallen" on /status until
+their step).
 **Rollback:** `git checkout <previous tag>`, restore `.env.local.before-tretu`, `npm ci && npm run build`,
 `pm2 reload ecosystem.config.cjs --update-env` (migrations are additive, the old code ignores the new tables).
 
@@ -189,14 +195,23 @@ npm run admin -- grant <your username> admin   # after registering at https://au
 Check: `oidc discovery PASS`, `oidc jwks PASS`; register a test account, `https://tretu.de/u/<name>` exists
 (user.created reached the platform). **Rollback:** `pm2 stop tretu-auth tretu-auth-events` (no app uses it yet).
 
-### 7.3 Umami and Uptime Kuma
+### 7.3 Status page and alerts
 
-As in [deploy/README.md](README.md) (env from `/root/tretu-secrets/umami/.env`). Create one Umami website per app
-and put the ids into `NEXT_PUBLIC_UMAMI_WEBSITE_ID` of each env file (inlined at build time: rebuild later in 7.5).
-Uptime Kuma: the monitors listed in [deploy/README.md](README.md#uptime-kuma-statustretude), plus push monitors for
-the backup and restore test (`BACKUP_PING_URL`, `RESTORE_PING_URL` in `/etc/tretu/pg-backup.env`).
+Nothing to install: `tretu-platform-worker` (started in 7.1) checks every service's `/api/health` once a minute and
+https://tretu.de/status shows the result. The generated `.env.local` already lists the six services in
+`TRETU_STATUS_TARGETS_JSON`, the Minecraft server (`TRETU_STATUS_MINECRAFT`) and the extra certificate hosts; the
+TeamSpeak row appears with `TS_QUERY_*` (or `TRETU_STATUS_TEAMSPEAK`). The webhook also gets certificate warnings
+(14 and 3 days before expiry). Optionally create a Discord webhook (channel settings → Integrations → Webhooks) and set
+`TRETU_STATUS_DISCORD_WEBHOOK_URL` in `/srv/tretu/.env.local`, and the same URL as `BACKUP_ALERT_WEBHOOK_URL` in
+`/etc/tretu/pg-backup.env`; then `pm2 reload ecosystem.config.cjs --update-env`.
 
-**Rollback:** `pm2 stop umami uptime-kuma`; apps without a website id render no tag.
+Check: https://tretu.de/status lists every service with "Stand: <time>" from the last minute; `curl -s
+https://tretu.de/api/status | head -c 300`. To try the webhook without touching a live app, add a temporary entry
+`{"id":"alarmtest","url":"https://tretu.de/gibt-es-nicht"}` to `TRETU_STATUS_TARGETS_JSON` and reload: after two
+minutes one "alarmtest … ist ausgefallen" message arrives (and nothing more); remove the entry and reload again.
+
+**Rollback:** empty `TRETU_STATUS_DISCORD_WEBHOOK_URL` (no messages); `TRETU_STATUS_TARGETS_JSON=[]` and `TRETU_STATUS_MINECRAFT=off`
+stop the checks.
 
 ### 7.4 Legacy accounts: dry run, then import
 
@@ -244,7 +259,8 @@ to switch off without removing, remove `DISCORD_BOT_TOKEN` instead).
 /srv/tretu/deploy/scripts/smoke.sh --env-file /srv/tretu/.env.local    # every row PASS
 ```
 
-- Every Uptime Kuma monitor green, certificate expiry > 60 days.
+- https://tretu.de/status: every service "Läuft", "Stand" from the last minute; `certbot certificates`: every
+  certificate valid for more than 60 days.
 - With a test Tretu-Konto: sign in to every app, win a game in Play → badge + credits on tretu.de, invite a friend,
   notification + push, link Steam and TeamSpeak in Mein Konto / `/einstellungen#teamspeak`.
 - Delete the test account in Mein Konto: it disappears from every app, its profile on tretu.de 404s, and Discord

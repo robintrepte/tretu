@@ -21,7 +21,7 @@ export const OPERATOR = {
 } as const;
 
 /** "Stand" of all three legal documents. Update together with the texts. */
-export const LEGAL_UPDATED = { de: "1. November 2026", en: "1 November 2026" } as const;
+export const LEGAL_UPDATED = { de: "2. November 2026", en: "2 November 2026" } as const;
 
 export const SERVICES = {
   hub: "tretu.de",
@@ -30,6 +30,6 @@ export const SERVICES = {
   play: "play.tretu.de",
   hollowmere: "hollowmere.tretu.de",
   minecraft: "mc.tretu.de",
-  stats: "stats.tretu.de",
-  status: "status.tretu.de",
+  /** Public status page of all services (part of tretu.de). */
+  status: "tretu.de/status",
 } as const;

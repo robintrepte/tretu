@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next"
 import localFont from "next/font/local"
 import { headers } from "next/headers"
-import Script from "next/script"
 import { NextIntlClientProvider } from "next-intl"
 import { getLocale, getTranslations } from "next-intl/server"
 import type { ReactNode } from "react"
@@ -39,14 +38,12 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const locale = await getLocale()
-  const nonce = (await headers()).get("x-nonce") ?? undefined
-  const umamiSrc = process.env.NEXT_PUBLIC_UMAMI_SRC
-  const umamiId = process.env.NEXT_PUBLIC_UMAMI_WEBSITE_ID
+  // Rendered per request: Next.js reads the CSP nonce set by proxy.ts and puts it on its own scripts.
+  await headers()
   return (
     <html lang={locale} className={jost.variable}>
       <body className="min-h-dvh font-sans antialiased">
         <NextIntlClientProvider>{children}</NextIntlClientProvider>
-        {umamiSrc && umamiId && <Script src={umamiSrc} data-website-id={umamiId} strategy="afterInteractive" nonce={nonce} />}
       </body>
     </html>
   )

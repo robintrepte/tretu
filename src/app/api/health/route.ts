@@ -4,7 +4,7 @@ import { healthReport } from "@/lib/health";
 
 export const dynamic = "force-dynamic";
 
-/** Liveness/readiness for PM2, nginx and Uptime Kuma (no auth, no secrets). */
+/** Liveness/readiness for PM2, nginx and the status checks behind /status (no auth, no secrets). */
 export async function GET() {
   const report = await healthReport();
   return NextResponse.json(report, {

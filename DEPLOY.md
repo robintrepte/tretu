@@ -8,7 +8,7 @@ Production runs on the shared Hetzner server: PM2 behind nginx, one Postgres ser
 | `tretu-web` | Next.js (`next start`), hub + platform API | 3020 (127.0.0.1) |
 | `tretu-orchestrator` | game-server jobs and monitoring (`npm run worker:orchestrator`) | – |
 | `tretu-ts-rank` | TeamSpeak ranking worker (`npm run worker:ts-rank`) | – |
-| `tretu-platform-worker` | platform webhooks, jobs, presence expiry, badge sync (`npm run platform:worker`, see [docs/ecosystem/PLATFORM.md](docs/ecosystem/PLATFORM.md)) | – |
+| `tretu-platform-worker` | platform webhooks, jobs, presence expiry, badge sync (`npm run platform:worker`, see [docs/ecosystem/PLATFORM.md](docs/ecosystem/PLATFORM.md)) and the checks behind [/status](#status-page-tretudestatus) | – |
 
 First go-live of the whole ecosystem: [deploy/GO-LIVE.md](deploy/GO-LIVE.md). The env template is
 [deploy/env/tretu-web.env.local.example](deploy/env/tretu-web.env.local.example) (`deploy/scripts/generate-secrets.mjs`
@@ -32,9 +32,10 @@ curl -fsS https://tretu.de/api/health       # {"status":"ok",…,"checks":{"db":
 
 `/api/health` answers `503` when the database is unreachable or a migration is missing (`checks.migrations:
 "pending"`: run `npm run db:migrate`). `checks.worker` is `stale` when platform webhooks/jobs are overdue by more than
-10 minutes (the `tretu-platform-worker` is not running); it does not fail the check, Uptime Kuma watches it
-separately (deploy/README.md). Migration `0002_badge_grants_steam_teamspeak` (additive) adds the badge-grant
-columns, `platform_ts_links.link_error` and `platform_users.steam_id`.
+10 minutes (the `tretu-platform-worker` is not running); it does not fail the check (a stopped worker also shows up
+on [/status](#status-page-tretudestatus) as "Die Prüfungen laufen gerade nicht"). Migration
+`0002_badge_grants_steam_teamspeak` (additive) adds the badge-grant columns, `platform_ts_links.link_error` and
+`platform_users.steam_id`; migration `0003_status_page` (additive) adds the three `platform_status_*` tables.
 
 **Production safety:** `next start` refuses to start without an `AUTH_SECRET` (or `BETTER_AUTH_SECRET`) of at least
 32 characters. Security headers (CSP, HSTS, COOP, …) come from `next.config.ts`; nginx adds per-IP rate limits
@@ -45,6 +46,55 @@ lines without secrets (credential/email keys are redacted, platform errors log r
 other claimed jobs back and exits within the 15 s `kill_timeout`. A crashed worker's claimed work is retried once
 its lock expires (≤ 2 min). Failing passes (e.g. Postgres restarting) back off up to 60 s instead of exiting.
 Without `DATABASE_URL` it exits 78 and PM2 leaves it stopped.
+
+## Status page (tretu.de/status)
+
+Public page `https://tretu.de/status` (German, English via the language switcher, linked in the footer) and the same
+data as JSON at `GET /api/status` (public, `Cache-Control: max-age=30`). One row per service with its state
+(läuft / gestört / ausgefallen / keine Daten), last response time and uptime bars for the last 24 hours and 90 days.
+There is no separate status service: no extra PM2 process, nginx site or certificate.
+
+- **Checks** run in `tretu-platform-worker` (`src/lib/status/`): every 60 s it requests each service's `/api/health`
+  in parallel (5 s timeout, user agent `TretuStatus/1.0`). `200` + `"status":"ok"` = **läuft**; an answer that is not
+  healthy (`"status":"error"`, a 2xx without health JSON, slower than 3 s) = **gestört**; no answer, no connection or an
+  error page such as nginx's `502` = **ausgefallen**.
+- **Minecraft server** (row "Minecraft-Server", `TRETU_STATUS_MINECRAFT`, default `mc.tretu.de:25565`): the
+  standard Server List Ping (handshake with protocol -1, status request; works with every version since 1.7),
+  5 s timeout. An answer = **läuft** with "players online / slots", none = **ausgefallen**.
+- **TeamSpeak server** (row "TeamSpeak"): with `TS_QUERY_*` set, one ServerQuery login per minute through the
+  client in `src/lib/teamspeak` (`clientlist`, users online; keep the query IP whitelisted as for the rank worker);
+  otherwise, with `TRETU_STATUS_TEAMSPEAK=host:port`, a TCP connect (voice is UDP: use a TCP port such as the file
+  transfer port 30033). Neither set: no row.
+- **Certificates:** once an hour the worker reads the TLS certificate of every HTTPS target and of
+  `TRETU_STATUS_CERT_HOSTS` and posts to the Discord webhook 14 and 3 days before it expires (each threshold once per
+  certificate; a renewed certificate starts over). Only with `TRETU_STATUS_DISCORD_WEBHOOK_URL` set. Stored in
+  `platform_status_certs`.
+- **Storage** (migration `0003_status_page`): `platform_status_checks` (one row per check, kept 7 days),
+  `platform_status_rollups` (counts per hour and per day in Europe/Berlin, updated with every check, kept 90 days),
+  `platform_status_services` (current state per service incl. players / users online, used for alerts),
+  `platform_status_certs` (certificate expiry and warnings sent). The worker's 10-minute maintenance pass
+  prunes old rows. About 8 600 rows per day for six services.
+- **The page reads only the database** (cached 30 s per process) and never calls the services. When the worker stops,
+  it keeps showing the last results with "Stand: …" and a note that the checks are not running; `deploy/scripts/smoke.sh`
+  fails its "status page" row in that case.
+- **Alerts (optional):** with `TRETU_STATUS_DISCORD_WEBHOOK_URL` set, the worker posts a short German message to that
+  Discord channel when a service is down or disturbed for 2 consecutive checks ("Saga (saga.tretu.de) ist ausgefallen –
+  keine Antwort innerhalb von 5 Sekunden.") and when it recovers ("… läuft wieder (nach 12 Min.)"). Nothing else is
+  posted: a single failed check or a service that stays down never repeats the message.
+- **Maintenance note (optional):** `TRETU_STATUS_NOTICE="Wartung am Sonntag ab 22 Uhr"` shows a banner on the page (and
+  in `/api/status`); remove it and reload to hide it.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `TRETU_STATUS_TARGETS_JSON` | the contract's six hosts | JSON array `[{"id":"saga","url":"https://saga.tretu.de/api/health"}, …]`, optional `name`/`host` per entry; `[]` switches checks and list off. Ids `tretu-web`, `auth`, `saga`, `play`, `hollowmere`, `mc-dashboard` get their names ("Website", "Tretu-Konto", …) automatically. Read by the worker and the page: set it in `.env.local` and reload both. |
+| `TRETU_STATUS_MINECRAFT` | `mc.tretu.de:25565` | Minecraft server for the Server List Ping (`host[:port]`), `off` = no row |
+| `TRETU_STATUS_TEAMSPEAK` | – | `host:port` for a TCP check of TeamSpeak when `TS_QUERY_*` is not set |
+| `TRETU_STATUS_CERT_HOSTS` | – | extra hosts (`host[:port]`, comma-separated) whose certificates are watched, e.g. `map.tretu.de,mcp.hollowmere.tretu.de` |
+| `TRETU_STATUS_DISCORD_WEBHOOK_URL` | – | Discord webhook (`https://discord.com/api/webhooks/<id>/<token>`) for outage, recovery and certificate messages |
+| `TRETU_STATUS_NOTICE` | – | plain-text banner on `/status` |
+
+Changing any of them: edit `.env.local`, then `pm2 reload ecosystem.config.cjs --update-env`. A service that is removed
+from the list disappears from the page; its stored history ages out after 90 days.
 
 ## Fresh install
 
@@ -141,7 +191,7 @@ the SQLite file was never modified.
 | `TRETU_AUTH_ISSUER`, `TRETU_AUTH_CLIENT_ID`, `TRETU_AUTH_CLIENT_SECRET` | no | Tretu-Konto login (all three) |
 | `TRETU_DISCORD_FALLBACK` | no | keep direct Discord login when Tretu-Konto is on (default `true`) |
 | `TRETU_ADMIN_FROM_ROLES` | no | admin role from the `roles` claim (default `false`) |
-| `NEXT_PUBLIC_UMAMI_SRC`, `NEXT_PUBLIC_UMAMI_WEBSITE_ID` | no | Umami tag (build time; both required) |
+| `TRETU_STATUS_*` (targets, Minecraft, TeamSpeak, certificate hosts, Discord webhook, notice) | no | status page, see [Status page](#status-page-tretudestatus) |
 | `ORCHESTRATOR_EMBEDDED` | no | run jobs inside Next.js (default `true`; PM2 sets `false`) |
 | `SQLITE_DATABASE_PATH` | upgrade only | source file for `npm run db:migrate-sqlite` |
 | `AUTH_RATE_LIMIT` | tests only | `off` disables Better Auth's per-IP limits (e2e) |

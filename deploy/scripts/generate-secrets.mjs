@@ -33,11 +33,10 @@ export const APPS = {
   play: { host: "play.", dir: "/srv/play", db: "play", port: 3030 },
   hollowmere: { host: "hollowmere.", dir: "/srv/hollowmere", db: "nakama", port: 7350 },
   "mc-dashboard": { host: "mc.", dir: "/srv/tretu-minecraft", db: "mc_dashboard", port: 8130 },
-  umami: { host: "stats.", dir: "/srv/umami", db: "umami", port: 3050 },
 };
 
 /** Postgres roles (one per database) plus the read-only role auth uses for the legacy import. */
-export const DB_ROLES = ["tretu_web", "tretu_auth", "saga", "play", "mc_dashboard", "nakama", "umami", "tretu_legacy_reader"];
+export const DB_ROLES = ["tretu_web", "tretu_auth", "saga", "play", "mc_dashboard", "nakama", "tretu_legacy_reader"];
 
 /** Apps that sign platform calls (contract §1) and the ones that receive webhooks (convention path). */
 export const SIGNING_APPS = ["tretu-web", "auth", "saga", "play", "hollowmere", "mc-dashboard"];
@@ -67,7 +66,6 @@ export function completeSecrets(existing = {}) {
   put("auth.betterAuthSecret", () => b64url(48));
   put("saga.authSecret", () => b64url(48));
   put("play.betterAuthSecret", () => b64url(48));
-  put("umami.appSecret", () => hex(32));
   put("nakama.sessionKey", () => hex(24));
   put("nakama.refreshKey", () => hex(24));
   put("nakama.httpKey", () => hex(24));
@@ -94,7 +92,6 @@ export function urls(domain) {
     play: base("play"),
     hollowmere: base("hollowmere"),
     mc: base("mc-dashboard"),
-    stats: base("umami"),
     mcp: `https://mcp.hollowmere.${domain}`,
   };
 }
@@ -105,6 +102,19 @@ export function appsJson(domain, s) {
   return Object.fromEntries(
     SIGNING_APPS.map((app) => [app, WEBHOOK_APPS.includes(app) ? { secret: s[`app.${app}`], webhook: webhook[app] } : { secret: s[`app.${app}`] }])
   );
+}
+
+/** Health endpoints polled for tretu.de/status (contract §0; same ids and labels as src/lib/status/targets.ts). */
+export function statusTargets(domain) {
+  const u = urls(domain);
+  return [
+    { id: "tretu-web", url: `${u.web}/api/health` },
+    { id: "auth", url: `${u.auth}/api/health` },
+    { id: "saga", url: `${u.saga}/api/health` },
+    { id: "play", url: `${u.play}/api/health` },
+    { id: "hollowmere", url: `${u.hollowmere}/api/health` },
+    { id: "mc-dashboard", url: `${u.mc}/api/health` },
+  ];
 }
 
 export function oauthClientsJson(domain, s) {
@@ -170,8 +180,6 @@ function specs(domain, s) {
         ["NEXT_PUBLIC_DISCORD_SERVER_ID", "262342293250506752"],
         ["NEXT_PUBLIC_TWITCH_CHANNEL", "tretude"],
         ["NEXT_PUBLIC_TSVIEWER_ID", "1118784"],
-        ["NEXT_PUBLIC_UMAMI_SRC", `${u.stats}/script.js`],
-        ["NEXT_PUBLIC_UMAMI_WEBSITE_ID", X("website id from stats.tretu.de (after Umami setup)")],
         "# Server",
         ["YOUTUBE_CHANNEL_ID", "UCrn4oucvfow7jUNGSeE7ySg"],
         ["DATABASE_URL", { db: ["tretu_web", "tretu_web"] }],
@@ -195,6 +203,13 @@ function specs(domain, s) {
         ["WEB_PUSH_PUBLIC_KEY", G("tretu-web.vapidPublic")],
         ["WEB_PUSH_PRIVATE_KEY", G("tretu-web.vapidPrivate")],
         ["WEB_PUSH_SUBJECT", "mailto:business@tretu.de"],
+        "# Status page tretu.de/status (checks run in tretu-platform-worker, see DEPLOY.md)",
+        ["TRETU_STATUS_TARGETS_JSON", json(statusTargets(domain))],
+        ["TRETU_STATUS_MINECRAFT", `mc.${domain}:25565`],
+        ["TRETU_STATUS_TEAMSPEAK", X("optional host:port for a TCP check when TS_QUERY_* is not set (ServerQuery is used otherwise)")],
+        ["TRETU_STATUS_CERT_HOSTS", `map.${domain},mcp.hollowmere.${domain}`, "certificates to watch besides the hosts above"],
+        ["TRETU_STATUS_DISCORD_WEBHOOK_URL", X("optional: Discord webhook for outage and recovery messages")],
+        ["TRETU_STATUS_NOTICE", X("optional: maintenance note shown on /status")],
         "# Badge → Discord role / TeamSpeak group sync (off while the mappings are empty)",
         ["DISCORD_BOT_TOKEN", X("bot with Manage Roles, role above the badge roles")],
         ["DISCORD_GUILD_ID", "262342293250506752"],
@@ -247,8 +262,6 @@ function specs(domain, s) {
         ["TRETU_PLATFORM_URL", u.web],
         ["TRETU_APP_SECRET", G("app.auth")],
         ["TRETU_LEGAL_URL", u.web],
-        ["NEXT_PUBLIC_UMAMI_SRC", `${u.stats}/script.js`],
-        ["NEXT_PUBLIC_UMAMI_WEBSITE_ID", X()],
         "# Legacy import (read-only role, see deploy/scripts/create-databases.sh)",
         ["LEGACY_SAGA_DATABASE_URL", { db: ["tretu_legacy_reader", "saga"] }],
         ["LEGACY_PLAY_DATABASE_URL", { db: ["tretu_legacy_reader", "play"] }],
@@ -291,8 +304,6 @@ function specs(domain, s) {
         ["TRETU_APP_ID", "saga"],
         ["TRETU_APP_SECRET", G("app.saga")],
         ["TRETU_LEGAL_URL", u.web],
-        ["NEXT_PUBLIC_UMAMI_SRC", `${u.stats}/script.js`],
-        ["NEXT_PUBLIC_UMAMI_WEBSITE_ID", X()],
         "# Payments (prepared, off)",
         ["STRIPE_SECRET_KEY", X()],
         ["STRIPE_WEBHOOK_SECRET", X()],
@@ -336,8 +347,6 @@ function specs(domain, s) {
         ["TRETU_APP_ID", "play"],
         ["TRETU_APP_SECRET", G("app.play")],
         ["TRETU_LEGAL_URL", u.web],
-        ["NEXT_PUBLIC_UMAMI_SRC", `${u.stats}/script.js`],
-        ["NEXT_PUBLIC_UMAMI_WEBSITE_ID", X()],
       ],
     },
     hollowmere: {
@@ -370,20 +379,6 @@ function specs(domain, s) {
         ["TRETU_LEGAL_URL", u.web],
         ["TRETU_PRESENCE", "true"],
         ["TRETU_PLAYTIME_EVENTS", "true"],
-        ["NEXT_PUBLIC_UMAMI_SRC", `${u.stats}/script.js`],
-        ["NEXT_PUBLIC_UMAMI_WEBSITE_ID", X()],
-      ],
-    },
-    umami: {
-      file: "umami/.env",
-      target: `${APPS.umami.dir}/.env`,
-      doc: "deploy/README.md (Umami)",
-      lines: [
-        ["DATABASE_URL", { db: ["umami", "umami"], scheme: "postgresql" }],
-        ["APP_SECRET", G("umami.appSecret")],
-        ["DISABLE_TELEMETRY", "1"],
-        ["PORT", String(APPS.umami.port)],
-        ["HOSTNAME", "127.0.0.1"],
       ],
     },
     postgres: {
@@ -510,7 +505,6 @@ const IMPORT_SECRET_KEYS = {
   play: { BETTER_AUTH_SECRET: "play.betterAuthSecret", TRETU_APP_SECRET: "app.play", TRETU_AUTH_CLIENT_SECRET: "oauth.play", VAPID_PUBLIC_KEY: "play.vapidPublic", VAPID_PRIVATE_KEY: "play.vapidPrivate" },
   hollowmere: { NAKAMA_HTTP_KEY: "nakama.httpKey" },
   "mc-dashboard": { TRETU_APP_SECRET: "app.mc-dashboard", TRETU_AUTH_CLIENT_SECRET: "oauth.mc-dashboard" },
-  umami: { APP_SECRET: "umami.appSecret" },
 };
 const MIN_IMPORTED_SECRET = 16;
 
