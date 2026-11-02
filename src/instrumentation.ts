@@ -2,6 +2,14 @@ export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   if (process.env.NEXT_PHASE === "phase-production-build") return;
 
+  // Fail fast instead of signing sessions with the development fallback secret.
+  if (process.env.NODE_ENV === "production") {
+    const secret = process.env.BETTER_AUTH_SECRET || process.env.AUTH_SECRET || "";
+    if (secret.length < 32) {
+      throw new Error("AUTH_SECRET (or BETTER_AUTH_SECRET) must be set to at least 32 random characters in production.");
+    }
+  }
+
   const { ORCHESTRATOR_EMBEDDED } = await import("@/lib/env/server");
   if (!ORCHESTRATOR_EMBEDDED) return;
 
