@@ -227,21 +227,22 @@
   },
   "login": {
     "title": "Anmelden",
-    "intro": "Nur für Team-Leute mit Discord-Konto und den passenden Rechten. Danach kommst du ins interne Dashboard.",
-    "introTretu": "Melde dich mit deinem Tretu-Konto an – ein Konto für alle Tretu-Dienste. Das interne Dashboard sehen nur Team-Leute mit den passenden Rechten.",
+    "intro": "Melde dich mit deinem Tretu-Konto an – ein Konto für alle Tretu-Dienste. Das interne Dashboard sehen nur Team-Leute mit den passenden Rechten.",
     "withTretu": "Mit Tretu-Konto anmelden",
-    "withDiscord": "Mit Discord anmelden",
-    "withDiscordFallback": "Direkt mit Discord anmelden",
     "redirecting": "Weiterleitung…",
     "startFailed": "Die Anmeldung konnte nicht gestartet werden. Bitte versuche es erneut.",
     "sessionNote": "Es wird ein technisch notwendiges Sitzungs-Cookie gespeichert. Ohne die richtige Freigabe im Team siehst du keine internen Inhalte.",
     "tryAgain": "Bitte versuche es erneut.",
+    "notConfigured": {
+      "title": "Anmeldung nicht konfiguriert",
+      "body": "Die Anmeldung mit dem Tretu-Konto ist auf diesem Server noch nicht eingerichtet. Setze diese Umgebungsvariablen (siehe DEPLOY.md) und starte neu:"
+    },
     "errors": {
       "access_denied": "Der Zugriff wurde abgelehnt.",
-      "account_not_linked": "Zu dieser E-Mail-Adresse gibt es schon ein Konto, das noch nicht verknüpft ist. Melde dich zuerst mit deiner bisherigen Methode an.",
+      "account_not_linked": "Zu dieser E-Mail-Adresse gibt es hier schon ein Konto, das sich nicht automatisch mit deinem Tretu-Konto verknüpfen ließ. Bitte wende dich an das Tretu-Team.",
       "unable_to_link_account": "Das Konto konnte nicht verknüpft werden.",
       "account_already_linked_to_different_user": "Dieses Konto ist bereits mit einem anderen Nutzer verknüpft.",
-      "email_not_found": "Der Anbieter hat keine E-Mail-Adresse übermittelt.",
+      "email_not_found": "Das Tretu-Konto hat keine E-Mail-Adresse übermittelt.",
       "email_not_verified": "Bitte bestätige zuerst deine E-Mail-Adresse.",
       "state_mismatch": "Die Anmeldung ist abgelaufen oder wurde in einem anderen Tab gestartet.",
       "please_restart_the_process": "Die Anmeldung ist abgelaufen.",

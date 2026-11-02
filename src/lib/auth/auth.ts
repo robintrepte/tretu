@@ -6,28 +6,20 @@ import { genericOAuth } from "better-auth/plugins";
 
 import { db } from "@/db";
 import { authAccounts, authSessions, authVerifications, users } from "@/db/schema";
+import { AUTH_BASE_URL, AUTH_COOKIE_PREFIX, AUTH_SIGNING_SECRET, getTretuAuthConfig } from "@/lib/auth/config";
 import {
-  AUTH_BASE_URL,
-  AUTH_COOKIE_PREFIX,
-  AUTH_SIGNING_SECRET,
-  getLoginProviders,
-  getTretuAuthConfig,
-} from "@/lib/auth/config";
-import {
-  DISCORD_PROVIDER,
-  placeholderEmail,
-  prelinkAccount,
+  matchTretuLogin,
   syncUserAfterSignIn,
   TRETU_PROVIDER,
   tretuClaimsSchema,
+  tretuUserEmail,
 } from "@/lib/auth/sync";
 import { isUserLocked } from "@/lib/auth/tretu-account";
-import { AUTH_DISCORD_CLIENT_ID, AUTH_DISCORD_CLIENT_SECRET } from "@/lib/env/server";
 import { LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE, LOCALE_MANUAL_COOKIE } from "@/i18n/config";
 import { log } from "@/lib/observability/logger";
 
+/** The only sign-in. Missing config: production does not start (instrumentation.ts), development shows a notice. */
 const tretu = getTretuAuthConfig();
-const providers = getLoginProviders();
 
 const SESSION_DAYS = 30;
 
@@ -60,7 +52,8 @@ const options = {
     updateAge: 24 * 60 * 60,
   },
   account: {
-    accountLinking: { enabled: true, requireLocalEmailVerified: true },
+    // Existing users are matched (and linked) by matchTretuLogin before Better Auth looks; it never links by email itself.
+    accountLinking: { enabled: true, disableImplicitLinking: true, requireLocalEmailVerified: true },
   },
   // Per client IP (nginx overwrites X-Forwarded-For with the real address). In-memory: one tretu-web process.
   rateLimit: {
@@ -82,8 +75,8 @@ const options = {
   databaseHooks: {
     session: {
       create: {
-        // A locked Tretu-Konto (auth `user.updated` with `locked: true`) gets no new session, also not via the
-        // Discord fallback. Better Auth then redirects to /login?error=unable_to_create_session.
+        // A locked Tretu-Konto (auth `user.updated` with `locked: true`) gets no new session. Better Auth then
+        // redirects to /login?error=unable_to_create_session.
         async before(session) {
           const userId = Number(session.userId);
           if (Number.isInteger(userId) && (await isUserLocked(db, userId))) {
@@ -94,23 +87,17 @@ const options = {
       },
     },
   },
-  // Only social sign-in is offered; profile data is owned by Discord / the Tretu-Konto.
-  disabledPaths: ["/update-user", "/delete-user", "/change-email", "/sign-up/email", "/sign-in/email"],
+  // Only "Mit Tretu-Konto anmelden"; profile data is owned by the Tretu-Konto.
+  disabledPaths: [
+    "/update-user",
+    "/delete-user",
+    "/change-email",
+    "/sign-up/email",
+    "/sign-in/email",
+    "/link-social",
+    "/unlink-account",
+  ],
   onAPIError: { errorURL: "/login" },
-  socialProviders: providers.discord
-    ? {
-        discord: {
-          clientId: AUTH_DISCORD_CLIENT_ID,
-          clientSecret: AUTH_DISCORD_CLIENT_SECRET,
-          // Refresh display name and avatar from Discord on every login (as before).
-          overrideUserInfoOnSignIn: true,
-          async mapProfileToUser(profile) {
-            await prelinkAccount(DISCORD_PROVIDER, profile.id, profile.id);
-            return profile.email ? {} : { email: placeholderEmail(DISCORD_PROVIDER, profile.id), emailVerified: false };
-          },
-        },
-      }
-    : {},
   plugins: [
     ...(tretu
       ? [
@@ -132,13 +119,11 @@ const options = {
                   const claims = tretuClaimsSchema.safeParse(profile);
                   if (!claims.success) return {};
                   const c = claims.data;
-                  await prelinkAccount(TRETU_PROVIDER, c.sub, c.discord_id);
+                  const match = await matchTretuLogin(c);
                   return {
                     name: c.name || c.preferred_username || "Tretu",
                     image: c.picture,
-                    ...(c.email
-                      ? { email: c.email, emailVerified: c.email_verified === true }
-                      : { email: placeholderEmail(TRETU_PROVIDER, c.sub), emailVerified: false }),
+                    ...(await tretuUserEmail(c, match.userId)),
                   };
                 },
               },

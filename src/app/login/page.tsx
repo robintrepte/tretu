@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
 import { LoginButtons } from "@/components/auth/login-buttons";
-import { getLoginProviders } from "@/lib/auth/config";
+import { missingTretuAuthEnv } from "@/lib/auth/config";
 import { translatedMetadata } from "@/lib/metadata";
 
 export const dynamic = "force-dynamic";
@@ -42,7 +42,7 @@ export default async function SignInPage({
 }) {
   const { callbackUrl, error } = await searchParams;
   const t = await getTranslations("login");
-  const providers = getLoginProviders();
+  const missing = missingTretuAuthEnv();
   const target = safeCallbackUrl(callbackUrl);
   const code = error?.toLowerCase();
   const errorMessage = code
@@ -56,10 +56,23 @@ export default async function SignInPage({
       <div className="w-full max-w-md p-2 sm:p-4">
         <h1 className="text-center text-2xl font-semibold tracking-tight">{t("title")}</h1>
         <p className="mt-3 text-center text-sm text-muted-foreground leading-relaxed">
-          {providers.tretu ? t("introTretu") : t("intro")}
+          {t("intro")}
         </p>
 
-        {errorMessage ? (
+        {missing.length ? (
+          // Development only: production refuses to start without these (src/instrumentation.ts).
+          <div
+            className="mt-6 rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm leading-relaxed"
+            role="alert"
+            data-testid="login-not-configured"
+          >
+            <p className="font-semibold">{t("notConfigured.title")}</p>
+            <p className="mt-1 text-muted-foreground">{t("notConfigured.body")}</p>
+            <p className="mt-2 font-mono text-xs break-all">{missing.join(", ")}</p>
+          </div>
+        ) : null}
+
+        {errorMessage && !missing.length ? (
           <p
             className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
             role="alert"
@@ -68,10 +81,12 @@ export default async function SignInPage({
           </p>
         ) : null}
 
-        <div className="mt-6 space-y-2">
-          <LoginButtons callbackUrl={target} tretu={providers.tretu} discord={providers.discord} />
-          <p className="text-center text-xs text-muted-foreground">{t("sessionNote")}</p>
-        </div>
+        {missing.length ? null : (
+          <div className="mt-6 space-y-2">
+            <LoginButtons callbackUrl={target} />
+            <p className="text-center text-xs text-muted-foreground">{t("sessionNote")}</p>
+          </div>
+        )}
       </div>
     </div>
   );

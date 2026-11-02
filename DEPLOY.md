@@ -37,8 +37,10 @@ on [/status](#status-page-tretudestatus) as "Die Prüfungen laufen gerade nicht"
 `0002_badge_grants_steam_teamspeak` (additive) adds the badge-grant columns, `platform_ts_links.link_error` and
 `platform_users.steam_id`; migration `0003_status_page` (additive) adds the three `platform_status_*` tables.
 
-**Production safety:** `next start` refuses to start without an `AUTH_SECRET` (or `BETTER_AUTH_SECRET`) of at least
-32 characters. Security headers (CSP, HSTS, COOP, …) come from `next.config.ts`; nginx adds per-IP rate limits
+**Production safety:** `next start` refuses to start (logs `[startup] …` and exits 1, so PM2 shows it) without an
+`AUTH_SECRET` (or `BETTER_AUTH_SECRET`) of at least 32 characters, and without `TRETU_AUTH_ISSUER`,
+`TRETU_AUTH_CLIENT_ID` and `TRETU_AUTH_CLIENT_SECRET`: the Tretu-Konto is the only sign-in (see
+[Tretu-Konto login](#tretu-konto-login)). Security headers (CSP, HSTS, COOP, …) come from `next.config.ts`; nginx adds per-IP rate limits
 for `/api/auth/` and `/api/` (not for the signed `/api/v1/`, which the app limits per calling app). Logs are JSON
 lines without secrets (credential/email keys are redacted, platform errors log route patterns, not subs).
 
@@ -109,7 +111,7 @@ from the list disappears from the page; its stored history ages out after 90 day
 
    ```bash
    git clone https://github.com/robintrepte/tretu.git /srv/tretu && cd /srv/tretu
-   cp .env.example .env.local      # fill in DATABASE_URL, AUTH_SECRET, BETTER_AUTH_URL=https://tretu.de, Discord, …
+   cp .env.example .env.local      # fill in DATABASE_URL, AUTH_SECRET, BETTER_AUTH_URL=https://tretu.de, TRETU_AUTH_*, …
    chmod 600 .env.local
    npm ci
    npm run db:migrate
@@ -127,8 +129,8 @@ from the list disappears from the page; its stored history ages out after 90 day
    sudo nginx -t && sudo systemctl reload nginx
    ```
 
-4. Log in once with Discord (an ID from `DASHBOARD_ADMIN_DISCORD_IDS` becomes admin), then connect Hetzner under
-   `/dashboard/setup`.
+4. Sign in once with the Tretu-Konto (a Tretu-Konto with the `admin` role, or one whose linked Discord ID is in
+   `DASHBOARD_ADMIN_DISCORD_IDS`, becomes admin), then connect Hetzner under `/dashboard/setup`.
 
 ## Upgrade from the SQLite version (one-time, step by step)
 
@@ -144,7 +146,8 @@ This release replaces SQLite with Postgres and NextAuth with Better Auth. Plan ~
    - rename `NEXTAUTH_URL` to `BETTER_AUTH_URL=https://tretu.de` (the old name still works as a fallback)
    - keep `AUTH_SECRET` unchanged (it also decrypts the stored Hetzner/Cloudflare tokens)
    - keep `SQLITE_DATABASE_PATH` until step 6 is done, then remove it; `AUTH_TRUST_HOST` is no longer used
-   - Discord redirect URL stays `https://tretu.de/api/auth/callback/discord` – nothing to change at Discord.
+   - add `TRETU_AUTH_ISSUER`, `TRETU_AUTH_CLIENT_ID`, `TRETU_AUTH_CLIENT_SECRET` (required, see
+     [Tretu-Konto login](#tretu-konto-login)); `AUTH_DISCORD_CLIENT_*` are no longer used
 6. **Copy the data** – this applies the migrations, copies every table with its IDs, resets the sequences, links every
    Discord user to a Better Auth account row and prints a row-count table:
 
@@ -160,24 +163,55 @@ This release replaces SQLite with Postgres and NextAuth with Better Auth. Plan ~
    (`ORCHESTRATOR_EMBEDDED=false` is set for `tretu-web` by the PM2 file).
 8. **nginx** – install `deploy/nginx/tretu.de.conf` (or compare it with the existing vhost: 4 GB upload limit and
    unbuffered streaming for the dashboard), `sudo nginx -t && sudo systemctl reload nginx`.
-9. **Check** – `curl https://tretu.de/api/health` → `{"status":"ok",…}`; log in with Discord; the dashboard team list shows
-   the same members and roles as before.
+9. **Check** – `curl https://tretu.de/api/health` → `{"status":"ok",…}`; sign in with the Tretu-Konto; the dashboard team
+   list shows the same members and roles as before.
 10. **Keep the SQLite backup** for a while, then delete it (it contains personal data).
 
 What users notice: **everyone is signed out once** (NextAuth JWT cookies are not valid for Better Auth). After signing
-in again with Discord they land on their old account – same user ID, same roles – because step 6 linked their Discord ID.
+in again with the Tretu-Konto they land on their old account – same user ID, same roles – through the `legacy_ids`
+claim (auth's legacy import reads this database) or their Discord ID.
 
 Rollback: `git checkout` the previous release, restore `.env.local`, `npm ci && npm run build`, start the old processes;
 the SQLite file was never modified.
 
-## Enabling the Tretu-Konto login (later, once auth.tretu.de is live)
+## Tretu-Konto login
 
-1. At auth.tretu.de register client `tretu-web` (confidential) with redirect URI
-   `https://tretu.de/api/auth/oauth2/callback/tretu` and post-logout redirect URI `https://tretu.de/`.
-2. Set `TRETU_AUTH_ISSUER=https://auth.tretu.de`, `TRETU_AUTH_CLIENT_ID=tretu-web`, `TRETU_AUTH_CLIENT_SECRET=…`;
-   optionally `TRETU_DISCORD_FALLBACK=false` (hide direct Discord login). `TRETU_ADMIN_FROM_ROLES` is on by default (see
-   "Central Tretu admin" below).
-3. `pm2 reload ecosystem.config.cjs --update-env`. Existing users are matched by the `discord_id` claim.
+tretu.de signs people in **only** with the Tretu-Konto ("Mit Tretu-Konto anmelden", OIDC against auth.tretu.de). The
+direct Discord login is gone; there is no fallback.
+
+**Deploy order.** auth.tretu.de must be live and its legacy import (and the hand merges) done **before** this version
+of tretu.de goes live ([deploy/GO-LIVE.md](deploy/GO-LIVE.md), [auth/DEPLOY.md](auth/DEPLOY.md#legacy-import-once-before-switching-the-apps-to-tretu-login)):
+the import is what lets existing members land on their old account.
+
+1. At auth.tretu.de, client `tretu-web` (confidential) with redirect URI `https://tretu.de/api/auth/oauth2/callback/tretu`
+   and post-logout redirect URI `https://tretu.de/` (`TRETU_OAUTH_CLIENTS_JSON`, generated by
+   `deploy/scripts/generate-secrets.mjs`).
+2. `TRETU_AUTH_ISSUER=https://auth.tretu.de`, `TRETU_AUTH_CLIENT_ID=tretu-web`, `TRETU_AUTH_CLIENT_SECRET=…` in
+   `.env.local`. **Required:** in production `next start` exits with `[startup] TRETU_AUTH_… must be set` when one is
+   missing; in development `/login` shows "Anmeldung nicht konfiguriert" with the missing names.
+   `TRETU_ADMIN_FROM_ROLES` is on by default (see "Central Tretu admin" below).
+3. `pm2 reload ecosystem.config.cjs --update-env`.
+
+**Finding the existing local user** (first Tretu sign-in, `matchTretuLogin` in `src/lib/auth/sync.ts`), in this order:
+
+1. the user already linked to the `sub` (`auth_accounts` row of provider `tretu`, or `users.tretu_sub`);
+2. the user whose id is `legacy_ids["tretu-web"]` (auth's legacy import of this database);
+3. the user with the `discord_id` claim's Discord ID (`users.discord_id`);
+4. the user with the same email, verified on both sides;
+5. otherwise a new user.
+
+Steps 2–4 never take a user that is already linked to another Tretu-Konto; Better Auth's own email linking is off. A new
+user whose email another local user already holds gets a placeholder address (`tretu-<sub>@users.tretu.invalid`)
+instead of a duplicate. `tretu_sub` is stored on the match. `DASHBOARD_ADMIN_DISCORD_IDS` keeps working through the
+`discord_id` claim (the Discord account linked in "Mein Konto").
+
+**Old Discord sign-ins.** The `auth_accounts` rows of provider `discord` from the direct Discord login stay in the
+database (nothing destructive in this release; they let a rollback to the previous release sign people in as before)
+but are no longer read. Sessions that were started with Discord before the switch stay valid until they expire (30
+days); to have everyone sign in with the Tretu-Konto right away, end them at go-live:
+`delete from auth_sessions where user_id in (select id from users where tretu_sub is null);`.
+Later cleanup, once a rollback is out of the question: `delete from auth_accounts where provider_id = 'discord';`
+(`users.discord_id` stays: Discord badge roles, `DASHBOARD_ADMIN_DISCORD_IDS` and step 3 above use it).
 
 ## Central Tretu admin
 
@@ -198,7 +232,7 @@ and removed again when the claim disappears. Roles granted here (team panel, `DA
 Admin rows that existed before migration `0004_central_admin` count as local.
 
 **Locked Tretu-Konten.** auth's `user.updated` with `locked: true` (or a lock done in the hub) ends the user's tretu.de
-sessions and refuses new ones (also via the Discord fallback) until unlocked or `lockedUntil` has passed.
+sessions and refuses new ones until unlocked or `lockedUntil` has passed.
 
 **How it talks to auth.** Every account read and mutation goes to auth.tretu.de's admin API, signed as `tretu-web`
 (`TRETU_AUTH_ISSUER` + `TRETU_APP_SECRET`, which auth must know as `TRETU_APPS_JSON["tretu-web"].secret`; auth answers
@@ -230,10 +264,8 @@ mapped badge (forced sync jobs). Migration `0004_central_admin` (additive) adds 
 | `DATABASE_POOL_MAX` | no | connections per process (default 10) |
 | `AUTH_SECRET` / `BETTER_AUTH_SECRET` | yes (32+ chars in production) | signs sessions; `AUTH_SECRET` also encrypts dashboard secrets |
 | `BETTER_AUTH_URL` | yes (prod) | public base URL, e.g. `https://tretu.de` (`NEXTAUTH_URL` is read as fallback) |
-| `AUTH_DISCORD_CLIENT_ID`, `AUTH_DISCORD_CLIENT_SECRET` | yes | Discord login |
-| `DASHBOARD_ADMIN_DISCORD_IDS` | no | Discord IDs that get the admin role on login |
-| `TRETU_AUTH_ISSUER`, `TRETU_AUTH_CLIENT_ID`, `TRETU_AUTH_CLIENT_SECRET` | no | Tretu-Konto login (all three) |
-| `TRETU_DISCORD_FALLBACK` | no | keep direct Discord login when Tretu-Konto is on (default `true`) |
+| `TRETU_AUTH_ISSUER`, `TRETU_AUTH_CLIENT_ID`, `TRETU_AUTH_CLIENT_SECRET` | **yes** | Tretu-Konto login, the only sign-in (production does not start without all three) |
+| `DASHBOARD_ADMIN_DISCORD_IDS` | no | Discord IDs that get the admin role on login (through the Tretu-Konto's `discord_id` claim) |
 | `TRETU_ADMIN_FROM_ROLES` | no | the Tretu `admin` role grants the local admin role and the central admin (default `true`; `false` = only local grants) |
 | `TRETU_ADMIN_RATE_LIMIT_PER_MIN`, `TRETU_ADMIN_RATE_LIMIT_BURST` | no | central admin mutations per admin (default 30/min, burst 10) |
 | `TRETU_STATUS_*` (targets, Minecraft, TeamSpeak, certificate hosts, Discord webhook, notice) | no | status page, see [Status page](#status-page-tretudestatus) |

@@ -10,9 +10,6 @@ export const DATABASE_URL =
   process.env.DATABASE_URL ?? "postgres://postgres@localhost:5432/tretu_web";
 
 export const AUTH_SECRET = process.env.AUTH_SECRET ?? "dev-only-change-me";
-export const AUTH_DISCORD_CLIENT_ID = process.env.AUTH_DISCORD_CLIENT_ID ?? "";
-export const AUTH_DISCORD_CLIENT_SECRET =
-  process.env.AUTH_DISCORD_CLIENT_SECRET ?? "";
 export const CURSEFORGE_API_KEY = process.env.CURSEFORGE_API_KEY ?? "";
 
 /**

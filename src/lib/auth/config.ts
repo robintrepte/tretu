@@ -1,15 +1,12 @@
 /**
- * Auth configuration from env (server-only). Every Tretu-Konto integration is off unless
- * `TRETU_AUTH_ISSUER`, `TRETU_AUTH_CLIENT_ID` and `TRETU_AUTH_CLIENT_SECRET` are set.
+ * Auth configuration from env (server-only). tretu.de signs people in only with the Tretu-Konto
+ * (auth.tretu.de): `TRETU_AUTH_ISSUER`, `TRETU_AUTH_CLIENT_ID` and `TRETU_AUTH_CLIENT_SECRET` are required.
+ * Production refuses to start without them (src/instrumentation.ts); development shows "Anmeldung nicht
+ * konfiguriert" on /login.
  */
 import { adminFromRolesEnabled } from "@/lib/auth/tretu-account";
-import { AUTH_DISCORD_CLIENT_ID, AUTH_DISCORD_CLIENT_SECRET, AUTH_SECRET } from "@/lib/env/server";
+import { AUTH_SECRET } from "@/lib/env/server";
 import { SITE_URL } from "@/lib/env";
-
-function flag(value: string | undefined, fallback: boolean): boolean {
-  if (value === undefined || value.trim() === "") return fallback;
-  return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
-}
 
 function stripTrailingSlash(url: string): string {
   return url.replace(/\/+$/, "");
@@ -59,19 +56,24 @@ export function getTretuAuthConfig(): TretuAuthConfig | null {
 /** Public path auth.tretu.de redirects back to (Next.js forwards it to Better Auth's `/callback/tretu`). */
 export const TRETU_CALLBACK_PATH = "/api/auth/oauth2/callback/tretu";
 
-export type LoginProviders = {
-  tretu: boolean;
-  discord: boolean;
-  accountUrl: string | null;
-};
+/** The env vars the Tretu-Konto sign-in needs (all required). */
+export const TRETU_AUTH_ENV = ["TRETU_AUTH_ISSUER", "TRETU_AUTH_CLIENT_ID", "TRETU_AUTH_CLIENT_SECRET"] as const;
+
+/** Which of {@link TRETU_AUTH_ENV} are missing or empty (empty list = sign-in configured). */
+export function missingTretuAuthEnv(env: Record<string, string | undefined> = process.env): string[] {
+  return TRETU_AUTH_ENV.filter((key) => !env[key]?.trim());
+}
 
 /**
- * Which sign-in buttons exist. Without the Tretu provider, Discord is the only (and primary) login.
- * With it, Discord is a fallback unless `TRETU_DISCORD_FALLBACK=false`.
+ * Startup check of the production server: without the Tretu-Konto nobody could sign in, so refuse to start
+ * with a clear message instead of serving a site whose login is broken.
  */
-export function getLoginProviders(): LoginProviders {
-  const tretu = getTretuAuthConfig();
-  const discordConfigured = Boolean(AUTH_DISCORD_CLIENT_ID && AUTH_DISCORD_CLIENT_SECRET);
-  const discord = tretu ? discordConfigured && flag(process.env.TRETU_DISCORD_FALLBACK, true) : true;
-  return { tretu: Boolean(tretu), discord, accountUrl: tretu?.accountUrl ?? null };
+export function assertTretuAuthConfigured(env: Record<string, string | undefined> = process.env): void {
+  const missing = missingTretuAuthEnv(env);
+  if (missing.length) {
+    throw new Error(
+      `${missing.join(", ")} must be set: tretu.de signs people in only with the Tretu-Konto (auth.tretu.de). ` +
+        "See DEPLOY.md, \"Tretu-Konto\"."
+    );
+  }
 }

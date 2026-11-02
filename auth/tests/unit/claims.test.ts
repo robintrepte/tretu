@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { buildClaims, isPlaceholderEmail, placeholderEmail, type ClaimSource } from "@/lib/oidc/claims"
+import { buildClaims, isPlaceholderEmail, legacyIdsFromLinks, placeholderEmail, TRETU_CLAIMS, type ClaimSource, type LegacyLinkRow } from "@/lib/oidc/claims"
 
 const user: ClaimSource = {
   id: "7d1c0d2e-7a4b-4c55-9a3e-1b2c3d4e5f60",
@@ -54,5 +54,47 @@ describe("claim mapping", () => {
 
   it("returns nothing for openid only", () => {
     expect(buildClaims(user, links, ["openid"])).toEqual({})
+  })
+
+  it("adds legacy_ids with the tretu scope, only for apps with a link", () => {
+    const legacy = { saga: "42", hollowmere: "5f0c3b8e-1d2a-4c6b-9e7f-0a1b2c3d4e5f" }
+    expect(buildClaims(user, {}, ["openid", "tretu"], legacy)).toEqual({ roles: ["admin"], legacy_ids: legacy })
+    expect(buildClaims(user, {}, ["openid", "tretu"], { play: "", "tretu-web": "7" })).toEqual({ roles: ["admin"], legacy_ids: { "tretu-web": "7" } })
+  })
+
+  it("leaves legacy_ids out without links or without the tretu scope", () => {
+    expect(buildClaims(user, {}, ["openid", "tretu"], {})).toEqual({ roles: ["admin"] })
+    expect(buildClaims(user, {}, ["openid", "tretu"])).not.toHaveProperty("legacy_ids")
+    expect(buildClaims(user, links, ["openid", "profile", "email"], { saga: "42" })).not.toHaveProperty("legacy_ids")
+    expect(TRETU_CLAIMS).toContain("legacy_ids")
+  })
+})
+
+describe("legacy_ids from legacy_link rows", () => {
+  const at = (day: number) => new Date(Date.UTC(2026, 0, day))
+  const row = (app: string, legacyUserId: string, method = "import", day = 1): LegacyLinkRow => ({ app, legacyUserId, method, importedAt: at(day) })
+
+  it("maps every app to its old user id as a string", () => {
+    expect(
+      legacyIdsFromLinks([row("saga", "12"), row("play", "cuid_abc"), row("hollowmere", "5f0c3b8e-1d2a-4c6b-9e7f-0a1b2c3d4e5f"), row("tretu-web", "7")]),
+    ).toEqual({ saga: "12", play: "cuid_abc", hollowmere: "5f0c3b8e-1d2a-4c6b-9e7f-0a1b2c3d4e5f", "tretu-web": "7" })
+  })
+
+  it("is empty without links and ignores unknown apps and empty ids", () => {
+    expect(legacyIdsFromLinks([])).toEqual({})
+    expect(legacyIdsFromLinks([row("mc-dashboard", "1"), row("saga", "")])).toEqual({})
+  })
+
+  it("keeps the account's own old account when a merge brought a second one of the same app", () => {
+    // After `admin merge`, the survivor holds its own import and the moved link (method `admin`).
+    expect(legacyIdsFromLinks([row("saga", "99", "admin", 1), row("saga", "12", "import", 5)])).toEqual({ saga: "12" })
+    // Import merges rank before admin merges; then the oldest import; then the smallest id.
+    expect(legacyIdsFromLinks([row("play", "b", "admin", 1), row("play", "a", "merge", 9)])).toEqual({ play: "a" })
+    expect(legacyIdsFromLinks([row("play", "new", "merge", 9), row("play", "old", "merge", 2)])).toEqual({ play: "old" })
+    expect(legacyIdsFromLinks([row("play", "y", "merge", 2), row("play", "x", "merge", 2)])).toEqual({ play: "x" })
+  })
+
+  it("takes a moved link when the survivor had none of that app", () => {
+    expect(legacyIdsFromLinks([row("saga", "12"), row("hollowmere", "nakama-1", "admin")])).toEqual({ saga: "12", hollowmere: "nakama-1" })
   })
 })

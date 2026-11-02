@@ -16,8 +16,10 @@ Every step says how to check it and how to roll it back. Each app's own deploy d
 
 Tools used below (all in this repo, all tested in CI): `deploy/scripts/generate-secrets.mjs`,
 `create-databases.sh`, `smoke.sh`, `check-nginx.sh`, `pg-backup.sh`, `pg-restore-test.sh`. Run them from the
-tretu checkout (`/srv/tretu`). **Every integration stays off until its env is set**, so each app can be switched
-on and back off on its own.
+tretu checkout (`/srv/tretu`). **Every app signs people in only with the Tretu-Konto** (auth.tretu.de): its
+`TRETU_AUTH_*` settings are required (tretu.de does not start without them), and auth.tretu.de plus the legacy import
+(7.2, 7.4) must be done **before** any app's Tretu-only version is opened to members (7.5). Optional integrations
+(push, badge sync, status alerts, …) stay off until their env is set.
 
 Conventions: `$IP` / `$IP6` = the server's addresses; commands as root unless `sudo -u postgres` is shown; each
 app runs as its own Unix user or the deploy user that owns `/srv/<repo>`.
@@ -27,8 +29,9 @@ app runs as its own Unix user or the deploy user that owns `/srv/<repo>`.
 ## 0. One day before
 
 1. Lower the TTL of the existing DNS records to 300 s.
-2. Announce a maintenance window (Saga and Play sign everyone out once only if their session secret changes; step 3
-   keeps it).
+2. Announce a maintenance window from step 7.1 until 7.5 is through: sign-ins switch to the Tretu-Konto, and
+   members must not sign in to an app before the legacy import (7.4) has linked their old accounts. (Saga and Play
+   sign everyone out once only if their session secret changes; step 3 keeps it.)
 3. Back up what runs today: `pg_dump -Fc` of the existing Saga, Play and Nakama databases and tretu.de's data
    (SQLite file if not yet migrated, see [DEPLOY.md](../DEPLOY.md) "Upgrade from the SQLite version"), plus every
    current `.env`. Keep them off the server.
@@ -86,13 +89,27 @@ node deploy/scripts/generate-secrets.mjs --out /root/tretu-secrets \
 - Writes `/root/tretu-secrets/` (mode 700, files 600): `tretu-web/.env.local`, `tretu-auth/.env`, `saga/.env`,
   `play/.env`, `hollowmere/server.env` + `hollowmere/local.yml`, `mc-dashboard/.env`,
   `postgres/roles.env` and the state file `tretu-secrets.json`. Nothing secret is printed.
-- Templates of all of them: [deploy/env/](env/). Values marked `external` (Discord/Google/Apple OAuth apps, SES, OpenAI,
-  Replicate, ElevenLabs, TMDB, TeamSpeak ServerQuery, Discord bot, status Discord webhook) are filled in by hand now.
+- Templates of all of them: [deploy/env/](env/). Values marked `external` (auth's Discord/Google/Apple OAuth apps, SES,
+  OpenAI, Replicate, ElevenLabs, TMDB, TeamSpeak ServerQuery, Discord bots, status Discord webhook) are filled in by
+  hand now. The apps have no Discord/Google OAuth apps of their own any more: those sign-ins live in auth.tretu.de.
+- Settings of the removed app logins (`TRETU_DISCORD_FALLBACK`, `TRETU_LOCAL_LOGIN`, `TRETU_CODE_LOGIN`,
+  `TRETU_SKIP_INVITE_FOR_TRETU`, the apps' `AUTH_DISCORD_*` / `DISCORD_CLIENT_*` / `GOOGLE_CLIENT_*`) are dropped from
+  imported env files; the generated file names them in a comment at the end.
 - **tretu-web:** keep the existing `AUTH_SECRET` (imported): it also decrypts the stored Hetzner/Cloudflare tokens.
 - Running it again is safe (same files, only missing values are added). `--fresh` would rotate everything.
 - Store `/root/tretu-secrets/tretu-secrets.json` in the password manager.
 
-Check: `ls -la /root/tretu-secrets/*/` (all `-rw-------`), `grep -c = /root/tretu-secrets/tretu-auth/.env`.
+Check: `ls -la /root/tretu-secrets/*/` (all `-rw-------`), `grep -c = /root/tretu-secrets/tretu-auth/.env`, and every
+app has its Tretu-Konto settings (no output = good):
+
+```bash
+cd /root/tretu-secrets
+for f in tretu-web/.env.local saga/.env play/.env mc-dashboard/.env; do
+  for k in TRETU_AUTH_ISSUER TRETU_AUTH_CLIENT_ID TRETU_AUTH_CLIENT_SECRET; do grep -q "^$k=." "$f" || echo "MISSING $k in $f"; done
+done
+grep -q '"TRETU_AUTH_ISSUER=https://auth\.' hollowmere/local.yml || echo "MISSING TRETU_AUTH_ISSUER in hollowmere/local.yml"
+grep -E '^(TRETU_DISCORD_FALLBACK|TRETU_LOCAL_LOGIN|TRETU_CODE_LOGIN|TRETU_SKIP_INVITE_FOR_TRETU)=' */.env* && echo "REMOVED SETTING LEFT"
+```
 
 **Rollback:** delete `/root/tretu-secrets`; no app uses the files before its own step.
 
@@ -165,10 +182,22 @@ Each app: install its env file from `/root/tretu-secrets` (`install -m 600 -o <u
 deploy doc (`git pull` → `npm ci` → migrate → `npm run build` → `pm2 start|reload ecosystem.config.cjs --update-env`).
 Keep the previous env file as `<file>.before-tretu` for the rollback.
 
-### 7.1 tretu.de (hub + platform API) – first: auth sends its events here
+Before installing an app's env file (here and in 7.5), check its Tretu-Konto settings on the target path (no output =
+good):
 
-In the generated `.env.local`, leave `TRETU_AUTH_CLIENT_SECRET=` **empty** for now (the Tretu-Konto login turns on in
-7.5); the platform (`TRETU_APPS_JSON`, `TRETU_AUTH_ISSUER` for user fetches) is on.
+```bash
+for f in /srv/tretu/.env.local /srv/saga/.env /srv/play/.env /srv/tretu-minecraft/dashboard/.env; do
+  [ -f "$f" ] || continue
+  for k in TRETU_AUTH_ISSUER TRETU_AUTH_CLIENT_ID TRETU_AUTH_CLIENT_SECRET; do grep -q "^$k=." "$f" || echo "MISSING $k in $f"; done
+done
+```
+
+### 7.1 tretu.de (hub + platform API) – first: auth sends its events here, the import reads its database
+
+The generated `.env.local` has all three `TRETU_AUTH_*` (required: `next start` exits without them). tretu.de's
+sign-in ("Mit Tretu-Konto anmelden", the only one) works as soon as auth runs (7.2), but stays **closed to members
+until the import (7.4) is done** (maintenance window, step 0): the import is what brings members back to their old
+tretu.de account. Only the operator signs in before that, with a fresh test account.
 
 ```bash
 cd /srv/tretu && npm ci && systemctl start tretu-pg-backup && npm run db:migrate && npm run build
@@ -237,12 +266,14 @@ npm run admin -- merge <from> <into> --yes    # merge; the platform moves wallet
 
 ### 7.5 Switch the apps on, one at a time
 
-Order: **tretu.de login → Saga → Play → Minecraft dashboard → Hollowmere**. For each: backup, install the env file,
-deploy per its doc, smoke, sign in with a test Tretu-Konto and with an old local account, then the next one.
+Only after 7.2 and 7.4 are complete. Order: **tretu.de login → Saga → Play → Minecraft dashboard → Hollowmere**. For
+each: backup, check `TRETU_AUTH_*` (7, above), install the env file, deploy its Tretu-only version per its doc, smoke,
+sign in with a test Tretu-Konto and with an old local account (it must land on the old account through the
+`legacy_ids` claim), then the next one.
 
 | App | Switch on | Check | Rollback |
 |---|---|---|---|
-| tretu.de | set `TRETU_AUTH_CLIENT_SECRET` (from the generated file), `npm run build`, `pm2 reload ecosystem.config.cjs --update-env` | "Mit Tretu-Konto anmelden" works; Discord login still works | empty `TRETU_AUTH_CLIENT_SECRET`, reload |
+| tretu.de | already deployed in 7.1: open it to members (end of the maintenance window) | "Mit Tretu-Konto anmelden" is the only button; an old member lands on their old account (same roles); `select count(*) from users where tretu_sub is not null` grows | previous release + `.env.local.before-tretu` (7.1 rollback); the old Discord accounts are still in the database |
 | Saga | `/root/tretu-secrets/saga/.env` → `/srv/saga/.env`, deploy ([DEPLOY.md](https://github.com/robintrepte/adventure.ai/blob/main/DEPLOY.md)) | `smoke.sh --only saga`, Tretu login, a turn shows XP on tretu.de | `.env.before-tretu`, `pm2 reload saga --update-env` |
 | Play | `play/.env` → `/srv/play/.env`, deploy ([DEPLOY.md](https://github.com/robintrepte/play/blob/main/DEPLOY.md)) | `smoke.sh --only play`, a finished game shows up in the profile | same for `play` |
 | Minecraft dashboard | `mc-dashboard/.env` → `/srv/tretu-minecraft/dashboard/.env`, `npm ci --omit=dev && npm run migrate`, reload ([README](https://github.com/robintrepte/tretu-minecraft/blob/main/README.md)) | `smoke.sh --only mc`, Tretu login, "Minecraft verknüpfen" | same for `mc-dashboard` |
@@ -271,7 +302,8 @@ to switch off without removing, remove `DISCORD_BOT_TOKEN` instead).
 ## 9. Afterwards
 
 - Raise the DNS TTL again.
-- `TRETU_LOCAL_LOGIN=false` / `TRETU_DISCORD_FALLBACK=false` / `TRETU_CODE_LOGIN=false` once everyone has linked a
-  Tretu-Konto (each app's doc).
+- Later, once a rollback is out of the question: clean up the data of the removed app logins (kept by this release,
+  nothing was dropped). tretu.de: `delete from auth_accounts where provider_id = 'discord';`
+  ([DEPLOY.md](../DEPLOY.md#tretu-konto-login)); the other apps: their DEPLOY docs.
 - Keep `/root/tretu-secrets` only as long as needed; the password manager holds `tretu-secrets.json`.
 - GitHub Actions must be enabled for every repository (Settings → Actions → General) so CI runs on pull requests.

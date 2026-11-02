@@ -15,8 +15,11 @@
  * - `--import <app>=<env file>` takes the values of an app's current env file (existing secrets such as a
  *   running app's session secret, API keys, OAuth credentials); keys the template does not know are kept at
  *   the end of the file. Imported secrets win over generated ones and flow into the shared JSON configs.
- * - Values from outside (Discord/Google/Apple OAuth apps, SES, OpenAI, …) stay empty unless imported:
- *   fill them in afterwards. Every integration stays off while its values are empty.
+ * - Values from outside (auth's Discord/Google/Apple OAuth apps, SES, OpenAI, …) stay empty unless imported:
+ *   fill them in afterwards. Every optional integration stays off while its values are empty; the Tretu-Konto
+ *   settings (TRETU_AUTH_*) are always filled, as every app signs people in only with it.
+ * - Variables of the removed app logins (TRETU_DISCORD_FALLBACK, TRETU_LOCAL_LOGIN, TRETU_CODE_LOGIN,
+ *   TRETU_SKIP_INVITE_FOR_TRETU, the apps' own Discord/Google OAuth clients) are dropped, also from imports.
  */
 import { createECDH, randomBytes } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -185,15 +188,12 @@ function specs(domain, s) {
         ["DATABASE_URL", { db: ["tretu_web", "tretu_web"] }],
         ["AUTH_SECRET", G("tretu-web.authSecret"), "signs sessions and encrypts dashboard secrets: import the existing one on an upgrade"],
         ["BETTER_AUTH_URL", u.web],
-        ["AUTH_DISCORD_CLIENT_ID", X("Discord OAuth app, redirect <BETTER_AUTH_URL>/api/auth/callback/discord")],
-        ["AUTH_DISCORD_CLIENT_SECRET", X()],
-        ["DASHBOARD_ADMIN_DISCORD_IDS", X("comma-separated Discord user ids")],
+        ["DASHBOARD_ADMIN_DISCORD_IDS", X("comma-separated Discord user ids (matched through the Tretu-Konto's discord_id claim)")],
         ["HETZNER_DEFAULT_SERVER_IMAGE", "ubuntu-24.04"],
-        "# Tretu-Konto login (contract §2)",
+        "# Tretu-Konto login (contract §2): the only sign-in, required (production does not start without it)",
         ["TRETU_AUTH_ISSUER", u.auth],
         ["TRETU_AUTH_CLIENT_ID", "tretu-web"],
         ["TRETU_AUTH_CLIENT_SECRET", G("oauth.tretu-web")],
-        ["TRETU_DISCORD_FALLBACK", "true"],
         ["TRETU_ADMIN_FROM_ROLES", "true"],
         "# Platform (contract §3–§5)",
         ["TRETU_APPS_JSON", json(appsJson(domain, s))],
@@ -282,24 +282,18 @@ function specs(domain, s) {
         ["OPENAI_API_KEY", X()],
         ["REPLICATE_API_TOKEN", X()],
         ["ELEVENLABS_API_KEY", X()],
-        "# Optional sign-in providers and Discord bot",
-        ["DISCORD_CLIENT_ID", X()],
-        ["DISCORD_CLIENT_SECRET", X()],
+        "# Discord bot (optional: campaigns played in a Discord channel)",
         ["DISCORD_BOT_TOKEN", X()],
-        ["GOOGLE_CLIENT_ID", X()],
-        ["GOOGLE_CLIENT_SECRET", X()],
         "# Email (Amazon SES)",
         ["SES_REGION", X()],
         ["AWS_ACCESS_KEY_ID", X()],
         ["AWS_SECRET_ACCESS_KEY", X()],
         ["MAIL_FROM", `Saga <noreply@${domain}>`],
         ["SES_CONFIGURATION_SET", X()],
-        "# Tretu ecosystem",
+        "# Tretu ecosystem (the Tretu-Konto is the only sign-in: required)",
         ["TRETU_AUTH_ISSUER", u.auth],
         ["TRETU_AUTH_CLIENT_ID", "saga"],
         ["TRETU_AUTH_CLIENT_SECRET", G("oauth.saga")],
-        ["TRETU_LOCAL_LOGIN", "true"],
-        ["TRETU_SKIP_INVITE_FOR_TRETU", "true"],
         ["TRETU_PLATFORM_URL", u.web],
         ["TRETU_APP_ID", "saga"],
         ["TRETU_APP_SECRET", G("app.saga")],
@@ -322,11 +316,6 @@ function specs(domain, s) {
         ["BETTER_AUTH_SECRET", G("play.betterAuthSecret"), "import the existing one: a new value signs everyone out"],
         ["PORT", String(APPS.play.port)],
         ["TRUST_PROXY", "true"],
-        "# Optional social sign-in",
-        ["GOOGLE_CLIENT_ID", X()],
-        ["GOOGLE_CLIENT_SECRET", X()],
-        ["DISCORD_CLIENT_ID", X()],
-        ["DISCORD_CLIENT_SECRET", X()],
         "# Email (Amazon SES)",
         ["SES_REGION", X()],
         ["EMAIL_FROM", `Tretu Play <play@${domain}>`],
@@ -338,11 +327,10 @@ function specs(domain, s) {
         ["VAPID_PRIVATE_KEY", G("play.vapidPrivate")],
         ["VAPID_SUBJECT", `mailto:play@${domain}`],
         ["TMDB_API_KEY", X()],
-        "# Tretu ecosystem",
+        "# Tretu ecosystem (the Tretu-Konto is the only sign-in: required)",
         ["TRETU_AUTH_ISSUER", u.auth],
         ["TRETU_AUTH_CLIENT_ID", "play"],
         ["TRETU_AUTH_CLIENT_SECRET", G("oauth.play")],
-        ["TRETU_LOCAL_LOGIN", "true"],
         ["TRETU_PLATFORM_URL", u.web],
         ["TRETU_APP_ID", "play"],
         ["TRETU_APP_SECRET", G("app.play")],
@@ -367,11 +355,10 @@ function specs(domain, s) {
       lines: [
         ["DATABASE_URL", { db: ["mc_dashboard", "mc_dashboard"], host: "127.0.0.1" }],
         ["PUBLIC_URL", u.mc],
-        "# Tretu-Konto (confidential client mc-dashboard)",
+        "# Tretu-Konto (confidential client mc-dashboard): the only sign-in, required",
         ["TRETU_AUTH_ISSUER", u.auth],
         ["TRETU_AUTH_CLIENT_ID", "mc-dashboard"],
         ["TRETU_AUTH_CLIENT_SECRET", G("oauth.mc-dashboard")],
-        ["TRETU_CODE_LOGIN", "true"],
         "# Signed server-to-server requests",
         ["TRETU_APP_ID", "mc-dashboard"],
         ["TRETU_APP_SECRET", G("app.mc-dashboard")],
@@ -435,6 +422,17 @@ function resolve(value, s, mode) {
   throw new Error("unknown value");
 }
 
+/**
+ * Settings of the sign-in methods the apps no longer have (every app signs in only with the Tretu-Konto):
+ * dropped from imported env files instead of being kept at the end.
+ */
+export const REMOVED_KEYS = {
+  "tretu-web": ["AUTH_DISCORD_CLIENT_ID", "AUTH_DISCORD_CLIENT_SECRET", "TRETU_DISCORD_FALLBACK"],
+  saga: ["DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "TRETU_LOCAL_LOGIN", "TRETU_SKIP_INVITE_FOR_TRETU"],
+  play: ["DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "TRETU_LOCAL_LOGIN"],
+  "mc-dashboard": ["TRETU_CODE_LOGIN"],
+};
+
 function renderEnv(name, spec, s, mode, imported = {}) {
   const header = [
     `# ${name}: generated by deploy/scripts/generate-secrets.mjs${mode === "template" ? " (template, no secrets)" : ""}`,
@@ -458,10 +456,15 @@ function renderEnv(name, spec, s, mode, imported = {}) {
     const final = importedValue !== undefined && importedValue !== "" && !(typeof value === "object" && (value.json || value.secret || value.db)) ? importedValue : generated;
     lines.push(`${key}=${quote(final)}`);
   }
-  const extra = Object.keys(imported).filter((k) => !known.has(k));
+  const removed = new Set(REMOVED_KEYS[name] ?? []);
+  const extra = Object.keys(imported).filter((k) => !known.has(k) && !removed.has(k));
+  const dropped = Object.keys(imported).filter((k) => !known.has(k) && removed.has(k));
   if (mode !== "template" && extra.length) {
     lines.push("", "# Kept from the imported env file (not part of the template)");
     for (const key of extra) lines.push(`${key}=${quote(imported[key])}`);
+  }
+  if (mode !== "template" && dropped.length) {
+    lines.push("", `# Dropped from the imported env file (sign-in methods removed, Tretu-Konto only): ${dropped.join(", ")}`);
   }
   return `${lines.join("\n")}\n`;
 }
@@ -491,9 +494,6 @@ console:
   # Nakama console (127.0.0.1:7351 only, reach it through an SSH tunnel).
   username: "admin"
   password: "${v("nakama.consolePassword")}"
-social:
-  apple:
-    bundle_id: "com.hollowmere.unset"
 `;
 }
 

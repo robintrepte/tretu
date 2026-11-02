@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getLoginProviders } from "@/lib/auth/config";
+import { getTretuAuthConfig } from "@/lib/auth/config";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/permissions/checks";
 
@@ -15,7 +15,7 @@ export async function GET() {
       allowed,
       authenticated: Boolean(user),
       user: user ? { name: user.name, image: user.image } : null,
-      accountUrl: getLoginProviders().accountUrl,
+      accountUrl: getTretuAuthConfig()?.accountUrl ?? null,
     },
     { headers: { "Cache-Control": "no-store" } }
   );

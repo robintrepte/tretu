@@ -79,7 +79,8 @@ export function DatenschutzEn() {
             on it.
           </li>
           <li>
-            One Tretu account signs you in to all services. Each service only receives the details it needs to work.
+            Your Tretu account signs you in to all services – the services have no other sign-in any more (guest access in Play
+            and Hollowmere stays). Each service only receives the details it needs to work.
           </li>
           <li>
             Some features use external providers, such as AI services in Saga, Stripe for payments or Amazon SES for system emails.
@@ -178,7 +179,7 @@ export function DatenschutzEn() {
             ],
             [
               "Short-lived sign-in cookies",
-              "Protect the sign-in via the Tretu account, Discord, Google or Apple against forgery (CSRF, PKCE).",
+              "Protect the sign-in with the Tretu account (and, at the Tretu account, via Discord, Google, Apple or Steam) against forgery (CSRF, PKCE).",
               "a few minutes",
             ],
             ["NEXT_LOCALE, NEXT_LOCALE_MANUAL", "Remember the chosen language.", "1 year"],
@@ -227,23 +228,39 @@ export function DatenschutzEn() {
         </Sub>
         <Sub title="Signing in to our services">
           <P>
-            When you choose “Sign in with your Tretu account” in a Tretu service, the Tretu account transmits to that service (e.g.
-            Saga or Play) via OpenID Connect your Tretu ID, username, display name, profile picture, email address with its
-            verification status, language, roles and the IDs of linked accounts. The service uses them to match you with an
-            existing account (via the Tretu ID, the Discord ID or a verified email address) or creates a new one. We pass changes to
-            your Tretu account (e.g. name, language or deletion) on to the services so that they stay up to date or also delete or
-            anonymise your data.
+            All Tretu services ({SERVICES.hub}, Saga, Tretu Play, Hollowmere and the Minecraft dashboard) sign you in only via
+            “Sign in with your Tretu account”; the services no longer have their own passwords or sign-in via Discord, Google or
+            Apple. When you sign in, the Tretu account transmits to the service via OpenID Connect your Tretu ID, username, display
+            name, profile picture, email address with its verification status, language, roles, the IDs of linked accounts and –
+            if there is one – the ID of your previous account with that service (see below). The service uses them to match you
+            with an existing account in this order: via the Tretu ID, via the ID of your previous account, via the Discord ID or via
+            an email address verified on both sides; an account already connected to another Tretu account is never matched.
+            Otherwise it creates a new one. We pass changes to your Tretu account (e.g. name, language or deletion) on to the
+            services so that they stay up to date or also delete or anonymise your data.
+          </P>
+          <P>
+            Takeover of the previous accounts: accounts you previously had directly with a service were taken over into the Tretu
+            account once (username, display name, email address, password hash and linked Discord, Google, Apple or Steam
+            identifiers). We store which previous account (service and its account ID; for Hollowmere the game server’s ID) belongs
+            to which Tretu account. If two Tretu accounts of the same person are merged, these links move to the remaining account.
+            The services receive the link when you sign in, so that you find your previous account with its progress, content and
+            credits. Data of the former sign-ins in the services (such as password hashes and links to Discord, Google or Apple) is
+            kept by the services for now but no longer used, and deleted once it is no longer needed for a possible return to the
+            previous version. The legal basis is Art. 6(1)(b) GDPR (continuing your contract of use) or Art. 6(1)(f) GDPR
+            (continuing the existing accounts without data loss).
           </P>
           <P>
             The legal basis is the performance of the contract of use (Art. 6(1)(b) GDPR); we process security data to prevent
             abuse (Art. 6(1)(f) GDPR).
           </P>
         </Sub>
-        <Sub title="Signing in with Discord, Google or Apple">
+        <Sub title="Signing in to the Tretu account with Discord, Google, Apple or Steam">
           <P>
-            Where we offer sign-in via Discord (Discord Inc., 444 De Haro Street, Suite 200, San Francisco, CA 94107, USA), Google
-            (Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Ireland) or Apple (Apple Distribution International Ltd.,
-            Hollyhill Industrial Estate, Hollyhill, Cork, Ireland) and you choose it, you are redirected to that provider. We receive
+            At the Tretu account ({SERVICES.auth}) – and only there – you can sign in instead of with a password or passkey via
+            Discord (Discord Inc., 444 De Haro Street, Suite 200, San Francisco, CA 94107, USA), Google (Google Ireland Limited,
+            Gordon House, Barrow Street, Dublin 4, Ireland), Apple (Apple Distribution International Ltd., Hollyhill Industrial
+            Estate, Hollyhill, Cork, Ireland) or Steam (Valve Corporation, P.O. Box 1688, Bellevue, WA 98009, USA). If you choose a
+            provider, you are redirected to it. We receive
             an account identifier, your name and, where applicable, your email address and profile picture, and use this data only
             to sign you in and display your profile. We do not post anything on your behalf. The provider’s privacy terms apply to
             the processing by the provider; this may involve a transfer to the USA. Some services load profile pictures from these
@@ -263,9 +280,11 @@ export function DatenschutzEn() {
         </Sub>
         <Sub title="Signing in on tretu.de">
           <P>
-            On tretu.de you sign in with your Tretu account or directly with Discord. For this we store a local user profile
-            (display name, profile picture, Discord ID, Tretu ID, email address, language), your roles, the link to the sign-in
-            provider including the tokens it issues, and your sessions (with IP address and browser identifier). Each time you sign
+            On tretu.de you sign in only with your Tretu account. For this we store a local user profile (display name, profile
+            picture, Discord ID, Tretu ID, email address, language), your roles, the link to the Tretu account including the
+            tokens it issues, and your sessions (with IP address and browser identifier). Links from the former direct sign-in
+            with Discord are kept for now but no longer used; we delete them once we no longer need them for a possible return
+            to the previous version. Each time you sign
             in, we update your name, profile picture and the time of your last sign-in. The legal basis is Art. 6(1)(b) GDPR.
           </P>
         </Sub>
@@ -352,8 +371,10 @@ export function DatenschutzEn() {
         <Sub title="Account and content">
           <UL>
             <li>
-              Account data: username, email address, password (only as a secure hash), optional display name; when signing in via
-              the Tretu account, Google or Discord, the details transmitted by them (see section 6).
+              Account data: the details the Tretu account transmits when you sign in (Tretu ID, username, display name, email
+              address, profile picture, language; see section 6). You sign in to Saga only with the Tretu account; Saga no longer
+              has its own passwords, sign-in via Discord or Google or registration with an invite code. Invite codes for campaigns
+              remain a game feature.
             </li>
             <li>
               Content you create or that is created in the game: characters, worlds, campaigns, game messages, dice rolls, generated
@@ -389,6 +410,7 @@ export function DatenschutzEn() {
           <P>
             If a campaign is connected to a Discord channel, our Saga bot processes the messages players address to the campaign in
             that channel and their Discord names, in order to pass them to the AI game master and post the replies in the channel.
+            The bot is not a way to sign in to Saga.
           </P>
         </Sub>
       </Section>
@@ -400,12 +422,14 @@ export function DatenschutzEn() {
         </P>
         <UL>
           <li>
-            Account data: display name, username, email address, password (only as a secure hash) or passkey (only your device’s
-            public key), where applicable a profile picture and the link to your Tretu account, Google or Discord.
+            Account data: display name, username, email address, where applicable a profile picture and the link to your Tretu
+            account – the details the Tretu account transmits when you sign in (section 6). You sign in to Play only with the
+            Tretu account; Play no longer has its own passwords, passkeys (these now live in the Tretu account) or sign-in via
+            Google or Discord.
           </li>
           <li>
             Guest accounts: if you play as a guest, we create an account with a random name without you having to enter an email
-            address. If you create a proper account later, we transfer your progress.
+            address. If you sign in with your Tretu account later, we transfer your progress.
           </li>
           <li>
             Game data: matches with participants, rankings and points, solitaire rounds, achievements, friendships, your own
@@ -464,10 +488,10 @@ export function DatenschutzEn() {
         </P>
         <UL>
           <li>
-            Account: email address and password (only as a hash), sign-in via the Tretu account, Google, Apple or Discord (we store
-            the provider’s account identifier and an email address only if the provider sends one; for Discord, our server checks
-            the sign-in token with Discord once and does not keep it) or guest access with a random identifier on your device; plus a
-            display name and a session token on the device.
+            Account: sign-in only with the Tretu account (we store your Tretu ID and the details the Tretu account transmits, see
+            section 6) or guest access with a random identifier on your device; plus a display name and a session token on the
+            device. If you save a guest access to your Tretu account, it becomes an account and your progress stays. In-game
+            sign-in with email and password or via Google, Apple or Discord no longer exists.
           </li>
           <li>
             Cloud saves: as long as you are signed in and do not turn cloud backup off, every save (farm name, farmer name, day,
@@ -512,8 +536,9 @@ export function DatenschutzEn() {
         </Sub>
         <Sub title="Dashboard (mc.tretu.de)">
           <P>
-            You sign in to the dashboard with a code you get in the game with “/dashboard”, or with your Tretu account; a session
-            cookie is set. The dashboard shows players, achievements, leaderboards, chronicle, weekly review, community projects and
+            You sign in to the dashboard only with your Tretu account; a session cookie is set. The code you get in the game with
+            “/dashboard” now only links your Minecraft account to your Tretu account (we then store your Minecraft UUID and player
+            name with the Tretu account). The dashboard shows players, achievements, leaderboards, chronicle, weekly review, community projects and
             shops. For bonus playtime you can voluntarily tick off everyday tasks (such as sports, steps, reading, meditation); we
             store which task you ticked on which day and calculate bonus minutes and streaks from it. Please only tick what you want
             others to see – streaks and rewards are visible in the game.
@@ -627,7 +652,7 @@ export function DatenschutzEn() {
             ["Stripe Payments Europe, Ltd., Ireland", "payment processing", "processor or own responsibility (fraud prevention)"],
             ["OpenAI, Replicate, Inc., ElevenLabs, Inc.", "AI features in Saga", "processor"],
             ["OpenAI, Anthropic PBC, Amazon Bedrock", "AI companion Astra (Minecraft)", "processor"],
-            ["Discord, Google, Apple", "sign-in, if you choose it", "own responsibility"],
+            ["Discord, Google, Apple, Valve (Steam)", "sign-in to the Tretu account, if you choose it", "own responsibility"],
             ["Push services of browser vendors", "delivery of push notifications", "own responsibility"],
             ["Twitch, Discord, TSViewer, YouTube", "embedded content after your click", "own responsibility"],
             ["Panoramax instances, OpenStreetMap Foundation", "images and maps in Globetrotter (Play)", "own responsibility"],
@@ -644,11 +669,11 @@ export function DatenschutzEn() {
       <Section id="drittland" title="19. Transfers to third countries">
         <P>
           Some of the providers named are based in the USA or process data there (Cloudflare, Stripe, OpenAI, Replicate,
-          ElevenLabs, Anthropic, Amazon, Discord, Google, Apple, Twitch and push services). On 10 July 2023 the European Commission
+          ElevenLabs, Anthropic, Amazon, Discord, Google, Apple, Valve, Twitch and push services). On 10 July 2023 the European Commission
           adopted an adequacy decision for the USA (EU-US Data Privacy Framework); we base transfers to providers certified under
           it on Art. 45 GDPR. For providers without certification, we agree the European Commission’s standard contractual clauses
           (Art. 46(2)(c) GDPR) and assess supplementary measures. An adequacy decision exists for the United Kingdom (OpenStreetMap
-          Foundation) (Art. 45 GDPR). If you load embedded content or sign in via a provider, the transfer takes place at your
+          Foundation) (Art. 45 GDPR). If you load embedded content or sign in to the Tretu account via a provider, the transfer takes place at your
           request (Art. 49(1)(a) or (b) GDPR). On request, we will provide you with a copy of the respective safeguards.
         </P>
       </Section>

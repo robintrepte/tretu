@@ -48,7 +48,7 @@ describe("discovery", () => {
     expect(meta.scopes_supported).toEqual(["openid", "profile", "email", "offline_access", "tretu"])
     expect(meta.code_challenge_methods_supported).toEqual(["S256"])
     expect(meta.end_session_endpoint).toBe(`${ISSUER}/api/auth/oauth2/end-session`)
-    expect(meta.claims_supported).toEqual(expect.arrayContaining(["roles", "discord_id", "minecraft_uuid", "minecraft_name", "steam_id", "locale", "preferred_username"]))
+    expect(meta.claims_supported).toEqual(expect.arrayContaining(["roles", "discord_id", "minecraft_uuid", "minecraft_name", "steam_id", "legacy_ids", "locale", "preferred_username"]))
     const jwks = (await (await fetch(meta.jwks_uri as string)).json()) as { keys: { kty: string; alg?: string }[] }
     expect(jwks.keys.length).toBeGreaterThan(0)
   })
@@ -253,6 +253,7 @@ describe("admin API (contract §2/§3)", () => {
       locale: "de",
       roles: [],
       links: { minecraft: "069a79f4-44e9-4726-a5be-fca90e38aaf5", minecraftName: "Notch", steam: "76561197960287930" },
+      legacyIds: {},
     })
     expect(typeof shape.createdAt).toBe("string")
 

@@ -4,9 +4,11 @@ The single source of truth every Tretu app implements against. Repos stay separa
 packages**. Each app has its own small client (e.g. `lib/tretu/`) that implements this contract.
 A copy of this file is committed to `tretu/docs/ecosystem/CONTRACT.md`.
 
-Hard rule for every app: **every integration is OFF unless its env vars are set.** With no `TRETU_*`
-env, the app must behave exactly as it does today (old logins keep working). This makes merging to
-`main` safe before auth.tretu.de / the platform are deployed.
+Hard rule for every app: **every optional integration is OFF unless its env vars are set** (platform calls, events,
+push, badge sync, …). **Sign-in is the exception (Tretu-Konto only, §2):** every app signs people in only with the
+Tretu-Konto, so its `TRETU_AUTH_*` settings are required; without them an app fails fast at startup in production
+(clear error) and shows "Anmeldung nicht konfiguriert" in development. Deploy order: auth.tretu.de live and the legacy
+import done before any app's Tretu-only version is opened to members (`deploy/GO-LIVE.md`).
 
 ## 0. Hosts, processes, ports (production, Hetzner, PM2 behind nginx, no Docker)
 
@@ -54,6 +56,11 @@ App IDs: `tretu-web`, `auth`, `saga`, `play`, `hollowmere`, `mc-dashboard`.
   - `sub` – permanent Tretu ID (UUID string). Apps store it as `tretu_sub` / `tretuSub` (unique).
   - `preferred_username`, `name`, `picture`, `email`, `email_verified`, `locale` (`"de"` | `"en"`)
   - with scope `tretu`: `roles` (string[], global only, e.g. `["admin"]`), `discord_id`, `minecraft_uuid`, `minecraft_name`, `steam_id` (64-bit SteamID as a decimal string), `teamspeak_uid` (TeamSpeak unique identifier) (each string or absent)
+  - with scope `tretu`: `legacy_ids` — `{ "saga"?: string, "play"?: string, "hollowmere"?: string, "tretu-web"?: string }`:
+    the old app accounts the legacy import linked to this Tretu-Konto (table `legacy_link`), per app the app's own user
+    id as a string (Hollowmere: the Nakama user id). Only apps with a link appear; the claim is absent when there is
+    none. Merges in auth move the links, so after a `user.deleted` with `mergedInto` the surviving account's `legacy_ids`
+    contains the moved ones; when it then holds two old accounts of one app, its own import wins over the merged one.
 - Registered clients and redirect URIs:
 
 | client_id | type | redirect URIs |
@@ -66,14 +73,28 @@ App IDs: `tretu-web`, `auth`, `saga`, `play`, `hollowmere`, `mc-dashboard`.
 
   (Local dev: each client may additionally allow `http://localhost:<its port>/...` equivalents — configured by env in auth, never hard-coded in prod.)
 - Better Auth apps use the `genericOAuth` plugin with `providerId: "tretu"`, `discoveryUrl: ${TRETU_AUTH_ISSUER}/.well-known/openid-configuration`, `pkce: true`, scopes above → callback path `/api/auth/oauth2/callback/tretu`.
-- On login, a client finds the local user by `tretu_sub`; else matches an existing user by `discord_id` claim (only if the local user has that Discord ID), else by **verified** email (`email_verified === true` and the local email is also verified/OAuth-sourced); else creates a new local user. Then stores `tretu_sub`. Never merge on unverified email.
+- **Tretu-Konto only.** "Mit Tretu-Konto anmelden" is every app's only account sign-in (no local passwords, no
+  Discord/Google/Apple/passkey/code logins in the apps: those live in auth.tretu.de). Guests stay where an app has them
+  (Play guests, Hollowmere guest/device play); a guest who signs in keeps their progress. Data of removed login methods
+  stays in the databases (cleanup later, each app's DEPLOY doc).
+- On login, a client finds the local user in this order:
+  1. the local user with `tretu_sub = sub`;
+  2. the local user whose id equals `legacy_ids[<this app id>]` and who has no other `tretu_sub` yet;
+  3. the local user with the same Discord ID (`discord_id` claim), if not linked to another sub;
+  4. the local user with the same email, verified on **both** sides (`email_verified === true` and the local email
+     verified), if not linked to another sub;
+  5. otherwise a new local user.
+
+  Then it stores `tretu_sub` on the match. Never link a local user that already has a different `tretu_sub`; never
+  merge on unverified email.
 - On login, apply `locale` claim as the user's UI language (e.g. set `NEXT_LOCALE` cookie) unless the user chose a language locally afterwards.
 - Account page ("Mein Konto"): `https://auth.tretu.de/konto`. Apps link there from their user menu.
 
 ### Auth admin API (server-to-server, signed per §3)
 - `POST ${issuer}/api/v1/links` `{ "sub", "provider": "minecraft"|"steam"|"teamspeak", "providerAccountId", "displayName" }` → `200 {"ok":true}` (replaces that sub's existing link of the provider); `409` if that providerAccountId is linked to another sub.
 - `DELETE ${issuer}/api/v1/links` `{ "sub", "provider" }` → `200` (`404` = nothing linked, treated as done by callers).
-- `GET ${issuer}/api/v1/users/{sub}` → `{ sub, username, name, picture, locale, roles, locked, links:{discord?,minecraft?,minecraftName?,steam?,teamspeak?}, createdAt }`.
+- `GET ${issuer}/api/v1/users/{sub}` → `{ sub, username, name, picture, locale, roles, locked, links:{discord?,minecraft?,minecraftName?,steam?,teamspeak?}, legacyIds:{saga?,play?,hollowmere?,"tretu-web"?}, createdAt }`.
+  `legacyIds`: the same values as the `legacy_ids` claim (`{}` when none).
   `locked` (boolean): the Tretu-Konto is locked by an admin (see "Account lock" below).
 - **TeamSpeak** links are proven on tretu.de only (nickname code on `https://tretu.de/einstellungen#teamspeak`): tretu.de
   (app `tretu-web`) registers them with `provider:"teamspeak"`, `providerAccountId` = the TeamSpeak unique identifier,
@@ -102,7 +123,7 @@ optional `?actorSub=` checked the same way.
 - `GET ${issuer}/api/v1/admin/users/{sub}` → `user` + `emailVerified, locale, lockedReason, lockedUntil, lockedAt,
   providers:[{provider ("password"|"discord"|"google"|"apple"|"steam"), accountId|null, displayName, createdAt}],
   passkeys:[{id,name,createdAt,lastUsedAt}], sessions:[{id,createdAt,expiresAt,ipAddress,userAgent,client}],
-  legacyLinks:[{app,legacyUserId,legacyUsername,importedAt,method}], audit:[{id,event,success,ipAddress,userAgent,meta,createdAt}] (50)`
+  legacyLinks:[{app,legacyUserId,legacyUsername,importedAt,method}], legacyIds (as in the user shape), audit:[{id,event,success,ipAddress,userAgent,meta,createdAt}] (50)`
 - `GET ${issuer}/api/v1/admin/stats` → `{ users:{total,verified,withTwoFactor,locked,admins}, signUpsPerDay:[{day,count}],
   signInsPerDay:[{day,count}], providers:{password,discord,google,apple,steam,passkey} }` (90 Europe/Berlin days, oldest
   first; sign-ins = accounts that signed in that day)
@@ -240,3 +261,7 @@ Notifications
   profile, only where the profile itself may be seen.
 - **Account deletion** removes the Discord roles and TeamSpeak server groups the platform granted for badges (merges:
   they move to the surviving account when it has the same Discord / TeamSpeak identity).
+- **Tretu-Konto only** (round 3): the apps' own logins are removed (tretu.de's direct Discord login, Saga/Play
+  passwords and social logins, the MC dashboard's code login, Hollowmere's in-game logins). New claim `legacy_ids`
+  (§2) for finding the old local account; match order in §2. Env vars that are gone: `TRETU_DISCORD_FALLBACK`,
+  `TRETU_LOCAL_LOGIN`, `TRETU_CODE_LOGIN`, `TRETU_SKIP_INVITE_FOR_TRETU` and the apps' own Discord/Google OAuth clients.

@@ -1,7 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm"
 import { db as defaultDb, type Db } from "@/lib/db"
-import { account, externalLink, user } from "@/lib/db/schema"
-import { normalizeLocale, type ClaimSource, type UserLinks } from "@/lib/oidc/claims"
+import { account, externalLink, legacyLink, user } from "@/lib/db/schema"
+import { legacyIdsFromLinks, normalizeLocale, type ClaimSource, type LegacyIds, type UserLinks } from "@/lib/oidc/claims"
 
 /** Whether an admin lock is in force at `now` (a lock whose `lockedUntil` has passed is not, even before it is lifted). */
 export function isLockActive(row: { locked: boolean; lockedUntil: Date | null } | null | undefined, now: Date = new Date()): boolean {
@@ -19,6 +19,8 @@ export interface UserShape {
   /** Locked by an admin (lib/admin/lock.ts): apps end the user's sessions and refuse new ones until unlocked. */
   locked: boolean
   links: UserLinks
+  /** The old app accounts linked to this Tretu-Konto (`legacy_ids` claim): only apps with a link. */
+  legacyIds: LegacyIds
   createdAt: string
 }
 
@@ -62,6 +64,15 @@ export async function getUserLinksMany(userIds: string[], db: Db = defaultDb): P
   return result
 }
 
+/** The `legacy_ids` claim of an account, from `legacy_link` (moved along by merges). */
+export async function getLegacyIds(userId: string, db: Db = defaultDb): Promise<LegacyIds> {
+  const rows = await db
+    .select({ app: legacyLink.app, legacyUserId: legacyLink.legacyUserId, method: legacyLink.method, importedAt: legacyLink.importedAt })
+    .from(legacyLink)
+    .where(eq(legacyLink.userId, userId))
+  return legacyIdsFromLinks(rows)
+}
+
 export async function getClaimSource(userId: string, db: Db = defaultDb): Promise<ClaimSource | null> {
   const row = await db.query.user.findFirst({ where: eq(user.id, userId) })
   if (!row) return null
@@ -90,6 +101,7 @@ export async function getUserShape(userId: string, db: Db = defaultDb): Promise<
     roles: row.roles,
     locked: isLockActive(row),
     links: await getUserLinks(row.id, db),
+    legacyIds: await getLegacyIds(row.id, db),
     createdAt: row.createdAt.toISOString(),
   }
 }

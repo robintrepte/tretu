@@ -2,7 +2,7 @@ import { and, desc, eq, gt, inArray, sql } from "drizzle-orm"
 import { z } from "zod"
 import type { Db } from "@/lib/db"
 import * as s from "@/lib/db/schema"
-import { isPlaceholderEmail, PLACEHOLDER_EMAIL_DOMAIN, type UserLinks } from "@/lib/oidc/claims"
+import { isPlaceholderEmail, legacyIdsFromLinks, PLACEHOLDER_EMAIL_DOMAIN, type LegacyIds, type UserLinks } from "@/lib/oidc/claims"
 import { normalizeAccountId } from "@/lib/tretu/links"
 import { getUserLinksMany, isLockActive } from "@/lib/users"
 
@@ -183,6 +183,8 @@ export interface AdminUserDetail extends AdminUserItem {
   /** Active sessions on auth.tretu.de; `client` is the app that last got tokens through the session. */
   sessions: { id: string; createdAt: string; expiresAt: string; ipAddress: string | null; userAgent: string | null; client: string | null }[]
   legacyLinks: { app: string; legacyUserId: string; legacyUsername: string | null; importedAt: string; method: string }[]
+  /** What the apps receive as the `legacy_ids` claim (one old account per app, see legacyIdsFromLinks). */
+  legacyIds: LegacyIds
   /** The newest 50 entries of the activity log. */
   audit: { id: string; event: string; success: boolean; ipAddress: string | null; userAgent: string | null; meta: Record<string, unknown> | null; createdAt: string }[]
 }
@@ -279,6 +281,7 @@ export async function getAdminUserDetail(db: Db, sub: string): Promise<AdminUser
       client: clients.get(x.id) ?? null,
     })),
     legacyLinks: legacy.map((l) => ({ ...l, importedAt: l.importedAt.toISOString() })),
+    legacyIds: legacyIdsFromLinks(legacy),
     audit: activity.map((a) => ({ ...a, meta: a.meta ?? null, createdAt: a.createdAt.toISOString() })),
   }
 }

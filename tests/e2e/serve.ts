@@ -163,6 +163,9 @@ async function main() {
       // Platform on (signed API) with a Tretu-Konto issuer for the "Mein Konto" / "Steam verbinden" links.
       TRETU_APPS_JSON: JSON.stringify({ "tretu-web": { secret: WEB_SECRET } }),
       TRETU_AUTH_ISSUER: AUTH_MOCK_URL,
+      // Required: tretu.de signs in only with the Tretu-Konto (the button is never clicked here).
+      TRETU_AUTH_CLIENT_ID: "tretu-web",
+      TRETU_AUTH_CLIENT_SECRET: "e2e-oidc-client-secret",
       TRETU_APP_SECRET: WEB_SECRET,
       TS_QUERY_HOST: "127.0.0.1",
       TS_QUERY_USER: "serveradmin",

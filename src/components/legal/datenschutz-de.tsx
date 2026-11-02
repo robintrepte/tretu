@@ -79,8 +79,9 @@ export function DatenschutzDe() {
             erst, wenn du sie anklickst.
           </li>
           <li>
-            Mit einem Tretu-Konto meldest du dich bei allen Diensten an. Die Dienste erhalten dabei nur die Angaben, die sie für
-            ihre Funktion brauchen.
+            Mit deinem Tretu-Konto meldest du dich bei allen Diensten an – eine andere Anmeldung haben die Dienste nicht mehr
+            (Gastzugänge in Play und Hollowmere bleiben). Die Dienste erhalten dabei nur die Angaben, die sie für ihre Funktion
+            brauchen.
           </li>
           <li>
             Einige Funktionen nutzen externe Anbieter, etwa KI-Dienste in Saga, Stripe für Zahlungen oder Amazon SES für
@@ -181,7 +182,7 @@ export function DatenschutzDe() {
             ],
             [
               "Kurzlebige Anmelde-Cookies",
-              "Schützen den Anmeldevorgang über das Tretu-Konto, Discord, Google oder Apple vor Fälschung (CSRF, PKCE).",
+              "Schützen den Anmeldevorgang mit dem Tretu-Konto (und am Tretu-Konto über Discord, Google, Apple oder Steam) vor Fälschung (CSRF, PKCE).",
               "einige Minuten",
             ],
             ["NEXT_LOCALE, NEXT_LOCALE_MANUAL", "Merken sich die gewählte Sprache.", "1 Jahr"],
@@ -231,24 +232,41 @@ export function DatenschutzDe() {
         </Sub>
         <Sub title="Anmeldung bei unseren Diensten">
           <P>
-            Wenn du dich bei einem Tretu-Dienst „Mit Tretu-Konto anmelden“ entscheidest, übermittelt das Tretu-Konto dem
-            jeweiligen Dienst (z. B. Saga oder Play) per OpenID Connect deine Tretu-ID, Benutzername, Anzeigename, Profilbild,
-            E-Mail-Adresse samt Bestätigungsstatus, Sprache, Rollen und die IDs verknüpfter Konten. Der Dienst gleicht dich darüber
-            mit einem vorhandenen Konto ab (über die Tretu-ID, die Discord-ID oder eine bestätigte E-Mail-Adresse) oder legt ein
-            neues an. Änderungen an deinem Tretu-Konto (z. B. Name, Sprache oder Löschung) geben wir an die Dienste weiter, damit
-            sie aktuell bleiben bzw. deine Daten dort ebenfalls löschen oder anonymisieren.
+            Alle Tretu-Dienste ({SERVICES.hub}, Saga, Tretu Play, Hollowmere und das Minecraft-Dashboard) melden dich
+            ausschließlich über „Mit Tretu-Konto anmelden“ an; eigene Passwörter oder Anmeldungen über Discord, Google oder Apple
+            gibt es in den Diensten nicht mehr. Bei der Anmeldung übermittelt das Tretu-Konto dem jeweiligen Dienst per OpenID
+            Connect deine Tretu-ID, Benutzername, Anzeigename, Profilbild, E-Mail-Adresse samt Bestätigungsstatus, Sprache, Rollen,
+            die IDs verknüpfter Konten und – falls vorhanden – die Kennung deines bisherigen Kontos bei diesem Dienst (siehe
+            unten). Der Dienst ordnet dich darüber in dieser Reihenfolge einem vorhandenen Konto zu: über die Tretu-ID, über die
+            Kennung deines bisherigen Kontos, über die Discord-ID oder über eine auf beiden Seiten bestätigte E-Mail-Adresse; ein
+            Konto, das schon mit einem anderen Tretu-Konto verbunden ist, wird nie zugeordnet. Andernfalls legt er ein neues an.
+            Änderungen an deinem Tretu-Konto (z. B. Name, Sprache oder Löschung) geben wir an die Dienste weiter, damit sie aktuell
+            bleiben bzw. deine Daten dort ebenfalls löschen oder anonymisieren.
+          </P>
+          <P>
+            Übernahme der bisherigen Konten: Konten, die du vorher direkt in einem Dienst hattest, haben wir einmalig in das
+            Tretu-Konto übernommen (Benutzername, Anzeigename, E-Mail-Adresse, Passwort-Hash und verknüpfte Kennungen von
+            Discord, Google, Apple oder Steam). Dabei speichern wir, welches bisherige Konto (Dienst und dessen Konto-Kennung, bei
+            Hollowmere die Kennung des Spielservers) zu welchem Tretu-Konto gehört. Werden zwei Tretu-Konten derselben Person
+            zusammengeführt, gehen diese Zuordnungen auf das verbleibende Konto über. Die Dienste erhalten die Zuordnung bei der
+            Anmeldung, damit du dein bisheriges Konto mit Fortschritt, Inhalten und Credits wiederfindest. Daten der früheren
+            Anmeldungen in den Diensten (etwa Passwort-Hashes und Verknüpfungen zu Discord, Google oder Apple) bewahren die
+            Dienste vorerst auf, nutzen sie aber nicht mehr, und löschen sie, sobald sie für eine mögliche Rückkehr zur Vorversion
+            nicht mehr gebraucht werden. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO (Fortführung deines Nutzungsvertrags)
+            bzw. Art. 6 Abs. 1 lit. f DSGVO (Fortführung der bestehenden Konten ohne Datenverlust).
           </P>
           <P>
             Rechtsgrundlage ist die Erfüllung des Nutzungsvertrags (Art. 6 Abs. 1 lit. b DSGVO); Sicherheitsdaten verarbeiten wir
             zur Abwehr von Missbrauch (Art. 6 Abs. 1 lit. f DSGVO).
           </P>
         </Sub>
-        <Sub title="Anmeldung über Discord, Google oder Apple">
+        <Sub title="Anmeldung am Tretu-Konto über Discord, Google, Apple oder Steam">
           <P>
-            Soweit wir die Anmeldung über Discord (Discord Inc., 444 De Haro Street, Suite 200, San Francisco, CA 94107, USA),
-            Google (Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Irland) oder Apple (Apple Distribution
-            International Ltd., Hollyhill Industrial Estate, Hollyhill, Cork, Irland) anbieten und du sie wählst, wirst du zum
-            jeweiligen Anbieter weitergeleitet. Wir erhalten von dort eine Konto-Kennung, deinen Namen, gegebenenfalls deine
+            Am Tretu-Konto ({SERVICES.auth}) – und nur dort – kannst du dich statt mit Passwort oder Passkey auch über Discord
+            (Discord Inc., 444 De Haro Street, Suite 200, San Francisco, CA 94107, USA), Google (Google Ireland Limited, Gordon
+            House, Barrow Street, Dublin 4, Irland), Apple (Apple Distribution International Ltd., Hollyhill Industrial Estate,
+            Hollyhill, Cork, Irland) oder Steam (Valve Corporation, P.O. Box 1688, Bellevue, WA 98009, USA) anmelden. Wählst du
+            einen Anbieter, wirst du zu ihm weitergeleitet. Wir erhalten von dort eine Konto-Kennung, deinen Namen, gegebenenfalls deine
             E-Mail-Adresse und dein Profilbild und nutzen diese Daten nur zur Anmeldung und Darstellung deines Profils. Wir
             veröffentlichen nichts in deinem Namen. Für die Verarbeitung beim Anbieter gelten dessen Datenschutzbestimmungen;
             dabei kann eine Übermittlung in die USA stattfinden. Profilbilder dieser Anbieter laden manche Dienste direkt von deren
@@ -268,10 +286,11 @@ export function DatenschutzDe() {
         </Sub>
         <Sub title="Anmeldung auf tretu.de">
           <P>
-            Auf tretu.de meldest du dich mit deinem Tretu-Konto oder direkt mit Discord an. Wir speichern dazu ein lokales
+            Auf tretu.de meldest du dich ausschließlich mit deinem Tretu-Konto an. Wir speichern dazu ein lokales
             Nutzerprofil (Anzeigename, Profilbild, Discord-ID, Tretu-ID, E-Mail-Adresse, Sprache), deine Rollen, die
-            Verknüpfung zum Anmeldeanbieter samt der von ihm ausgestellten Tokens sowie deine Sitzungen (mit IP-Adresse und
-            Browser-Kennung). Bei jeder Anmeldung aktualisieren wir Name und Profilbild und den Zeitpunkt der letzten Anmeldung.
+            Verknüpfung zum Tretu-Konto samt der von ihm ausgestellten Tokens sowie deine Sitzungen (mit IP-Adresse und
+            Browser-Kennung). Verknüpfungen aus der früheren direkten Anmeldung mit Discord bewahren wir vorerst auf, nutzen sie
+            aber nicht mehr; wir löschen sie, sobald wir sie für eine mögliche Rückkehr zur Vorversion nicht mehr brauchen. Bei jeder Anmeldung aktualisieren wir Name und Profilbild und den Zeitpunkt der letzten Anmeldung.
             Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO.
           </P>
         </Sub>
@@ -362,8 +381,10 @@ export function DatenschutzDe() {
         <Sub title="Konto und Inhalte">
           <UL>
             <li>
-              Kontodaten: Benutzername, E-Mail-Adresse, Passwort (nur als sicherer Hash), optional Anzeigename; bei Anmeldung über
-              das Tretu-Konto, Google oder Discord die dort übermittelten Angaben (siehe Abschnitt 6).
+              Kontodaten: die Angaben, die das Tretu-Konto bei der Anmeldung übermittelt (Tretu-ID, Benutzername, Anzeigename,
+              E-Mail-Adresse, Profilbild, Sprache; siehe Abschnitt 6). In Saga meldest du dich nur mit dem Tretu-Konto an; eigene
+              Passwörter, Anmeldungen über Discord oder Google und Registrierungen mit Einladungscode gibt es nicht mehr.
+              Einladungscodes für Kampagnen bleiben eine Spielfunktion.
             </li>
             <li>
               Inhalte, die du erstellst oder die im Spiel entstehen: Charaktere, Welten, Kampagnen, Spielnachrichten, Würfelwürfe,
@@ -399,7 +420,7 @@ export function DatenschutzDe() {
           <P>
             Wenn eine Kampagne mit einem Discord-Kanal verbunden ist, verarbeitet unser Saga-Bot die Nachrichten, die Spieler in
             diesem Kanal an die Kampagne richten, sowie deren Discord-Namen, um sie der KI-Spielleitung zu übergeben und die Antworten
-            im Kanal zu veröffentlichen.
+            im Kanal zu veröffentlichen. Der Bot ist keine Anmeldung bei Saga.
           </P>
         </Sub>
       </Section>
@@ -411,12 +432,14 @@ export function DatenschutzDe() {
         </P>
         <UL>
           <li>
-            Kontodaten: Anzeigename, Benutzername, E-Mail-Adresse, Passwort (nur als sicherer Hash) oder Passkey (nur der öffentliche
-            Schlüssel deines Geräts), gegebenenfalls Profilbild und die Verknüpfung zum Tretu-Konto, zu Google oder Discord.
+            Kontodaten: Anzeigename, Benutzername, E-Mail-Adresse, gegebenenfalls Profilbild und die Verknüpfung zum Tretu-Konto
+            – die Angaben, die das Tretu-Konto bei der Anmeldung übermittelt (Abschnitt 6). In Play meldest du dich nur mit dem
+            Tretu-Konto an; eigene Passwörter, Passkeys (die liegen jetzt im Tretu-Konto) und Anmeldungen über Google oder Discord
+            gibt es nicht mehr.
           </li>
           <li>
             Gastkonten: Spielst du als Gast, legen wir ein Konto mit einem zufälligen Namen an, ohne dass du eine E-Mail-Adresse
-            angeben musst. Erstellst du später ein richtiges Konto, übernehmen wir deinen Fortschritt.
+            angeben musst. Meldest du dich später mit deinem Tretu-Konto an, übernehmen wir deinen Fortschritt.
           </li>
           <li>
             Spieldaten: Partien mit Teilnehmern, Platzierungen und Punkten, Solitaire-Runden, Erfolge, Freundschaften, selbst
@@ -479,10 +502,11 @@ export function DatenschutzDe() {
         </P>
         <UL>
           <li>
-            Konto: E-Mail-Adresse und Passwort (nur als Hash), Anmeldung über das Tretu-Konto, Google, Apple oder Discord (wir
-            speichern die Konto-Kennung des Anbieters und eine E-Mail-Adresse nur, wenn der Anbieter sie mitschickt; bei Discord
-            prüft unser Server das Anmelde-Token einmal bei Discord und behält es nicht) oder ein Gastzugang mit einer zufälligen
-            Kennung auf deinem Gerät; dazu ein Anzeigename und ein Sitzungs-Token auf dem Gerät.
+            Konto: Anmeldung nur mit dem Tretu-Konto (wir speichern deine Tretu-ID und die Angaben, die das Tretu-Konto
+            übermittelt, siehe Abschnitt 6) oder ein Gastzugang mit einer zufälligen Kennung auf deinem Gerät; dazu ein
+            Anzeigename und ein Sitzungs-Token auf dem Gerät. Sicherst du einen Gastzugang in deinem Tretu-Konto, wird daraus ein
+            Konto; der Fortschritt bleibt. Anmeldungen im Spiel per E-Mail und Passwort oder über Google, Apple oder Discord gibt es
+            nicht mehr.
           </li>
           <li>
             Cloud-Speicherstände: Solange du angemeldet bist und die Cloud-Sicherung nicht ausschaltest, liegt jeder Spielstand
@@ -534,8 +558,9 @@ export function DatenschutzDe() {
         </Sub>
         <Sub title="Dashboard (mc.tretu.de)">
           <P>
-            Im Dashboard meldest du dich mit einem Code an, den du im Spiel mit „/dashboard“ erhältst, oder mit deinem Tretu-Konto;
-            dabei wird ein Sitzungs-Cookie gesetzt. Das Dashboard zeigt Spieler, Erfolge, Bestenlisten, Chronik, Wochenrückblick,
+            Im Dashboard meldest du dich nur mit deinem Tretu-Konto an; dabei wird ein Sitzungs-Cookie gesetzt. Den Code, den du
+            im Spiel mit „/dashboard“ erhältst, nutzt du nur noch, um dein Minecraft-Konto mit deinem Tretu-Konto zu verknüpfen
+            (wir speichern dann deine Minecraft-UUID und deinen Spielernamen am Tretu-Konto). Das Dashboard zeigt Spieler, Erfolge, Bestenlisten, Chronik, Wochenrückblick,
             Gemeinschaftsprojekte und Shops. Für Bonus-Spielzeit kannst du freiwillig alltägliche Aufgaben abhaken (etwa Sport,
             Schritte, Lesen, Meditation); wir speichern, welche Aufgabe du an welchem Tag abgehakt hast, und berechnen daraus
             Bonus-Minuten und Serien. Bitte hake nur ab, was du anderen zeigen möchtest – Serien und Belohnungen sind im Spiel
@@ -656,7 +681,7 @@ export function DatenschutzDe() {
             ["Stripe Payments Europe, Ltd., Irland", "Zahlungsabwicklung", "Auftragsverarbeiter bzw. eigene Verantwortung (Betrugsprävention)"],
             ["OpenAI, Replicate, Inc., ElevenLabs, Inc.", "KI-Funktionen in Saga", "Auftragsverarbeiter"],
             ["OpenAI, Anthropic PBC, Amazon Bedrock", "KI-Mitspielerin Astra (Minecraft)", "Auftragsverarbeiter"],
-            ["Discord, Google, Apple", "Anmeldung, wenn du sie wählst", "eigene Verantwortung"],
+            ["Discord, Google, Apple, Valve (Steam)", "Anmeldung am Tretu-Konto, wenn du sie wählst", "eigene Verantwortung"],
             ["Push-Dienste der Browser-Hersteller", "Zustellung von Push-Benachrichtigungen", "eigene Verantwortung"],
             ["Twitch, Discord, TSViewer, YouTube", "eingebettete Inhalte nach deinem Klick", "eigene Verantwortung"],
             ["Panoramax-Instanzen, OpenStreetMap Foundation", "Bilder und Karten in Globetrotter (Play)", "eigene Verantwortung"],
@@ -673,12 +698,12 @@ export function DatenschutzDe() {
       <Section id="drittland" title="19. Übermittlung in Drittländer">
         <P>
           Einige der genannten Anbieter sitzen in den USA oder verarbeiten Daten dort (Cloudflare, Stripe, OpenAI, Replicate,
-          ElevenLabs, Anthropic, Amazon, Discord, Google, Apple, Twitch sowie Push-Dienste). Für die USA hat die EU-Kommission
+          ElevenLabs, Anthropic, Amazon, Discord, Google, Apple, Valve, Twitch sowie Push-Dienste). Für die USA hat die EU-Kommission
           am 10. Juli 2023 einen Angemessenheitsbeschluss erlassen (EU-US Data Privacy Framework); Übermittlungen an Anbieter, die
           danach zertifiziert sind, stützen wir auf Art. 45 DSGVO. Bei Anbietern ohne Zertifizierung vereinbaren wir die
           Standardvertragsklauseln der EU-Kommission (Art. 46 Abs. 2 lit. c DSGVO) und prüfen ergänzende Maßnahmen. Für das
           Vereinigte Königreich (OpenStreetMap Foundation) besteht ein Angemessenheitsbeschluss (Art. 45 DSGVO). Wenn du
-          eingebettete Inhalte lädst oder dich über einen Anbieter anmeldest, erfolgt die Übermittlung auf deine Veranlassung
+          eingebettete Inhalte lädst oder dich am Tretu-Konto über einen Anbieter anmeldest, erfolgt die Übermittlung auf deine Veranlassung
           (Art. 49 Abs. 1 lit. a bzw. b DSGVO). Auf Anfrage stellen wir dir eine Kopie der jeweiligen Garantien zur Verfügung.
         </P>
       </Section>
