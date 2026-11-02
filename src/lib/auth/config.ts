@@ -2,6 +2,7 @@
  * Auth configuration from env (server-only). Every Tretu-Konto integration is off unless
  * `TRETU_AUTH_ISSUER`, `TRETU_AUTH_CLIENT_ID` and `TRETU_AUTH_CLIENT_SECRET` are set.
  */
+import { adminFromRolesEnabled } from "@/lib/auth/tretu-account";
 import { AUTH_DISCORD_CLIENT_ID, AUTH_DISCORD_CLIENT_SECRET, AUTH_SECRET } from "@/lib/env/server";
 import { SITE_URL } from "@/lib/env";
 
@@ -35,6 +36,7 @@ export type TretuAuthConfig = {
   redirectUri: string;
   /** "Mein Konto" page of the central account. */
   accountUrl: string;
+  /** `TRETU_ADMIN_FROM_ROLES` (default on): the Tretu `admin` claim grants the local admin role. */
   adminFromRoles: boolean;
 };
 
@@ -50,7 +52,7 @@ export function getTretuAuthConfig(): TretuAuthConfig | null {
     discoveryUrl: `${issuer}/.well-known/openid-configuration`,
     redirectUri: `${AUTH_BASE_URL}${TRETU_CALLBACK_PATH}`,
     accountUrl: `${issuer}/konto`,
-    adminFromRoles: flag(process.env.TRETU_ADMIN_FROM_ROLES, false),
+    adminFromRoles: adminFromRolesEnabled(),
   };
 }
 

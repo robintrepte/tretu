@@ -1,6 +1,9 @@
 import { db as defaultDb, type Db } from "@/lib/db"
 import { auditLog } from "@/lib/db/schema"
 
+/** Admin actions (admin API and `npm run admin`), each recorded as `admin.<action>`. */
+export type AdminAction = "roles_changed" | "sessions_revoked" | "locked" | "unlocked" | "two_factor_reset" | "link_removed" | "email_verified" | "merge"
+
 /** Event names shown under "Sicherheit" (translated in messages/*.json → audit.events). */
 export type AuditEvent =
   | "login"
@@ -29,7 +32,11 @@ export type AuditEvent =
   | "locale.changed"
   | "data.exported"
   | "roles.changed"
-  | "admin.merge"
+  | "lock.expired"
+  /** Done by an admin (lib/admin/audit.ts): `admin.<action>` on the account it was done to … */
+  | `admin.${AdminAction}`
+  /** … and `admin.performed` on the admin's own account. */
+  | "admin.performed"
 
 export interface AuditInput {
   userId?: string | null

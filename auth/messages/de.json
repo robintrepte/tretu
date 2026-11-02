@@ -56,7 +56,9 @@
       "steam_failed": "Die Anmeldung über Steam hat nicht geklappt. Bitte versuche es noch einmal.",
       "state_mismatch": "Die Anmeldung wurde in einem anderen Tab oder Browser gestartet oder hat zu lange gedauert. Bitte versuche es noch einmal.",
       "signup_disabled": "Zu diesem Konto gibt es noch kein Tretu-Konto.",
-      "cancelled": "Die Anmeldung wurde abgebrochen."
+      "cancelled": "Die Anmeldung wurde abgebrochen.",
+      "accountLocked": "Dein Tretu-Konto ist gesperrt. Wenn du Fragen dazu hast, wende dich bitte an das Tretu-Team.",
+      "accountLockedUntil": "Dein Tretu-Konto ist bis {until} gesperrt. Wenn du Fragen dazu hast, wende dich bitte an das Tretu-Team."
     },
     "notices": {
       "verified": "Deine E-Mail-Adresse ist bestätigt. Willkommen bei Tretu!",
@@ -318,10 +320,34 @@
       "other": "Sonstiges",
       "steam": "Steam",
       "backup-code": "Backup-Code",
-      "totp": "Authenticator-App"
+      "totp": "Authenticator-App",
+      "minecraft": "Minecraft",
+      "teamspeak": "TeamSpeak",
+      "session": "bestehende Sitzung"
     },
     "2fa_challenge": "Code bei der Anmeldung abgefragt",
-    "2fa_backup_code_used": "Backup-Code verwendet"
+    "2fa_backup_code_used": "Backup-Code verwendet",
+    "login_locked": "Anmeldung abgelehnt: Konto gesperrt",
+    "lock_expired": "Sperre abgelaufen",
+    "admin_roles_changed": "Rollen vom Tretu-Team geändert",
+    "admin_sessions_revoked": "Vom Tretu-Team überall abgemeldet",
+    "admin_locked": "Konto vom Tretu-Team gesperrt",
+    "admin_locked_until": "Konto vom Tretu-Team bis {until} gesperrt",
+    "admin_unlocked": "Konto vom Tretu-Team entsperrt",
+    "admin_two_factor_reset": "Bestätigung in zwei Schritten vom Tretu-Team zurückgesetzt",
+    "admin_link_removed": "Verknüpfung mit {provider} vom Tretu-Team entfernt",
+    "admin_email_verified": "E-Mail-Adresse vom Tretu-Team bestätigt",
+    "admin_performed": "Admin-Aktion bei {target}: {action}",
+    "adminActions": {
+      "roles_changed": "Rollen geändert",
+      "sessions_revoked": "überall abgemeldet",
+      "locked": "Konto gesperrt",
+      "unlocked": "Konto entsperrt",
+      "two_factor_reset": "Bestätigung in zwei Schritten zurückgesetzt",
+      "link_removed": "Verknüpfung entfernt",
+      "email_verified": "E-Mail-Adresse bestätigt",
+      "merge": "Konto zusammengeführt"
+    }
   },
   "connections": {
     "title": "Verknüpfte Konten",

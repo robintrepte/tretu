@@ -249,6 +249,7 @@
       "unable_to_get_user_info": "Die Profildaten konnten nicht abgerufen werden.",
       "oauth_provider_not_found": "Diese Anmeldemethode ist aktuell nicht verfügbar.",
       "signup_disabled": "Neue Konten können derzeit nicht angelegt werden.",
+      "unable_to_create_session": "Die Anmeldung wurde abgelehnt. Ist dein Tretu-Konto gesperrt, wende dich bitte an das Tretu-Team.",
       "generic": "Anmeldung fehlgeschlagen ({code})."
     }
   },

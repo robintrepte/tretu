@@ -32,6 +32,7 @@ const KNOWN_ERRORS = new Set([
   "unable_to_get_user_info",
   "oauth_provider_not_found",
   "signup_disabled",
+  "unable_to_create_session",
 ]);
 
 export default async function SignInPage({

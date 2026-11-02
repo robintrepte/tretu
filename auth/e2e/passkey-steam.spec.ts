@@ -1,6 +1,7 @@
 import { readdir, readFile } from "node:fs/promises"
 import path from "node:path"
 import { expect, test, type Page } from "@playwright/test"
+import { withoutPasskeyAutofill } from "./login-page"
 
 const outbox = path.join(import.meta.dirname, "..", ".outbox", "e2e")
 const steamStub = `http://127.0.0.1:${process.env.E2E_STEAM_PORT ?? 3197}`
@@ -36,6 +37,7 @@ async function steamAs(steamId: string) {
 }
 
 test("passkey: register in Mein Konto, sign out, sign in with it (RP ID = issuer host)", async ({ page }) => {
+  await withoutPasskeyAutofill(page)
   const cdp = await page.context().newCDPSession(page)
   await cdp.send("WebAuthn.enable")
   const { authenticatorId } = await cdp.send("WebAuthn.addVirtualAuthenticator", {

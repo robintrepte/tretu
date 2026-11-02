@@ -1,7 +1,8 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
 import { roles, userRoles } from "@/db/schema";
+import { grantRoleWithSource } from "@/lib/auth/tretu-account";
 import { ROLE_PERMISSIONS } from "@/lib/permissions/model";
 import { ROLES, type Permission, type Role } from "@/lib/permissions/types";
 
@@ -70,22 +71,28 @@ export async function getPermissions(userId: string | number): Promise<Permissio
   return [...set];
 }
 
-/** Replaces the roles of a user (atomically). */
+/**
+ * Replaces the roles of a user (atomically). Roles that stay keep how they were granted (`source`), so a
+ * Tretu-sourced admin stays removable by the claim; newly added roles are local grants.
+ */
 export async function setUserRoles(userId: number, nextRoles: Role[]): Promise<void> {
   await seedDefaultRoles();
   const roleRows = await db.select().from(roles);
+  const wanted = new Set(
+    [...new Set(nextRoles)]
+      .map((key) => roleRows.find((r) => r.key === key)?.id)
+      .filter((id): id is number => typeof id === "number")
+  );
   await db.transaction(async (tx) => {
-    await tx.delete(userRoles).where(eq(userRoles.userId, userId));
-    const values = [...new Set(nextRoles)]
-      .map((key) => roleRows.find((r) => r.key === key))
-      .filter((role): role is (typeof roleRows)[number] => Boolean(role))
-      .map((role) => ({ userId, roleId: role.id }));
-    if (values.length) await tx.insert(userRoles).values(values);
+    const current = await tx.select({ roleId: userRoles.roleId }).from(userRoles).where(eq(userRoles.userId, userId));
+    const remove = current.map((r) => r.roleId).filter((id) => !wanted.has(id));
+    if (remove.length) await tx.delete(userRoles).where(and(eq(userRoles.userId, userId), inArray(userRoles.roleId, remove)));
+    const values = [...wanted].map((roleId) => ({ userId, roleId, source: "local" }));
+    if (values.length) await tx.insert(userRoles).values(values).onConflictDoNothing();
   });
 }
 
+/** Grants a role locally (an existing Tretu-sourced grant becomes local and is then never removed automatically). */
 export async function grantRole(userId: number, role: Role): Promise<void> {
-  await seedDefaultRoles();
-  const [row] = await db.select().from(roles).where(eq(roles.key, role)).limit(1);
-  if (row) await db.insert(userRoles).values({ userId, roleId: row.id }).onConflictDoNothing();
+  await grantRoleWithSource(db, userId, role, "local");
 }

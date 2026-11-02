@@ -154,6 +154,57 @@ async function stillHeld(db: Executor, target: SyncTarget, to: string, ref: stri
   return rows.length > 0;
 }
 
+/** A forced sync (admin "resync") grants again even when the role / group is recorded as granted. */
+function isForced(job: JobRow): boolean {
+  return job.payload.force === true;
+}
+
+/**
+ * Admin "resync": takes back grants that no longer apply, then grants every earned, mapped badge of
+ * `sub` again (also those recorded as done, in case a role was removed by hand in Discord / TeamSpeak).
+ * Returns the number of queued sync jobs.
+ */
+export async function forceBadgeResync(db: Executor, sub: string): Promise<number> {
+  await releaseStaleGrants(db, { sub });
+  let queued = 0;
+  for (const target of SYNC_TARGETS) {
+    const badges = mappedBadges(target);
+    if (!badges.length) continue;
+    const earned = await db
+      .select({ key: platformUserBadges.badgeKey })
+      .from(platformUserBadges)
+      .where(and(eq(platformUserBadges.sub, sub), inArray(platformUserBadges.badgeKey, badges)));
+    for (const { key } of earned) {
+      await enqueueJob(db, {
+        type: jobType(target),
+        payload: { sub, badge: key, force: true },
+        dedupeKey: `${target}:${sub}:${key}:force`,
+        sub,
+      });
+      queued++;
+    }
+  }
+  return queued;
+}
+
+/**
+ * Admin revoke of a badge (same transaction as removing the badge row): takes back what was granted
+ * for it and forgets the sync state, so a later manual grant syncs again.
+ */
+export async function releaseBadgeGrants(tx: Executor, sub: string, badgeKey: string): Promise<number> {
+  const rows = await tx
+    .delete(platformBadgeSync)
+    .where(and(eq(platformBadgeSync.sub, sub), eq(platformBadgeSync.badgeKey, badgeKey)))
+    .returning();
+  let queued = 0;
+  for (const row of rows) {
+    if (row.status !== "done" || !row.grantedTo || !row.grantedRef) continue;
+    await enqueueRevoke(tx, row.target as SyncTarget, { to: row.grantedTo, ref: row.grantedRef, badge: badgeKey, reason: "badge.revoked" });
+    queued++;
+  }
+  return queued;
+}
+
 /** Queues sync jobs for every earned, mapped badge of `sub` that is not synced yet (e.g. after linking). */
 export async function enqueueBadgeResync(db: Executor, sub: string, target: SyncTarget | "all"): Promise<number> {
   let queued = 0;
@@ -394,7 +445,7 @@ export async function discordSyncJob(db: Executor, job: JobRow, fetchImpl: Fetch
   const badge = String(job.payload.badge ?? "");
   const roleId = config?.roles[badge];
   if (!config || !roleId) return { status: "done" };
-  if (await alreadyDone(db, sub, badge, "discord")) return { status: "done" };
+  if (!isForced(job) && (await alreadyDone(db, sub, badge, "discord"))) return { status: "done" };
   if (!(await stillEarned(db, sub, badge))) return { status: "done" };
 
   const discordId = await currentIdentity(db, sub, "discord");
@@ -495,7 +546,7 @@ export function createTeamspeakSyncHandler(db: Executor, clientFactory: () => Te
       const badge = String(job.payload.badge ?? "");
       const groupId = groups[badge];
       if (!groupId || !teamspeakSyncEnabled()) return { status: "done" };
-      if (await alreadyDone(db, sub, badge, "teamspeak")) return { status: "done" };
+      if (!isForced(job) && (await alreadyDone(db, sub, badge, "teamspeak"))) return { status: "done" };
       if (!(await stillEarned(db, sub, badge))) return { status: "done" };
       const dbId = await currentIdentity(db, sub, "teamspeak");
       if (!dbId) {

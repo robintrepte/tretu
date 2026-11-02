@@ -249,6 +249,7 @@
       "unable_to_get_user_info": "The profile data could not be retrieved.",
       "oauth_provider_not_found": "This sign-in method is currently not available.",
       "signup_disabled": "New accounts cannot be created at the moment.",
+      "unable_to_create_session": "Sign-in was refused. If your Tretu account is locked, please contact the Tretu team.",
       "generic": "Sign-in failed ({code})."
     }
   },

@@ -1,7 +1,7 @@
 import { expect, test, type BrowserContext } from "@playwright/test";
 import { serializeSignedCookie } from "better-call";
 
-import { E2E_SECRET, SESSION_TOKEN, STEAM_ID, TS_UID } from "./fixtures";
+import { AUTH_MOCK_URL, E2E_SECRET, SESSION_TOKEN, STEAM_ID, TS_UID } from "./fixtures";
 
 async function signIn(context: BrowserContext, baseURL: string) {
   // The same signed cookie Better Auth sets after a login (`tretu.session_token` on http).
@@ -46,7 +46,7 @@ test("signed-in owner: 'Steam verbinden' on the profile, TeamSpeak section with 
   await page.goto("/u/robin");
   const connect = page.getByTestId("profile-connect-steam");
   await expect(connect).toBeVisible();
-  await expect(connect).toHaveAttribute("href", "http://127.0.0.1:9/konto");
+  await expect(connect).toHaveAttribute("href", `${AUTH_MOCK_URL}/konto`);
 
   await page.goto("/einstellungen#teamspeak");
   const section = page.locator("section#teamspeak");

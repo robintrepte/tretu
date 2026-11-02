@@ -10,6 +10,7 @@ import { randomUUID } from "node:crypto";
 import { eq, or, sql } from "drizzle-orm";
 
 import {
+  platformBadgeRevocations,
   platformBadgeSync,
   platformDailyCounters,
   platformDeletedUsers,
@@ -75,6 +76,7 @@ export async function eraseUser(
   await tx.delete(platformTsLinks).where(eq(platformTsLinks.sub, sub));
   await tx.delete(platformBadgeSync).where(eq(platformBadgeSync.sub, sub));
   await tx.delete(platformUserBadges).where(eq(platformUserBadges.sub, sub));
+  await tx.delete(platformBadgeRevocations).where(eq(platformBadgeRevocations.sub, sub));
   await tx.delete(platformUserAchievements).where(eq(platformUserAchievements.sub, sub));
   await tx.delete(platformUserStats).where(eq(platformUserStats.sub, sub));
   await tx.delete(platformUserProgress).where(eq(platformUserProgress.sub, sub));

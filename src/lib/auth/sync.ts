@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { authAccounts, users } from "@/db/schema";
 import { getDashboardAdminDiscordIds } from "@/lib/env/server";
 import { log } from "@/lib/observability/logger";
+import { applyTretuRoles } from "@/lib/auth/tretu-account";
 import { grantRole } from "@/lib/permissions/checks";
 
 export const DISCORD_PROVIDER = "discord";
@@ -80,7 +81,8 @@ export type SignInSyncResult = { locale: "de" | "en" | null };
 
 /**
  * Runs after every successful sign-in (Better Auth `hooks.after`): stores Discord ID / Tretu sub on the
- * user, bumps `updated_at` (last login), applies the Tretu `locale` claim and grants admin rights.
+ * user, bumps `updated_at` (last login), applies the Tretu `locale` claim and the admin role (Tretu `admin` claim
+ * when `adminFromRoles`, tracked as `source = 'tretu'` and removed again without it; `DASHBOARD_ADMIN_DISCORD_IDS`).
  */
 export async function syncUserAfterSignIn(
   userId: number,
@@ -113,9 +115,12 @@ export async function syncUserAfterSignIn(
 
   await db.update(users).set(updates).where(eq(users.id, userId));
 
-  const adminByDiscord = Boolean(discordId && getDashboardAdminDiscordIds().includes(discordId));
-  const adminByRoles = opts.adminFromRoles && Boolean(claims?.roles?.includes("admin"));
-  if (adminByDiscord || adminByRoles) await grantRole(userId, "admin");
+  // Tretu login: the `roles` claim decides the Tretu-sourced admin role (granted or taken back).
+  if (opts.provider === TRETU_PROVIDER && claims) {
+    await applyTretuRoles(db, userId, claims.roles ?? [], { adminFromRoles: opts.adminFromRoles });
+  }
+  // Admins listed by Discord ID are local admins (never removed automatically).
+  if (discordId && getDashboardAdminDiscordIds().includes(discordId)) await grantRole(userId, "admin");
 
   return { locale: claims?.locale ?? null };
 }

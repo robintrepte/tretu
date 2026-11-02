@@ -7,6 +7,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { platformEvents, platformUserAchievements, platformUserApps } from "@/db/platform-schema";
+import { applyAuthAccountState } from "@/lib/auth/tretu-account";
 import { enqueueBadgeResync, releaseStaleGrants } from "@/lib/platform/badge-sync";
 import { inTransaction, platformDb, type Executor } from "@/lib/platform/db";
 import { authUserSchema, ensureStub, isErased, upsertDirectoryUser } from "@/lib/platform/directory";
@@ -226,6 +227,8 @@ async function processUserEvent(tx: Executor, event: EventEnvelope, now: Date): 
   const user = authUserSchema.parse({ ...event.data, sub });
   const { applied, previous, current } = await upsertDirectoryUser(tx, user, new Date(event.occurredAt));
   if (!applied || !current) return "processed";
+  // The local hub user (if any): Tretu admin role → local admin, account lock → end sessions.
+  await applyAuthAccountState(tx, sub, { roles: user.roles, locked: user.locked, lockedUntil: user.lockedUntil }, now);
 
   if (event.type === "user.updated") {
     await emitPlatformEvent(tx, { type: "user.updated", sub, data: event.data, exceptApps: ["auth"], now });

@@ -194,7 +194,7 @@ function specs(domain, s) {
         ["TRETU_AUTH_CLIENT_ID", "tretu-web"],
         ["TRETU_AUTH_CLIENT_SECRET", G("oauth.tretu-web")],
         ["TRETU_DISCORD_FALLBACK", "true"],
-        ["TRETU_ADMIN_FROM_ROLES", "false"],
+        ["TRETU_ADMIN_FROM_ROLES", "true"],
         "# Platform (contract §3–§5)",
         ["TRETU_APPS_JSON", json(appsJson(domain, s))],
         ["TRETU_APP_ID", "tretu-web"],

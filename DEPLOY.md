@@ -175,8 +175,52 @@ the SQLite file was never modified.
 1. At auth.tretu.de register client `tretu-web` (confidential) with redirect URI
    `https://tretu.de/api/auth/oauth2/callback/tretu` and post-logout redirect URI `https://tretu.de/`.
 2. Set `TRETU_AUTH_ISSUER=https://auth.tretu.de`, `TRETU_AUTH_CLIENT_ID=tretu-web`, `TRETU_AUTH_CLIENT_SECRET=…`;
-   optionally `TRETU_DISCORD_FALLBACK=false` (hide direct Discord login) and `TRETU_ADMIN_FROM_ROLES=true`.
+   optionally `TRETU_DISCORD_FALLBACK=false` (hide direct Discord login). `TRETU_ADMIN_FROM_ROLES` is on by default (see
+   "Central Tretu admin" below).
 3. `pm2 reload ecosystem.config.cjs --update-env`. Existing users are matched by the `discord_id` claim.
+
+## Central Tretu admin
+
+`/dashboard/admin` is the one admin for everything that spans the ecosystem (each app keeps its own admin for
+app-specific things): **Übersicht** (Tretu-Konten KPIs, sign-ups/sign-ins, active users per app, credit flow, badges,
+service status, links to each app's admin), **Konten** (search over every identifier, detail page with profile, roles,
+2FA, sign-in methods and game links, passkeys, sessions, lock/unlock, old app accounts, merge, apps used with deep links
+into each app's admin, level/XP, badges, stats, friends, wallet, auth and hub audit), **Altkonten** (unmerged old
+accounts with one-click merge preview), **Wallet** (circulation, flow per day, top holders, per-user history, manual
+adjustment, reversing a transaction), **Abzeichen** (catalog with counts, holders, grant/revoke, Discord/TeamSpeak sync
+state and resync) and **Protokoll** (every admin action, filterable).
+
+**Who gets in.** Only the Tretu `admin` role (auth.tretu.de requires 2FA for it): a Tretu-Konto whose `roles` claim
+contains `admin` *and* the local `admin` role. With `TRETU_ADMIN_FROM_ROLES` not `false` (default) the claim grants the
+local admin role on every Tretu login and on auth's `user.updated`; the grant is stored as `user_roles.source = 'tretu'`
+and removed again when the claim disappears. Roles granted here (team panel, `DASHBOARD_ADMIN_DISCORD_IDS`) are
+`source = 'local'` and never removed automatically. `operator` / `manager` keep their game-server permissions only.
+Admin rows that existed before migration `0004_central_admin` count as local.
+
+**Locked Tretu-Konten.** auth's `user.updated` with `locked: true` (or a lock done in the hub) ends the user's tretu.de
+sessions and refuses new ones (also via the Discord fallback) until unlocked or `lockedUntil` has passed.
+
+**How it talks to auth.** Every account read and mutation goes to auth.tretu.de's admin API, signed as `tretu-web`
+(`TRETU_AUTH_ISSUER` + `TRETU_APP_SECRET`, which auth must know as `TRETU_APPS_JSON["tretu-web"].secret`; auth answers
+any other app with `403 forbidden_app`), 5 s timeout; when auth is down or not configured the pages show a friendly
+notice and the platform data still works. Reads carry `?actorSub=` and changes `actorSub` in the body: auth only serves
+an admin who holds `admin`, is not locked and has **2FA turned on** (`actor_two_factor_required`; the overview checks
+this first and links to "Mein Konto"). Every mutation needs a reason (3–500 characters), is confirmed in a dialog,
+rate-limited per admin (`TRETU_ADMIN_RATE_LIMIT_*`) and recorded in `platform_admin_audit` (failed attempts too, and
+changes auth answered with `changed: false` as `outcome: "noop"`; auth itself records only real changes, as `admin.*`
+in the account's activity log). auth's refusals (`self_action`, `last_admin`, `last_sign_in_method`, `no_email`,
+`merge_refused`, …) each have their own message. The service panel of the overview reads the same status tables as
+[/status](#status-page-tretudestatus). Mutations are Next.js server
+actions (same-origin only). Admin pages are rendered per request (`Cache-Control: no-store`) and sent with
+`X-Robots-Tag: noindex` (`robots.txt` disallows `/dashboard`).
+
+**Data it writes on tretu.de.** Wallet adjustments are `adjust` bookings of app `tretu-web` with the idempotency key
+`admin:<uuid>` (one per opened form, so a double submit books once); a reversal books the opposite amount once per
+transaction (key `reverse:<id>`, a spend comes back as `refund`). A manual badge grant behaves like an earned badge;
+a revoke removes the badge and its XP (level follows), takes back the Discord role / TeamSpeak group and stops the rules
+from awarding it again (`platform_badge_revocations`; a manual grant lifts it); credits stay. Resync re-grants every
+mapped badge (forced sync jobs). Migration `0004_central_admin` (additive) adds `platform_admin_audit`,
+`platform_badge_revocations`, `user_roles.source` and `users.tretu_roles / tretu_locked_at / tretu_locked_until`.
 
 ## Environment variables
 
@@ -190,7 +234,8 @@ the SQLite file was never modified.
 | `DASHBOARD_ADMIN_DISCORD_IDS` | no | Discord IDs that get the admin role on login |
 | `TRETU_AUTH_ISSUER`, `TRETU_AUTH_CLIENT_ID`, `TRETU_AUTH_CLIENT_SECRET` | no | Tretu-Konto login (all three) |
 | `TRETU_DISCORD_FALLBACK` | no | keep direct Discord login when Tretu-Konto is on (default `true`) |
-| `TRETU_ADMIN_FROM_ROLES` | no | admin role from the `roles` claim (default `false`) |
+| `TRETU_ADMIN_FROM_ROLES` | no | the Tretu `admin` role grants the local admin role and the central admin (default `true`; `false` = only local grants) |
+| `TRETU_ADMIN_RATE_LIMIT_PER_MIN`, `TRETU_ADMIN_RATE_LIMIT_BURST` | no | central admin mutations per admin (default 30/min, burst 10) |
 | `TRETU_STATUS_*` (targets, Minecraft, TeamSpeak, certificate hosts, Discord webhook, notice) | no | status page, see [Status page](#status-page-tretudestatus) |
 | `ORCHESTRATOR_EMBEDDED` | no | run jobs inside Next.js (default `true`; PM2 sets `false`) |
 | `SQLITE_DATABASE_PATH` | upgrade only | source file for `npm run db:migrate-sqlite` |
@@ -208,9 +253,27 @@ npm run test:platform         # tretu_platform_test (created automatically)
 NODE_OPTIONS=--max-old-space-size=3072 npm run build
 npm run test:e2e              # Playwright against next start (needs the build; database tretu_web_test_e2e)
 npm run test:deploy           # deploy/scripts (local Postgres with throwaway names, nginx for check-nginx.sh)
+npm --prefix auth ci && npm --prefix auth run build
+npm run test:e2e:admin-real   # central admin against the REAL auth (see below)
 ```
 
-`.github/workflows/ci.yml` runs exactly these (and `auth/`'s suite) with a Postgres 16 service on every pull request
+**Central admin against the real auth (`npm run test:e2e:admin-real`).** `npm run test:e2e` uses a stand-in for auth's
+admin API (`tests/helpers/mock-auth-admin.ts`, kept identical to `auth/app/api/v1/admin/**`); this suite runs the real
+thing. `tests/e2e-real/serve.ts` resets the databases `tretu_auth_test_admin_real` and `tretu_web_test_admin_real`
+(override with `E2E_REAL_AUTH_DATABASE_URL` / `E2E_REAL_HUB_DATABASE_URL`), migrates both, runs `npm run clients:sync`
+in `auth/` with a confidential `tretu-web` client, then starts auth on `http://localhost:3141` (with `TRETU_APPS_JSON`
+holding the tretu-web secret, event delivery to the hub, and `npm run worker:events`) and the hub on
+`http://127.0.0.1:3142` (Tretu-Konto provider on that auth, `TRETU_ADMIN_FROM_ROLES=true`, `npm run platform:worker`
+checking both apps for the status panel). Plain http works because auth accepts an http issuer on loopback hosts; the
+two hosts keep the cookies apart. Ports: `E2E_REAL_AUTH_PORT`, `E2E_REAL_HUB_PORT`. The scenario
+(`tests/e2e-real/admin-real.spec.ts`): an admin made with `npm run admin -- grant` and TOTP (codes generated in the
+test) signs in through auth, searches and opens a normal account, locks it (its auth and hub sessions end, auth's login
+shows the lock), unlocks it, ends its sessions, corrects its wallet, grants a badge, previews and merges an imported old
+account into it, and finds all of it in the hub's audit log and in auth's activity log; a second admin without 2FA (role
+from the CLI, delivered as `user.updated`) gets "Aktiviere 2FA in Mein Konto, um die Verwaltung zu nutzen". Takes about
+a minute (TOTP codes are single-use, so the sign-in may wait for the next 30 s step).
+
+`.github/workflows/ci.yml` runs exactly these (`auth/`'s suite and the real hub + auth admin e2e as separate jobs) with a Postgres 16 service on every pull request
 and push to `main`. **GitHub Actions must be enabled** for the repository (Settings → Actions → General).
 
 TeamSpeak (`TS_*`), Hetzner/Cloudflare/CurseForge fallbacks and the remaining variables are documented in `.env.example`.

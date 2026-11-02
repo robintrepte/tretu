@@ -4,6 +4,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { loadMessages, mergeMessages } from "../src/i18n/messages";
+import { ADMIN_ACTIONS } from "../src/lib/admin/audit";
 
 const FIXTURES = path.join(__dirname, "fixtures", "messages");
 
@@ -37,4 +38,14 @@ test("the app's German and English messages have the same keys (games: English o
   const en = new Set(keys(read("en")).filter((k) => !k.startsWith("games")));
   assert.deepEqual([...de].filter((k) => !en.has(k)), []);
   assert.deepEqual([...en].filter((k) => !de.has(k)), []);
+});
+
+test("the central admin's German and English messages have the same keys and no dotted keys", () => {
+  const read = (locale: string) => JSON.parse(readFileSync(path.join(__dirname, "..", "messages", "admin", `${locale}.json`), "utf8"));
+  const de = keys(read("de"));
+  const en = keys(read("en"));
+  assert.deepEqual(de.filter((k) => !en.includes(k)), []);
+  assert.deepEqual(en.filter((k) => !de.includes(k)), []);
+  // next-intl splits keys on "."; audit actions use `account_lock` for `account.lock`.
+  for (const action of ADMIN_ACTIONS) assert.ok(de.includes(`audit.actions.${action.replace(/\./g, "_")}`), action);
 });

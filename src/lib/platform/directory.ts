@@ -38,6 +38,9 @@ export const authUserSchema = z.object({
     })
     .nullish(),
   createdAt: optionalString(64),
+  /** Account lock (central admin spec): sign-in refused, sessions ended while true. */
+  locked: z.boolean().nullish(),
+  lockedUntil: optionalString(64),
 });
 export type AuthUser = z.infer<typeof authUserSchema>;
 export type DirectoryUser = typeof platformUsers.$inferSelect;

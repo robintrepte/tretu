@@ -112,6 +112,7 @@ npm run test:platform
 npm run build
 npm run test:e2e    # browser tests (Playwright) against the build
 npm run test:deploy # deploy/scripts (secrets generator, databases, smoke test, backups)
+npm run test:e2e:admin-real  # central admin against the real auth.tretu.de (needs both builds, see DEPLOY.md)
 ```
 
 CI (`.github/workflows/ci.yml`) runs all of it, plus `auth/`'s suite, on pull requests and pushes to `main`; GitHub
@@ -185,6 +186,10 @@ mods/worlds, edit configs) and a per-server job log.
 - `operator` — create/configure/delete servers, console, files
 - `manager` — start, turn off, restart, backups
 - `user` — no dashboard access
+
+The **central Tretu admin** (`/dashboard/admin`: Tretu-Konten, wallet, badges, cross-app stats, audit log) needs the
+Tretu `admin` role of the Tretu-Konto, not just the local admin role; operator and manager never get it. See
+[DEPLOY.md](DEPLOY.md#central-tretu-admin).
 
 ### Orchestrator worker
 

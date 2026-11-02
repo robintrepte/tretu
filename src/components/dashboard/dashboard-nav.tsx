@@ -12,12 +12,16 @@ export function DashboardNav({
   canCreate,
   canManageSettings,
   canManageRoles,
+  accountAdmin = false,
 }: {
   canCreate: boolean;
   canManageSettings: boolean;
   canManageRoles: boolean;
+  /** Tretu `admin` role: link to the central admin (accounts, wallet, badges). */
+  accountAdmin?: boolean;
 }) {
   const t = useTranslations("dashboard.nav");
+  const tAdmin = useTranslations("admin");
   const pathname = usePathname() ?? "";
 
   const links: LinkItem[] = [{ href: "/dashboard", label: t("servers") }];
@@ -27,6 +31,7 @@ export function DashboardNav({
     links.push({ href: "/dashboard/team", label: t("team") });
   }
   if (canManageSettings) links.push({ href: "/dashboard/setup", label: t("setup") });
+  if (accountAdmin) links.push({ href: "/dashboard/admin", label: tAdmin("navLink") });
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return pathname === "/dashboard" || pathname.startsWith("/dashboard/games/");

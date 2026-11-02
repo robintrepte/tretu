@@ -40,6 +40,15 @@ export const users = pgTable("users", {
   emailVerified: boolean("email_verified").notNull().default(false),
   /** UI language from the Tretu-Konto (`de` | `en`). */
   locale: text("locale"),
+  /**
+   * Global roles of the Tretu-Konto (`roles` claim) as of the last Tretu login or auth `user.updated`.
+   * `null` = never seen. The central admin pages require `admin` here (see src/lib/admin/access.ts).
+   */
+  tretuRoles: jsonb("tretu_roles").$type<string[]>(),
+  /** Set while auth.tretu.de reports the Tretu-Konto as locked (`user.updated` with `locked: true`). */
+  tretuLockedAt: ts("tretu_locked_at"),
+  /** End of a temporary lock (null = until unlocked). */
+  tretuLockedUntil: ts("tretu_locked_until"),
   createdAt: createdAt(),
   /** Bumped on every sign-in (shown as "last login" in the team list). */
   updatedAt: ts("updated_at").notNull().defaultNow(),
@@ -119,6 +128,11 @@ export const userRoles = pgTable(
     roleId: integer("role_id")
       .notNull()
       .references(() => roles.id, { onDelete: "cascade" }),
+    /**
+     * `local`: granted here (team panel, `DASHBOARD_ADMIN_DISCORD_IDS`), never removed automatically.
+     * `tretu`: granted from the Tretu `admin` claim (`TRETU_ADMIN_FROM_ROLES`), removed when the claim disappears.
+     */
+    source: text("source").notNull().default("local"),
     createdAt: createdAt(),
   },
   (table) => [uniqueIndex("user_roles_user_role_idx").on(table.userId, table.roleId)]

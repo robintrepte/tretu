@@ -21,6 +21,7 @@ import {
   TRETU_PROVIDER,
   tretuClaimsSchema,
 } from "@/lib/auth/sync";
+import { isUserLocked } from "@/lib/auth/tretu-account";
 import { AUTH_DISCORD_CLIENT_ID, AUTH_DISCORD_CLIENT_SECRET } from "@/lib/env/server";
 import { LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE, LOCALE_MANUAL_COOKIE } from "@/i18n/config";
 import { log } from "@/lib/observability/logger";
@@ -77,6 +78,21 @@ const options = {
     ipAddress: { ipAddressHeaders: ["x-forwarded-for", "x-real-ip"] },
     // Keep the integer primary keys of `users` (and every table that references them).
     database: { generateId: "serial" },
+  },
+  databaseHooks: {
+    session: {
+      create: {
+        // A locked Tretu-Konto (auth `user.updated` with `locked: true`) gets no new session, also not via the
+        // Discord fallback. Better Auth then redirects to /login?error=unable_to_create_session.
+        async before(session) {
+          const userId = Number(session.userId);
+          if (Number.isInteger(userId) && (await isUserLocked(db, userId))) {
+            log("info", "auth.session_refused_locked", { userId });
+            return false;
+          }
+        },
+      },
+    },
   },
   // Only social sign-in is offered; profile data is owned by Discord / the Tretu-Konto.
   disabledPaths: ["/update-user", "/delete-user", "/change-email", "/sign-up/email", "/sign-in/email"],

@@ -1,6 +1,7 @@
 /**
  * Test server for the Playwright suite: fresh database `tretu_web_test_e2e` (override E2E_DATABASE_URL),
- * migrations, seed data (profiles with linked accounts, a signed-in owner, status history), then `next start`.
+ * migrations, seed data (profiles with linked accounts, a signed-in owner who is a Tretu admin, a team member without
+ * it, status history), the mocked auth admin API on E2E_AUTH_PORT (default 3133), then `next start`.
  * While it runs, it stands in for the platform worker's status checks (one result per service every 30 s).
  */
 import { spawn } from "node:child_process";
@@ -8,7 +9,23 @@ import path from "node:path";
 
 import postgres from "postgres";
 
-import { E2E_SECRET, SESSION_TOKEN, STATUS_SEED, STATUS_TARGETS, STEAM_ID, TS_UID, USERS } from "./fixtures";
+import { mockUser, startMockAuth } from "../helpers/mock-auth-admin";
+import {
+  AUTH_MOCK_PORT,
+  AUTH_MOCK_URL,
+  E2E_SECRET,
+  MEMBER_SESSION_TOKEN,
+  MEMBER_SUB,
+  NO2FA_SESSION_TOKEN,
+  NO2FA_SUB,
+  SESSION_TOKEN,
+  STATUS_SEED,
+  STATUS_TARGETS,
+  STEAM_ID,
+  TS_UID,
+  USERS,
+  WEB_SECRET,
+} from "./fixtures";
 
 const root = path.resolve(__dirname, "../..");
 const port = process.env.E2E_PORT ?? "3132";
@@ -44,8 +61,19 @@ async function seed() {
   await platformDb.insert(platformTsLinks).values({ sub: USERS.owner.sub, linkError: "ts_identity_taken_auth" });
   await setVisibility(platformDb, USERS.hidden.sub, "friends");
 
-  const [owner] = await db.insert(users).values({ displayName: USERS.owner.name, tretuSub: USERS.owner.sub }).returning();
+  // The owner is a Tretu admin (roles claim → local admin, tracked as `tretu`): the central admin is open to them.
+  const [owner] = await db.insert(users).values({ displayName: USERS.owner.name, tretuSub: USERS.owner.sub, tretuRoles: ["admin"] }).returning();
   await db.insert(authSessions).values({ token: SESSION_TOKEN, userId: owner!.id, expiresAt: new Date(Date.now() + 24 * 3600_000) });
+  const { grantRoleWithSource } = await import("../../src/lib/auth/tretu-account");
+  await grantRoleWithSource(db, owner!.id, "admin", "tretu");
+  // A game-server operator without the Tretu admin role.
+  const [member] = await db.insert(users).values({ displayName: "Member", tretuSub: MEMBER_SUB, tretuRoles: [] }).returning();
+  await db.insert(authSessions).values({ token: MEMBER_SESSION_TOKEN, userId: member!.id, expiresAt: new Date(Date.now() + 24 * 3600_000) });
+  await grantRoleWithSource(db, member!.id, "operator", "local");
+  // A Tretu admin without 2FA at auth (the overview explains why the account admin stays closed).
+  const [no2fa] = await db.insert(users).values({ displayName: "Neu-Admin", tretuSub: NO2FA_SUB, tretuRoles: ["admin"] }).returning();
+  await db.insert(authSessions).values({ token: NO2FA_SESSION_TOKEN, userId: no2fa!.id, expiresAt: new Date(Date.now() + 24 * 3600_000) });
+  await grantRoleWithSource(db, no2fa!.id, "admin", "tretu");
   await seedStatus();
   await closePlatformDb();
   await closeDb();
@@ -88,9 +116,39 @@ function keepStatusFresh() {
   timer.unref();
 }
 
+/** auth.tretu.de admin API stand-in (signature-checked, in memory) for the central admin flows. */
+async function startAuthMock() {
+  const at = "2026-01-01T00:00:00.000Z";
+  await startMockAuth({
+    secret: WEB_SECRET,
+    port: AUTH_MOCK_PORT,
+    users: [
+      mockUser({ sub: USERS.owner.sub, username: USERS.owner.username, name: USERS.owner.name, email: "robin@example.org", emailVerified: true, roles: ["admin"], twoFactor: true, createdAt: at }),
+      mockUser({
+        sub: USERS.steamy.sub,
+        username: USERS.steamy.username,
+        name: USERS.steamy.name,
+        email: "steamy@example.org",
+        emailVerified: true,
+        createdAt: at,
+        lastSignInAt: "2026-10-30T12:00:00.000Z",
+        links: { steam: STEAM_ID, discord: "424242", minecraftName: "SteamyMC", minecraft: "uuid-steamy", teamspeak: TS_UID },
+        providers: [
+          { provider: "steam", accountId: STEAM_ID, displayName: "Steamy", createdAt: at },
+          { provider: "discord", accountId: "424242", displayName: "steamy", createdAt: at },
+        ],
+        sessions: [{ id: "sess-1", createdAt: "2026-10-30T12:00:00.000Z", expiresAt: "2099-12-30T12:00:00.000Z", ipAddress: "203.0.113.9", client: "play" }],
+      }),
+      mockUser({ sub: USERS.hidden.sub, username: USERS.hidden.username, name: USERS.hidden.name, createdAt: at }),
+      mockUser({ sub: NO2FA_SUB, username: "neuadmin", name: "Neu-Admin", roles: ["admin"], twoFactor: false, createdAt: at }),
+    ],
+  });
+}
+
 async function main() {
   await resetDatabase();
   await seed();
+  await startAuthMock();
   const child = spawn(process.execPath, [path.join(root, "node_modules/next/dist/bin/next"), "start", "-p", port], {
     cwd: root,
     stdio: "inherit",
@@ -103,8 +161,9 @@ async function main() {
       ORCHESTRATOR_EMBEDDED: "false",
       AUTH_RATE_LIMIT: "off",
       // Platform on (signed API) with a Tretu-Konto issuer for the "Mein Konto" / "Steam verbinden" links.
-      TRETU_APPS_JSON: JSON.stringify({ "tretu-web": { secret: "e2e-web-secret-0123456789" } }),
-      TRETU_AUTH_ISSUER: "http://127.0.0.1:9",
+      TRETU_APPS_JSON: JSON.stringify({ "tretu-web": { secret: WEB_SECRET } }),
+      TRETU_AUTH_ISSUER: AUTH_MOCK_URL,
+      TRETU_APP_SECRET: WEB_SECRET,
       TS_QUERY_HOST: "127.0.0.1",
       TS_QUERY_USER: "serveradmin",
       TS_QUERY_PASSWORD: "e2e",
