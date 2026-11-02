@@ -2,6 +2,8 @@
  * `user.deleted` (from auth): erase every platform record of a sub and forward the event to all
  * subscribed apps. The wallet account and its ledger entries are anonymised instead of deleted so
  * the double-entry ledger keeps balancing to zero; nothing left behind is linkable to the person.
+ * Discord roles and TeamSpeak server groups granted for badges are captured first and queued for
+ * removal (or handed to the surviving account of a merge with the same identity), see badge-sync.ts.
  */
 import { randomUUID } from "node:crypto";
 
@@ -32,10 +34,18 @@ import {
   platformWalletDaily,
   platformWalletTransactions,
 } from "@/db/platform-schema";
+import { releaseGrantsForErasure } from "@/lib/platform/badge-sync";
 import { type Executor } from "@/lib/platform/db";
 import { emitPlatformEvent } from "@/lib/platform/outbox";
 
-export async function eraseUser(tx: Executor, sub: string, now: Date = new Date()): Promise<void> {
+export async function eraseUser(
+  tx: Executor,
+  sub: string,
+  now: Date = new Date(),
+  options: { mergedInto?: string | null } = {}
+): Promise<void> {
+  // Must run before the directory row, TS link and sync state are deleted below.
+  await releaseGrantsForErasure(tx, sub, options.mergedInto ?? null);
   await tx.insert(platformDeletedUsers).values({ sub, deletedAt: now }).onConflictDoNothing();
 
   // Friends lose this friendship: recount their friend stat.

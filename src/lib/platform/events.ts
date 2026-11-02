@@ -7,7 +7,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { platformEvents, platformUserAchievements, platformUserApps } from "@/db/platform-schema";
-import { enqueueBadgeResync } from "@/lib/platform/badge-sync";
+import { enqueueBadgeResync, releaseStaleGrants } from "@/lib/platform/badge-sync";
 import { inTransaction, platformDb, type Executor } from "@/lib/platform/db";
 import { authUserSchema, ensureStub, isErased, upsertDirectoryUser } from "@/lib/platform/directory";
 import { getEconomy, xpForStatIncrement } from "@/lib/platform/economy";
@@ -178,7 +178,9 @@ type ProcessStatus = "processed" | "stored" | "ignored";
  * stats move to the surviving account. Idempotent: the bookings use deterministic keys, and the
  * stats copy only runs while the old stats still exist (they are erased right after).
  */
-async function carryOverMergedAccount(tx: Executor, from: string, into: string, now: Date): Promise<void> {
+async function carryOverMergedAccount(tx: Executor, from: string, into: string, now: Date, eventId: string): Promise<void> {
+  await ensureStub(tx, into);
+  await lockProgress(tx, into);
   const balance = (await peekBalance(tx, from)) ?? 0;
   if (balance > 0) {
     await bookTransaction(tx, {
@@ -206,16 +208,17 @@ async function carryOverMergedAccount(tx: Executor, from: string, into: string, 
     insert into platform_user_stats (sub, key, value, updated_at)
     select ${into}, key, value, ${now.toISOString()}::timestamptz from platform_user_stats where sub = ${from} and key <> 'tretu.friends'
     on conflict (sub, key) do update set value = platform_user_stats.value + excluded.value, updated_at = excluded.updated_at`);
+  // The moved stats can unlock badges (and their Discord / TeamSpeak sync) on the surviving account.
+  await settleProgress(tx, into, { now, sourceEventId: eventId });
 }
 
 async function processUserEvent(tx: Executor, event: EventEnvelope, now: Date): Promise<ProcessStatus> {
   const sub = event.sub as string;
   if (event.type === "user.deleted") {
     const mergedInto = typeof event.data.mergedInto === "string" ? event.data.mergedInto : null;
-    if (mergedInto && mergedInto !== sub && !(await isErased(tx, mergedInto))) {
-      await carryOverMergedAccount(tx, sub, mergedInto, now);
-    }
-    await eraseUser(tx, sub, now);
+    const survivor = mergedInto && mergedInto !== sub && !(await isErased(tx, mergedInto)) ? mergedInto : null;
+    if (survivor) await carryOverMergedAccount(tx, sub, survivor, now, event.id);
+    await eraseUser(tx, sub, now, { mergedInto: survivor });
     return "processed";
   }
   if (await isErased(tx, sub)) return "ignored";
@@ -226,8 +229,10 @@ async function processUserEvent(tx: Executor, event: EventEnvelope, now: Date): 
   if (event.type === "user.updated") {
     await emitPlatformEvent(tx, { type: "user.updated", sub, data: event.data, exceptApps: ["auth"], now });
   }
-  if (current.discordId && previous?.discordId !== current.discordId) {
-    await enqueueBadgeResync(tx, sub, "discord");
+  if ((previous?.discordId ?? null) !== (current.discordId ?? null)) {
+    // Roles granted to the old Discord account are taken back, the new one gets them (if linked).
+    await releaseStaleGrants(tx, { sub, target: "discord", previousIdentity: previous?.discordId ?? null });
+    if (current.discordId) await enqueueBadgeResync(tx, sub, "discord");
   }
   // The account creation date can unlock the early-supporter badge.
   await lockProgress(tx, sub);

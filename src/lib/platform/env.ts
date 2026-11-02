@@ -77,42 +77,69 @@ export function intEnv(name: string, fallback: number, min = 0, max = Number.MAX
   return Math.min(max, Math.max(min, Math.trunc(n)));
 }
 
-function parseJsonMap(name: string): Record<string, string> {
+/** `{ok:false}` when the variable is set but not a valid JSON map (so callers never mistake a typo for "empty"). */
+function parseJsonMapStrict(name: string): { ok: true; value: Record<string, string> } | { ok: false } {
   const raw = process.env[name]?.trim();
-  if (!raw) return {};
+  if (!raw) return { ok: true, value: {} };
   try {
     const parsed = z.record(z.string(), z.union([z.string(), z.number()])).safeParse(JSON.parse(raw));
     if (!parsed.success) {
       log("error", "platform.config.invalid_json_map", { name });
-      return {};
+      return { ok: false };
     }
-    return Object.fromEntries(Object.entries(parsed.data).map(([k, v]) => [k, String(v)]));
+    return { ok: true, value: Object.fromEntries(Object.entries(parsed.data).map(([k, v]) => [k, String(v)])) };
   } catch {
     log("error", "platform.config.invalid_json_map", { name });
-    return {};
+    return { ok: false };
   }
+}
+
+function parseJsonMap(name: string): Record<string, string> {
+  const result = parseJsonMapStrict(name);
+  return result.ok ? result.value : {};
 }
 
 export type DiscordSyncConfig = { token: string; guildId: string; roles: Record<string, string> };
 
-/** Discord badge-role sync; null unless token, guild and a non-empty mapping are set. */
-export function getDiscordSyncConfig(): DiscordSyncConfig | null {
+/** Bot token + guild (enough to remove roles even when no badge is mapped any more). */
+export function getDiscordCredentials(): { token: string; guildId: string } | null {
   const token = process.env.DISCORD_BOT_TOKEN?.trim();
   const guildId = process.env.DISCORD_GUILD_ID?.trim();
-  const roles = parseJsonMap("TRETU_BADGE_DISCORD_ROLES_JSON");
-  if (!token || !guildId || Object.keys(roles).length === 0) return null;
-  return { token, guildId, roles };
+  return token && guildId ? { token, guildId } : null;
 }
 
-/** Badge → TeamSpeak server group id (empty = TS badge sync off). */
-export function getTsBadgeGroups(): Record<string, number> {
-  const map = parseJsonMap("TRETU_BADGE_TS_GROUPS_JSON");
+/** Discord badge-role sync; null unless token, guild and a non-empty mapping are set. */
+export function getDiscordSyncConfig(): DiscordSyncConfig | null {
+  const credentials = getDiscordCredentials();
+  const roles = parseJsonMap("TRETU_BADGE_DISCORD_ROLES_JSON");
+  if (!credentials || Object.keys(roles).length === 0) return null;
+  return { ...credentials, roles };
+}
+
+/** Badge → Discord role id; null when the variable is set but invalid (reconciliation then leaves roles alone). */
+export function getDiscordRoleMapStrict(): Record<string, string> | null {
+  const result = parseJsonMapStrict("TRETU_BADGE_DISCORD_ROLES_JSON");
+  return result.ok ? result.value : null;
+}
+
+function toGroupIds(map: Record<string, string>): Record<string, number> {
   const out: Record<string, number> = {};
   for (const [badge, value] of Object.entries(map)) {
     const n = Number(value);
     if (Number.isInteger(n) && n > 0) out[badge] = n;
   }
   return out;
+}
+
+/** Badge → TeamSpeak server group id (empty = TS badge sync off). */
+export function getTsBadgeGroups(): Record<string, number> {
+  return toGroupIds(parseJsonMap("TRETU_BADGE_TS_GROUPS_JSON"));
+}
+
+/** Badge → TeamSpeak server group id; null when the variable is set but invalid. */
+export function getTsBadgeGroupsStrict(): Record<string, number> | null {
+  const result = parseJsonMapStrict("TRETU_BADGE_TS_GROUPS_JSON");
+  return result.ok ? toGroupIds(result.value) : null;
 }
 
 export type WebPushConfig = { publicKey: string; privateKey: string; subject: string };

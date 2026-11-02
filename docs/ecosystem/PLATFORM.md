@@ -73,7 +73,9 @@ Pages: `/u/[username]` (also accepts a sub), `/freunde`, `/benachrichtigungen`, 
   devices, TS link, sync state, jobs, queued webhooks), anonymises stored events, and anonymises the
   wallet (account → `erased:<uuid>`, transactions lose sub/reason/ref/key) so the ledger still balances.
   A tombstone (`platform_deleted_users`, only the sub) stops late events from recreating data. Then
-  `user.deleted` is forwarded. Discord roles / TS groups already granted are not revoked.
+  `user.deleted` is forwarded. **Discord roles and TeamSpeak groups granted for badges are taken back**
+  (see "Discord + TeamSpeak badge sync" below). With `mergedInto`, the moved stats are settled on the
+  surviving account (badges it now qualifies for are awarded).
 - Unknown subs: events create a stub directory row and queue a `user.fetch` job; API calls for an unknown
   sub fetch it inline from `GET ${TRETU_AUTH_ISSUER}/api/v1/users/{sub}` (signed as `tretu-web` with
   `TRETU_APP_SECRET`, falling back to `TRETU_APPS_JSON["tretu-web"].secret`, 5 s timeout). Read-only
@@ -137,12 +139,12 @@ POSTs the envelope (`app:"platform"`) signed with `x-tretu-app: platform` and th
 secret, 5 s timeout. Non-2xx/timeouts retry after 30 s, 1, 2, 4 … min (capped at 2 h) until 24 h after
 creation, then `failed`. Rows are claimed with `FOR UPDATE SKIP LOCKED`, so several workers are safe.
 
-`platform_jobs` (same backoff; push gives up after 1 h): `push.send`, `badge.sync.discord`,
-`badge.sync.teamspeak`, `user.fetch`.
+`platform_jobs` (same backoff; push gives up after 1 h, role removals after 7 days): `push.send`,
+`badge.sync.discord`, `badge.sync.teamspeak`, `badge.revoke.discord`, `badge.revoke.teamspeak`, `user.fetch`.
 
 Worker: `scripts/platform-worker.ts` (`npm run platform:worker`, `-- --once` for a single pass). Loop: webhooks
-+ jobs (every 2 s when idle), presence expiry (30 s), every 10 min badge-sync reconciliation (earned,
-mapped, not yet synced; "skipped" ones retried after a day) and housekeeping (delivered webhooks/done jobs
++ jobs (every 2 s when idle), presence expiry (30 s), every 10 min badge-sync reconciliation (first removes
+grants that no longer map, then queues earned, mapped, not yet synced badges; "skipped" ones retried after a day) and housekeeping (delivered webhooks/done jobs
 after 7 days, failed after 30 days, notifications after 180 days). PM2 entry for `ecosystem.config.cjs`:
 
 ```js
@@ -166,7 +168,25 @@ after 7 days, failed after 30 days, notifications after 180 days). PM2 entry for
   identity on `/einstellungen`: they put a code (`TRT-XXXXX`, 15 min) into their TS nickname and click
   *Prüfen*; the online client with that code is stored (uid + database id). Groups are added with
   `servergroupaddclient`; "already member" counts as done.
-- State per (sub, badge, target) in `platform_badge_sync` (idempotent).
+- State per (sub, badge, target) in `platform_badge_sync` (idempotent). A `done` row records what was granted:
+  `granted_to` (Discord user id / TS client database id) and `granted_ref` (role id / server group id).
+- **Taking grants back** (`badge.revoke.discord` = `DELETE …/members/{id}/roles/{role}`, `badge.revoke.teamspeak` =
+  `servergroupdelclient`; 404 / "not in group" count as done; retried with the usual backoff for up to 7 days):
+  - `user.deleted`: in the same transaction, before anything is erased, every grant of the sub is captured and a
+    revoke job queued. Revoke jobs have no `sub` (they outlive the erasure); their identity (`to`) is removed from
+    the payload once they finish. The directory row is locked first, so a grant finishing concurrently is queued
+    for removal instead of being recorded for an erased sub.
+  - Merge (`mergedInto`): a grant moves to the surviving account when it has the same Discord account linked; a
+    verified TeamSpeak link moves to the surviving account when it has none (then its groups stay). Otherwise the
+    grants are removed.
+  - Identity change: a new / removed Discord link (`user.updated`), re-linking or unlinking TeamSpeak on
+    `/einstellungen` remove the grants of the old identity and queue them for the new one.
+  - Mapping change: the 10-minute reconciliation removes grants whose badge is no longer mapped or now maps to
+    another role / group (and grants the new one). An empty mapping removes everything that was granted; an
+    **invalid** JSON mapping or missing credentials (`DISCORD_BOT_TOKEN` + `DISCORD_GUILD_ID`, `TS_QUERY_*`) never
+    remove anything (logged, retried later).
+  - A role still needed by another live grant (same identity and role, e.g. two badges mapped to one role) is not
+    removed.
 
 ## Web push
 
@@ -182,7 +202,7 @@ users (directory: sub, username, name, picture, locale, roles, links, discord_id
 source_updated_at, fetched_at) · deleted_users (tombstones) · profile_settings (visibility
 public/friends/private, default public) · events · user_stats (sub, key, value) · user_progress (xp,
 level) · daily_counters (sub, Berlin day, counter) · user_apps · user_badges · user_achievements ·
-badge_sync · ts_links · outbox · jobs · wallet_accounts · wallet_transactions (unique app +
+badge_sync (granted_to, granted_ref) · ts_links · outbox · jobs · wallet_accounts · wallet_transactions (unique app +
 idempotency_key) · wallet_entries (amount, balance_after) · wallet_daily (sub, day) · friend_requests ·
 friendships (sub_a < sub_b) · presence (sub, app, expires_at) · notifications · notification_settings ·
 push_subscriptions.
@@ -213,4 +233,6 @@ npm run test:platform   # uses tretu_platform_test (created + schema applied aut
                         # override with TRETU_PLATFORM_TEST_DATABASE_URL)
 ```
 
-Migrations are not committed here: the integrator generates one migration for the merged schema.
+Schema changes: edit `src/db/platform-schema.ts`, then `npm run db:generate` (new file in `drizzle/`, additive only)
+and `npm run db:migrate`. `0002_badge_grants_steam.sql` adds `platform_badge_sync.granted_to/granted_ref` and
+`platform_users.steam_id` (backfilled from `links`).

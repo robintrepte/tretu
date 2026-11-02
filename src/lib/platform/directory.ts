@@ -43,6 +43,21 @@ export type DirectoryUser = typeof platformUsers.$inferSelect;
 
 export const USERNAME_PATTERN = /^[A-Za-z0-9_.-]{2,32}$/;
 
+/** SteamID64 range of individual accounts (universe 1, type 1, instance 1): 76561197960265728 + account id. */
+const STEAM_INDIVIDUAL_BASE = BigInt("76561197960265728");
+const STEAM_ACCOUNT_ID_MAX = BigInt(0xffffffff);
+
+/** The Steam ID if it is a valid individual SteamID64 (decimal), else null (never render anything else as a link). */
+export function validSteamId(value: string | null | undefined): string | null {
+  if (!value || !/^\d{17}$/.test(value)) return null;
+  const accountId = BigInt(value) - STEAM_INDIVIDUAL_BASE;
+  return accountId > BigInt(0) && accountId <= STEAM_ACCOUNT_ID_MAX ? value : null;
+}
+
+export function steamProfileUrl(steamId: string): string {
+  return `https://steamcommunity.com/profiles/${steamId}`;
+}
+
 function cleanLinks(links: AuthUser["links"]): PlatformUserLinks {
   const out: PlatformUserLinks = {};
   if (!links) return out;
@@ -100,6 +115,7 @@ export async function upsertDirectoryUser(db: Executor, user: AuthUser, sourceAt
     roles: user.roles ?? [],
     links,
     discordId: links.discord ?? null,
+    steamId: validSteamId(links.steam),
     authCreatedAt: parseDate(user.createdAt) ?? previous?.authCreatedAt ?? null,
     sourceUpdatedAt: sourceAt,
     fetchedAt: new Date(),

@@ -49,6 +49,8 @@ export const platformUsers = pgTable(
     roles: jsonb("roles").$type<string[]>().notNull().default([]),
     links: jsonb("links").$type<PlatformUserLinks>().notNull().default({}),
     discordId: text("discord_id"),
+    /** 64-bit SteamID (decimal string) from auth's `links.steam`; shown on the profile page. */
+    steamId: text("steam_id"),
     authCreatedAt: tz("auth_created_at"),
     /** occurredAt of the last applied user.* event (out-of-order protection). */
     sourceUpdatedAt: tz("source_updated_at"),
@@ -176,9 +178,19 @@ export const platformBadgeSync = pgTable(
     /** done | skipped */
     status: text("status").notNull(),
     detail: text("detail"),
+    /**
+     * What was actually granted (status `done`): the Discord user id / TeamSpeak client database id and
+     * the role / server group id. Kept so a deletion, an identity change or a changed mapping removes
+     * exactly what was granted, even after the env changed. Null on rows from before this column.
+     */
+    grantedTo: text("granted_to"),
+    grantedRef: text("granted_ref"),
     updatedAt: updatedAt(),
   },
-  (t) => [primaryKey({ columns: [t.sub, t.badgeKey, t.target] })]
+  (t) => [
+    primaryKey({ columns: [t.sub, t.badgeKey, t.target] }),
+    index("platform_badge_sync_granted_idx").on(t.target, t.grantedTo, t.grantedRef),
+  ]
 );
 
 /** TeamSpeak identity verified by the user (nickname code), used for badge server groups. */

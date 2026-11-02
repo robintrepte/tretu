@@ -9,7 +9,13 @@ import { log } from "@/lib/observability/logger";
 import { platformDb, type Executor } from "@/lib/platform/db";
 import { nextAttemptAt, WEBHOOK_MAX_AGE_MS } from "@/lib/platform/outbox";
 
-export type JobType = "push.send" | "badge.sync.discord" | "badge.sync.teamspeak" | "user.fetch";
+export type JobType =
+  | "push.send"
+  | "badge.sync.discord"
+  | "badge.sync.teamspeak"
+  | "badge.revoke.discord"
+  | "badge.revoke.teamspeak"
+  | "user.fetch";
 export type JobRow = typeof platformJobs.$inferSelect;
 
 /** done | retry later | give up. */
@@ -17,8 +23,30 @@ export type JobOutcome = { status: "done" } | { status: "retry"; error: string }
 
 export type JobHandler = (job: JobRow) => Promise<JobOutcome>;
 
-/** Max age before a job is given up (push is useless after an hour). */
-const MAX_AGE_MS: Partial<Record<JobType, number>> = { "push.send": 60 * 60 * 1000 };
+/**
+ * Max age before a job is given up (default 24 h). Push is useless after an hour; role removals after
+ * a deletion keep trying for a week (e.g. Discord or TeamSpeak down for a while).
+ */
+const MAX_AGE_MS: Partial<Record<JobType, number>> = {
+  "push.send": 60 * 60 * 1000,
+  "badge.revoke.discord": 7 * 24 * 3600_000,
+  "badge.revoke.teamspeak": 7 * 24 * 3600_000,
+};
+
+/**
+ * Payload keys removed once a job is finished (done or failed): revoke jobs carry the Discord /
+ * TeamSpeak identity of a deleted user and must not keep it after the work is done.
+ */
+const SCRUB_ON_FINISH: Partial<Record<JobType, string[]>> = {
+  "badge.revoke.discord": ["to"],
+  "badge.revoke.teamspeak": ["to"],
+};
+
+function scrubbed(job: JobRow): Record<string, unknown> | undefined {
+  const keys = SCRUB_ON_FINISH[job.type as JobType];
+  if (!keys) return undefined;
+  return Object.fromEntries(Object.entries(job.payload).filter(([k]) => !keys.includes(k)));
+}
 
 export async function enqueueJob(
   db: Executor,
@@ -82,7 +110,7 @@ export async function runDueJobs(
     if (outcome.status === "done") {
       await platformDb
         .update(platformJobs)
-        .set({ status: "done", attempts, finishedAt: now, lockedUntil: null, lastError: null })
+        .set({ status: "done", attempts, finishedAt: now, lockedUntil: null, lastError: null, ...(scrubbed(job) && { payload: scrubbed(job) }) })
         .where(eq(platformJobs.id, job.id));
       result.done++;
       continue;
@@ -100,6 +128,7 @@ export async function runDueJobs(
         lockedUntil: null,
         lastError: outcome.error.slice(0, 500),
         finishedAt: next ? null : now,
+        ...(!next && scrubbed(job) && { payload: scrubbed(job) }),
       })
       .where(eq(platformJobs.id, job.id));
     if (next) result.retried++;

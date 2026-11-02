@@ -18,6 +18,11 @@ import { TeamSpeakQueryClient, type TsOnlineClient } from "@/lib/teamspeak/query
 
 export const TS_CODE_TTL_MS = 15 * 60 * 1000;
 
+/** ServerQuery credentials (TS_QUERY_*) are set: enough to remove groups even without a badge mapping. */
+export function teamspeakConfigured(): boolean {
+  return getTsRankConfig().enabled;
+}
+
 /** TS badge groups are on when ServerQuery is configured (TS_QUERY_*) and a badge mapping exists. */
 export function teamspeakSyncEnabled(): boolean {
   return getTsRankConfig().enabled && Object.keys(getTsBadgeGroups()).length > 0;
@@ -127,6 +132,8 @@ export async function verifyTsLink(
   return { nickname };
 }
 
-export async function unlinkTs(db: Executor, sub: string): Promise<void> {
-  await db.delete(platformTsLinks).where(eq(platformTsLinks.sub, sub));
+/** Removes the link; returns the client database id that was linked (for taking back granted groups). */
+export async function unlinkTs(db: Executor, sub: string): Promise<string | null> {
+  const [row] = await db.delete(platformTsLinks).where(eq(platformTsLinks.sub, sub)).returning();
+  return row?.verifiedAt && row.tsClientDbId ? String(row.tsClientDbId) : null;
 }

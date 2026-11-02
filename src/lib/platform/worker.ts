@@ -7,7 +7,7 @@ import { and, inArray, lt } from "drizzle-orm";
 
 import { platformJobs, platformOutbox } from "@/db/platform-schema";
 import { log } from "@/lib/observability/logger";
-import { createTeamspeakSyncHandler, discordSyncJob, reconcileBadgeSync } from "@/lib/platform/badge-sync";
+import { createTeamspeakSyncHandler, discordRevokeJob, discordSyncJob, reconcileBadgeSync } from "@/lib/platform/badge-sync";
 import { platformDb } from "@/lib/platform/db";
 import { AuthUnavailableError, refreshStub } from "@/lib/platform/directory";
 import { runDueJobs, type JobOutcome, type JobRow } from "@/lib/platform/jobs";
@@ -39,6 +39,7 @@ export async function runDeliveryTick(now: Date = new Date()): Promise<number> {
     {
       "push.send": (job) => sendPushJob(platformDb, job),
       "badge.sync.discord": (job) => discordSyncJob(platformDb, job),
+      "badge.revoke.discord": (job) => discordRevokeJob(platformDb, job),
       "user.fetch": userFetchJob,
     },
     { now, limit: 50 }
@@ -47,7 +48,7 @@ export async function runDeliveryTick(now: Date = new Date()): Promise<number> {
 
   const ts = createTeamspeakSyncHandler(platformDb);
   try {
-    const tsJobs = await runDueJobs({ "badge.sync.teamspeak": ts.handle }, { now, limit: 50 });
+    const tsJobs = await runDueJobs({ "badge.sync.teamspeak": ts.handle, "badge.revoke.teamspeak": ts.revoke }, { now, limit: 50 });
     work += tsJobs.done + tsJobs.retried + tsJobs.failed;
   } finally {
     await ts.close();

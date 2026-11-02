@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { enqueueBadgeResync } from "@/lib/platform/badge-sync";
+import { enqueueBadgeResync, releaseStaleGrants } from "@/lib/platform/badge-sync";
 import { platformDb } from "@/lib/platform/db";
 import { PlatformError } from "@/lib/platform/errors";
 import { json, parseBody, sessionRoute } from "@/lib/platform/http";
@@ -18,11 +18,14 @@ export const POST = sessionRoute(async (_req, { user, rawBody }) => {
   const body = parseBody(rawBody, schema);
   if (body.action === "start") return json(await startTsLink(platformDb, user.sub));
   const result = await verifyTsLink(platformDb, user.sub);
+  // Groups granted to a previously linked identity are taken back, the new one gets them.
+  await releaseStaleGrants(platformDb, { sub: user.sub, target: "teamspeak" });
   await enqueueBadgeResync(platformDb, user.sub, "teamspeak");
   return json({ linked: true, ...result });
 });
 
 export const DELETE = sessionRoute(async (_req, { user }) => {
-  await unlinkTs(platformDb, user.sub);
+  const previous = await unlinkTs(platformDb, user.sub);
+  await releaseStaleGrants(platformDb, { sub: user.sub, target: "teamspeak", previousIdentity: previous });
   return json({ ok: true });
 });
