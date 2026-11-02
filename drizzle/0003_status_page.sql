@@ -1,3 +1,11 @@
+CREATE TABLE "platform_status_certs" (
+	"endpoint" text PRIMARY KEY NOT NULL,
+	"fingerprint" text NOT NULL,
+	"valid_to" timestamp with time zone NOT NULL,
+	"warned_days" integer,
+	"checked_at" timestamp with time zone NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "platform_status_checks" (
 	"id" bigserial PRIMARY KEY NOT NULL,
 	"service" text NOT NULL,
@@ -30,7 +38,9 @@ CREATE TABLE "platform_status_services" (
 	"alerted_at" timestamp with time zone,
 	"last_checked_at" timestamp with time zone NOT NULL,
 	"last_response_ms" integer,
-	"last_error" text
+	"last_error" text,
+	"users_online" integer,
+	"users_max" integer
 );
 --> statement-breakpoint
 CREATE INDEX "platform_status_checks_service_idx" ON "platform_status_checks" USING btree ("service","checked_at");--> statement-breakpoint

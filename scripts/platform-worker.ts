@@ -9,12 +9,14 @@
  * is logged and retried with backoff instead of exiting; an unexpected crash exits 1 and PM2 restarts it
  * with exponential backoff. Without DATABASE_URL it exits 78, which PM2 treats as "stay stopped".
  *
- * It also runs the checks behind tretu.de/status: every 60 s each service's /api/health (src/lib/status).
+ * It also runs the checks behind tretu.de/status (src/lib/status): every 60 s each service's /api/health, the
+ * Minecraft and TeamSpeak servers; every hour the TLS certificates (expiry warnings on Discord).
  */
 import { log } from "@/lib/observability/logger";
 import { closePlatformDb, isPlatformDbConfigured } from "@/lib/platform/db";
 import { runDeliveryTick, runMaintenanceTick, runPresenceTick } from "@/lib/platform/worker";
-import { runStatusTick, STATUS_CHECK_EVERY_MS } from "@/lib/status/worker";
+import { CERT_CHECK_EVERY_MS } from "@/lib/status/certs";
+import { runCertificateTick, runStatusTick, STATUS_CHECK_EVERY_MS } from "@/lib/status/worker";
 
 const DELIVERY_IDLE_MS = 2000;
 const PRESENCE_EVERY_MS = 30_000;
@@ -71,6 +73,7 @@ async function main(): Promise<void> {
   let lastPresence = 0;
   let lastMaintenance = 0;
   let lastStatus = 0;
+  let lastCerts = 0;
   let failures = 0;
   while (!stopping) {
     let work = 0;
@@ -86,6 +89,11 @@ async function main(): Promise<void> {
     if (once || now - lastStatus >= STATUS_CHECK_EVERY_MS) {
       lastStatus = now;
       await safe("status", () => runStatusTick(new Date(now), { signal: stopChecks.signal }));
+      if (stopping) break;
+    }
+    if (once || now - lastCerts >= CERT_CHECK_EVERY_MS) {
+      lastCerts = now;
+      await safe("certificates", () => runCertificateTick(new Date(now), { signal: stopChecks.signal }));
       if (stopping) break;
     }
     if (once || now - lastMaintenance >= MAINTENANCE_EVERY_MS) {

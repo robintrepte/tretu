@@ -528,6 +528,21 @@ export const platformStatusServices = pgTable("platform_status_services", {
   lastCheckedAt: tz("last_checked_at").notNull(),
   lastResponseMs: integer("last_response_ms"),
   lastError: text("last_error"),
+  /** Minecraft: players online / slots; TeamSpeak: users online (max unknown). Null for web services. */
+  usersOnline: integer("users_online"),
+  usersMax: integer("users_max"),
+});
+
+/** TLS certificates of the checked hosts (read hourly) and the expiry warnings already sent for them. */
+export const platformStatusCerts = pgTable("platform_status_certs", {
+  /** `host:port`, e.g. `saga.tretu.de:443`. */
+  endpoint: text("endpoint").primaryKey(),
+  /** SHA-256 fingerprint of the certificate: a renewed certificate starts without warnings. */
+  fingerprint: text("fingerprint").notNull(),
+  validTo: tz("valid_to").notNull(),
+  /** Smallest warning threshold (days) already announced for this certificate, e.g. 14 or 3. */
+  warnedDays: integer("warned_days"),
+  checkedAt: tz("checked_at").notNull(),
 });
 
 /** Every table in this file (tests use it to reset the database). */
@@ -559,4 +574,5 @@ export const PLATFORM_TABLE_NAMES = [
   "platform_status_checks",
   "platform_status_rollups",
   "platform_status_services",
+  "platform_status_certs",
 ] as const;

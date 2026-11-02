@@ -25,7 +25,14 @@ function startWorker(env: Record<string, string | undefined>, args: string[] = [
     {
       cwd: root,
       // Status checks off unless a test sets targets (never the real hosts from a test).
-      env: { PATH: process.env.PATH, HOME: process.env.HOME, NODE_ENV: "production", TRETU_STATUS_TARGETS_JSON: "[]", ...env },
+      env: {
+        PATH: process.env.PATH,
+        HOME: process.env.HOME,
+        NODE_ENV: "production",
+        TRETU_STATUS_TARGETS_JSON: "[]",
+        TRETU_STATUS_MINECRAFT: "off",
+        ...env,
+      },
       stdio: ["ignore", "pipe", "pipe"],
     }
   );

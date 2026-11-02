@@ -31,6 +31,8 @@ export type Bucket = {
 
 export type ServiceStatus = {
   id: string;
+  /** http | minecraft | teamspeak */
+  kind: StatusTarget["kind"];
   name: string;
   host: string;
   state: DisplayState;
@@ -38,6 +40,9 @@ export type ServiceStatus = {
   since: string | null;
   checkedAt: string | null;
   responseMs: number | null;
+  /** Game servers: players / users online and slots of the latest check (null when unknown or down). */
+  usersOnline: number | null;
+  usersMax: number | null;
   /** Share of checks with an answer that was not "down", in percent (null without checks). */
   uptime24h: number | null;
   uptime90d: number | null;
@@ -145,12 +150,15 @@ export async function loadStatusOverview(db: Executor, now: Date = new Date(), t
     const totalMs = hourRows.reduce((n, r) => n + (r?.responseMsSum ?? 0), 0);
     return {
       id: target.id,
+      kind: target.kind,
       name: target.name,
       host: target.host,
       state: (row?.state as ServiceState | undefined) ?? "unknown",
       since: row?.since.toISOString() ?? null,
       checkedAt: row?.lastCheckedAt.toISOString() ?? null,
       responseMs: row?.lastResponseMs ?? null,
+      usersOnline: row?.usersOnline ?? null,
+      usersMax: row?.usersMax ?? null,
       uptime24h: uptime(hours),
       uptime90d: uptime(dayBuckets),
       avgResponseMs24h: answered ? Math.round(totalMs / answered) : null,
@@ -175,7 +183,7 @@ const globalCache = globalThis as unknown as { __tretuStatusCache?: Cache };
 /** The overview for the page and `/api/status`: cached {@link CACHE_MS}, last good value on database errors. */
 export async function getStatusOverview(now: Date = new Date()): Promise<StatusOverview> {
   const targets = statusTargets();
-  const key = JSON.stringify([targets.map((t) => [t.id, t.name, t.host]), process.env.TRETU_STATUS_NOTICE ?? ""]);
+  const key = JSON.stringify([targets.map((t) => [t.id, t.kind, t.name, t.host]), process.env.TRETU_STATUS_NOTICE ?? ""]);
   const cached = globalCache.__tretuStatusCache;
   if (cached && cached.key === key && now.getTime() - cached.at < CACHE_MS) return cached.value;
   const unavailable = (): StatusOverview => ({
@@ -187,12 +195,15 @@ export async function getStatusOverview(now: Date = new Date()): Promise<StatusO
     notice: notice(),
     services: targets.map((t) => ({
       id: t.id,
+      kind: t.kind,
       name: t.name,
       host: t.host,
       state: "unknown",
       since: null,
       checkedAt: null,
       responseMs: null,
+      usersOnline: null,
+      usersMax: null,
       uptime24h: null,
       uptime90d: null,
       avgResponseMs24h: null,

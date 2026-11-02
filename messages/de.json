@@ -820,6 +820,9 @@
     },
     "explanation": "„Gestört“ heißt: Der Dienst antwortet, meldet aber ein Problem oder antwortet sehr langsam. „Ausgefallen“ heißt: keine Antwort innerhalb von 5 Sekunden oder eine Fehlerseite. Verfügbarkeit ist der Anteil der Prüfungen, bei denen der Dienst nicht ausgefallen war.",
     "api": "Dieselben Daten als JSON: <link>/api/status</link>.",
-    "legendLabel": "Legende"
+    "legendLabel": "Legende",
+    "playersOf": "{online} / {max} Spieler online",
+    "players": "{online} Spieler online",
+    "users": "{online} Nutzer online"
   }
 }

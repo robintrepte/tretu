@@ -17,6 +17,8 @@ test("status page: one row per service with state, response time and 24 h / 90 d
     ["play", "Play", "Ausgefallen"],
     ["hollowmere", "Hollowmere", "Läuft"],
     ["mc-dashboard", "Minecraft-Dashboard", "Keine Daten"],
+    ["minecraft", "Minecraft-Server", "Läuft"],
+    ["teamspeak", "TeamSpeak", "Läuft"],
   ] as const;
   for (const [id, name, state] of expected) {
     const row = page.getByTestId(`status-service-${id}`);
@@ -41,6 +43,11 @@ test("status page: one row per service with state, response time and 24 h / 90 d
   await expect(mc.getByTestId("status-hours-mc-dashboard")).toContainText("keine Daten");
   await expect(mc.locator('[data-testid="status-hours-mc-dashboard"] [data-tone="none"]')).toHaveCount(24);
 
+  // Game servers: players / users online.
+  await expect(page.getByTestId("status-service-minecraft").getByTestId("status-users")).toHaveText("3 / 20 Spieler online");
+  await expect(page.getByTestId("status-service-teamspeak").getByTestId("status-users")).toHaveText("4 Nutzer online");
+  await expect(page.getByTestId("status-service-minecraft")).toContainText("mc.tretu.de");
+
   // Linked from the footer.
   const footerLink = page.getByRole("contentinfo").getByRole("link", { name: "Status" });
   await expect(footerLink).toHaveAttribute("href", "/status");
@@ -56,6 +63,8 @@ test("status page in English via the NEXT_LOCALE cookie, usable on a phone", asy
   await expect(page.getByTestId("status-service-tretu-web").getByTestId("status-state")).toHaveText("Running");
   await expect(page.getByTestId("status-service-mc-dashboard").getByTestId("status-state")).toHaveText("No data");
   await expect(page.getByTestId("status-hours-hollowmere")).toContainText("Last 24 hours");
+  await expect(page.getByTestId("status-service-minecraft").getByTestId("status-users")).toHaveText("3 / 20 players online");
+  await expect(page.getByTestId("status-service-teamspeak").getByTestId("status-users")).toHaveText("4 users online");
   const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
   expect(scrollWidth).toBeLessThanOrEqual(375);
 });
@@ -68,7 +77,7 @@ test("GET /api/status: the same data as JSON, public and cached", async ({ reque
     status: string;
     stale: boolean;
     notice: string;
-    services: { id: string; name: string; state: string; uptime90d: number | null; hours: unknown[]; days: unknown[] }[];
+    services: { id: string; name: string; state: string; uptime90d: number | null; usersOnline: number | null; usersMax: number | null; hours: unknown[]; days: unknown[] }[];
   };
   expect(body.status).toBe("down");
   expect(body.stale).toBe(false);
@@ -80,11 +89,15 @@ test("GET /api/status: the same data as JSON, public and cached", async ({ reque
     ["play", "down"],
     ["hollowmere", "up"],
     ["mc-dashboard", "unknown"],
+    ["minecraft", "up"],
+    ["teamspeak", "up"],
   ]);
   for (const service of body.services) {
     expect(service.hours).toHaveLength(24);
     expect(service.days).toHaveLength(90);
   }
   expect(body.services.find((s) => s.id === "play")!.uptime90d).toBeLessThan(100);
+  const minecraft = body.services.find((s) => s.id === "minecraft")!;
+  expect([minecraft.usersOnline, minecraft.usersMax]).toEqual([3, 20]);
   expect(JSON.stringify(body)).not.toContain("127.0.0.1:9");
 });

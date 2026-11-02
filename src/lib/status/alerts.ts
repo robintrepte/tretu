@@ -61,6 +61,7 @@ const REASONS: Record<string, string> = {
   timeout: "keine Antwort innerhalb von 5 Sekunden",
   connection: "keine Verbindung",
   invalid_json: "unerwartete Antwort",
+  invalid_response: "unerwartete Antwort",
   slow: "antwortet sehr langsam",
 };
 

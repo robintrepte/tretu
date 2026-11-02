@@ -6,7 +6,7 @@
  *   e.g. `503 {"status":"error","checks":{"db":"error"}}`), a 2xx without valid health JSON, or a slow answer.
  * - `down`: no answer within the timeout, no connection, or an error page without health JSON (e.g. nginx 502).
  */
-import type { StatusTarget } from "@/lib/status/targets";
+import type { HttpTarget } from "@/lib/status/targets";
 
 export type ServiceState = "up" | "degraded" | "down";
 
@@ -15,8 +15,11 @@ export type CheckResult = {
   /** Time until the response body was read; null without an answer. */
   responseMs: number | null;
   httpStatus: number | null;
-  /** Short code for the reason when not `up`: `timeout`, `connection`, `http_502`, `invalid_json`, `slow`, `checks:db`, `status:<s>`. */
+  /** Short code for the reason when not `up`: `timeout`, `connection`, `http_502`, `invalid_json`, `slow`, `checks:db`, `status:<s>`, `invalid_response`. */
   error: string | null;
+  /** Game servers: players / users online and slots (null when unknown). */
+  usersOnline?: number | null;
+  usersMax?: number | null;
 };
 
 export const CHECK_TIMEOUT_MS = 5_000;
@@ -90,7 +93,7 @@ export type CheckOptions = {
 };
 
 /** Requests `target.url` once. Never throws. */
-export async function checkTarget(target: Pick<StatusTarget, "url">, options: CheckOptions = {}): Promise<CheckResult> {
+export async function checkTarget(target: Pick<HttpTarget, "url">, options: CheckOptions = {}): Promise<CheckResult> {
   const timeoutMs = options.timeoutMs ?? CHECK_TIMEOUT_MS;
   const signals = [AbortSignal.timeout(timeoutMs), ...(options.signal ? [options.signal] : [])];
   const signal = signals.length > 1 ? AbortSignal.any(signals) : signals[0]!;

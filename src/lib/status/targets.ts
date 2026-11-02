@@ -1,22 +1,37 @@
 /**
- * Which services tretu.de/status checks: env `TRETU_STATUS_TARGETS_JSON` (JSON array of `{id, url, name?, host?}`),
- * by default the hosts of docs/ecosystem/CONTRACT.md §0. `[]` switches the checks off.
- * Read by the platform worker (checks) and by the page / `/api/status` (which services to list).
+ * Which services tretu.de/status checks. Read by the platform worker (checks) and by the page / `/api/status`
+ * (which services to list):
+ * - web services: env `TRETU_STATUS_TARGETS_JSON` (JSON array of `{id, url, name?, host?}`), by default the hosts of
+ *   docs/ecosystem/CONTRACT.md §0; `[]` switches them off;
+ * - the Minecraft server: env `TRETU_STATUS_MINECRAFT` (`host[:port]`, default `mc.tretu.de:25565`, `off`);
+ * - the TeamSpeak server: via ServerQuery when `TS_QUERY_*` is set, else a TCP check of `TRETU_STATUS_TEAMSPEAK`
+ *   (`host:port`); no row when neither is configured.
  */
 import { z } from "zod";
 
 import { log } from "@/lib/observability/logger";
 
-export type StatusTarget = {
+export type Address = { host: string; port: number };
+
+type TargetBase = {
   /** Stable key in the database, e.g. `saga`. */
   id: string;
   /** Display name; known ids get it from {@link KNOWN_SERVICES}. */
   name: string;
   /** Host shown next to the name, e.g. `saga.tretu.de` (known ids: the public host, never the check URL's). */
   host: string;
-  /** Health endpoint (contract §0). */
-  url: string;
 };
+
+/** A web service: `GET <url>` (contract §0 `/api/health`). */
+export type HttpTarget = TargetBase & { kind: "http"; url: string };
+/** The Minecraft server: Server List Ping. */
+export type MinecraftTarget = TargetBase & { kind: "minecraft"; address: Address };
+/** The TeamSpeak server: ServerQuery (`TS_QUERY_*`) or a plain TCP connect to `address`. */
+export type TeamspeakTarget = TargetBase & { kind: "teamspeak"; mode: "query" | "tcp"; address: Address | null };
+
+export type StatusTarget = HttpTarget | MinecraftTarget | TeamspeakTarget;
+
+export const MINECRAFT_DEFAULT = "mc.tretu.de:25565";
 
 /** Names of the contract's services (the same in German and English). */
 export const KNOWN_SERVICES: Record<string, { name: string; host: string }> = {
@@ -53,9 +68,10 @@ const targetsSchema = z
   .max(MAX_TARGETS)
   .refine((list) => new Set(list.map((t) => t.id)).size === list.length, "duplicate id");
 
-function toTarget(input: { id: string; url: string; name?: string; host?: string }): StatusTarget {
+function toTarget(input: { id: string; url: string; name?: string; host?: string }): HttpTarget {
   const known = KNOWN_SERVICES[input.id];
   return {
+    kind: "http",
     id: input.id,
     name: input.name ?? known?.name ?? input.id,
     host: input.host ?? known?.host ?? new URL(input.url).host,
@@ -67,7 +83,7 @@ function toTarget(input: { id: string; url: string; name?: string; host?: string
  * Parses a TRETU_STATUS_TARGETS_JSON value. Empty/unset → the contract's hosts. Invalid → the contract's hosts
  * plus an error message (logged by {@link statusTargets}), so a typo never empties the public page.
  */
-export function parseStatusTargets(raw: string | undefined): { targets: StatusTarget[]; error?: string } {
+export function parseStatusTargets(raw: string | undefined): { targets: HttpTarget[]; error?: string } {
   const value = raw?.trim();
   if (!value) return { targets: DEFAULT_TARGETS.map(toTarget) };
   let json: unknown;
@@ -87,15 +103,52 @@ export function parseStatusTargets(raw: string | undefined): { targets: StatusTa
   return { targets: parsed.data.map(toTarget) };
 }
 
-let warned: string | undefined;
+/** `host`, `host:port` or `[v6]:port` → address; null when invalid. */
+export function parseAddress(raw: string, defaultPort: number): Address | null {
+  const value = raw.trim();
+  const m = /^(?:\[([0-9a-fA-F:.]+)\]|([A-Za-z0-9.-]+))(?::(\d{1,5}))?$/.exec(value);
+  if (!m) return null;
+  const port = m[3] ? Number(m[3]) : defaultPort;
+  if (!Number.isInteger(port) || port < 1 || port > 65535) return null;
+  return { host: (m[1] ?? m[2])!, port };
+}
 
-/** The configured targets (logs a configuration error once per value). */
-export function statusTargets(env: Record<string, string | undefined> = process.env): StatusTarget[] {
-  const raw = env.TRETU_STATUS_TARGETS_JSON;
-  const { targets, error } = parseStatusTargets(raw);
-  if (error && warned !== raw) {
-    warned = raw;
-    log("error", "status.targets_invalid", { error });
+type Env = Record<string, string | undefined>;
+
+/** The Minecraft server row (default mc.tretu.de:25565, `off` = none). */
+export function minecraftTarget(env: Env): { target: MinecraftTarget | null; error?: string } {
+  const raw = env.TRETU_STATUS_MINECRAFT?.trim() || MINECRAFT_DEFAULT;
+  if (raw.toLowerCase() === "off") return { target: null };
+  const address = parseAddress(raw, 25565);
+  if (!address) return { target: null, error: "TRETU_STATUS_MINECRAFT must be host[:port] or off" };
+  return { target: { kind: "minecraft", id: "minecraft", name: "Minecraft-Server", host: address.host, address } };
+}
+
+/** The TeamSpeak row: ServerQuery when `TS_QUERY_*` is set, else TCP to `TRETU_STATUS_TEAMSPEAK`, else none. */
+export function teamspeakTarget(env: Env): { target: TeamspeakTarget | null; error?: string } {
+  const raw = env.TRETU_STATUS_TEAMSPEAK?.trim();
+  const address = raw ? parseAddress(raw, 30033) : null;
+  const error = raw && !address ? "TRETU_STATUS_TEAMSPEAK must be host:port" : undefined;
+  const query = Boolean(env.TS_QUERY_HOST && env.TS_QUERY_USER && env.TS_QUERY_PASSWORD);
+  if (!query && !address) return { target: null, error };
+  return {
+    target: { kind: "teamspeak", id: "teamspeak", name: "TeamSpeak", host: address?.host ?? "tretu.de", mode: query ? "query" : "tcp", address },
+    error,
+  };
+}
+
+const warned = new Set<string>();
+
+/** Every configured target, web services first (logs each configuration error once). */
+export function statusTargets(env: Env = process.env): StatusTarget[] {
+  const http = parseStatusTargets(env.TRETU_STATUS_TARGETS_JSON);
+  const minecraft = minecraftTarget(env);
+  const teamspeak = teamspeakTarget(env);
+  for (const error of [http.error, minecraft.error, teamspeak.error]) {
+    if (error && !warned.has(error)) {
+      warned.add(error);
+      log("error", "status.targets_invalid", { error });
+    }
   }
-  return targets;
+  return [...http.targets, ...(minecraft.target ? [minecraft.target] : []), ...(teamspeak.target ? [teamspeak.target] : [])];
 }

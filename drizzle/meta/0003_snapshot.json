@@ -1,5 +1,5 @@
 {
-  "id": "21adbaaa-db55-4729-930a-30bd4be9fa25",
+  "id": "5570d0fc-539f-4d23-aa6d-b4bdd2909adf",
   "prevId": "25d4f649-9eb0-483f-8eae-36dbecea0805",
   "version": "7",
   "dialect": "postgresql",
@@ -1143,6 +1143,49 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.platform_status_certs": {
+      "name": "platform_status_certs",
+      "schema": "",
+      "columns": {
+        "endpoint": {
+          "name": "endpoint",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "fingerprint": {
+          "name": "fingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valid_to": {
+          "name": "valid_to",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "warned_days": {
+          "name": "warned_days",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "checked_at": {
+          "name": "checked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.platform_status_checks": {
       "name": "platform_status_checks",
       "schema": "",
@@ -1396,6 +1439,18 @@
         "last_error": {
           "name": "last_error",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "users_online": {
+          "name": "users_online",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "users_max": {
+          "name": "users_max",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         }

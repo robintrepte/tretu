@@ -604,8 +604,11 @@ export function DatenschutzEn() {
           <P>
             At {SERVICES.status} we show whether our services are reachable. For this, our own server requests the technical status
             addresses of our services once a minute and stores whether and how fast they answered (individual checks 7 days,
-            hourly and daily values 90 days). No personal data is processed for this. When you visit the status page, the
-            information on server log files in <A href="#hosting">section 4</A> applies.
+            hourly and daily values 90 days). For the Minecraft and TeamSpeak servers we also request how many players or
+            users are connected and show that number. For technical reasons the servers also return names or identifiers of
+            connected people; we do not evaluate or store them, only the number is stored. The legal basis is our legitimate
+            interest in informing about the availability of our services (Art. 6(1)(f) GDPR). When you visit the status page,
+            the information on server log files in <A href="#hosting">section 4</A> applies.
           </P>
         </Sub>
       </Section>
@@ -668,7 +671,10 @@ export function DatenschutzEn() {
               "Tretu Play visitor statistics",
               "checksums only in memory until the day ends; daily totals without reference to persons without a fixed limit",
             ],
-            ["Results of the status checks", "7 days (individual checks), 90 days (hourly and daily values), without reference to persons"],
+            [
+              "Results of the status checks",
+              "7 days (individual checks), 90 days (hourly and daily values); for game and TeamSpeak servers only the number connected",
+            ],
             ["Credit transactions, payment records", "10 years (§ 147 AO, § 257 HGB), then deleted"],
             ["Contact enquiries", "until resolved, then as long as obligations require"],
             ["Game server dashboard logs", "as long as the respective server exists"],

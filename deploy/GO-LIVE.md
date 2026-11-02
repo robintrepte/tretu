@@ -199,7 +199,9 @@ Check: `oidc discovery PASS`, `oidc jwks PASS`; register a test account, `https:
 
 Nothing to install: `tretu-platform-worker` (started in 7.1) checks every service's `/api/health` once a minute and
 https://tretu.de/status shows the result. The generated `.env.local` already lists the six services in
-`TRETU_STATUS_TARGETS_JSON`. Optionally create a Discord webhook (channel settings → Integrations → Webhooks) and set
+`TRETU_STATUS_TARGETS_JSON`, the Minecraft server (`TRETU_STATUS_MINECRAFT`) and the extra certificate hosts; the
+TeamSpeak row appears with `TS_QUERY_*` (or `TRETU_STATUS_TEAMSPEAK`). The webhook also gets certificate warnings
+(14 and 3 days before expiry). Optionally create a Discord webhook (channel settings → Integrations → Webhooks) and set
 `TRETU_STATUS_DISCORD_WEBHOOK_URL` in `/srv/tretu/.env.local`, and the same URL as `BACKUP_ALERT_WEBHOOK_URL` in
 `/etc/tretu/pg-backup.env`; then `pm2 reload ecosystem.config.cjs --update-env`.
 
@@ -208,7 +210,8 @@ https://tretu.de/api/status | head -c 300`. To try the webhook without touching 
 `{"id":"alarmtest","url":"https://tretu.de/gibt-es-nicht"}` to `TRETU_STATUS_TARGETS_JSON` and reload: after two
 minutes one "alarmtest … ist ausgefallen" message arrives (and nothing more); remove the entry and reload again.
 
-**Rollback:** empty `TRETU_STATUS_DISCORD_WEBHOOK_URL` (no messages); `TRETU_STATUS_TARGETS_JSON=[]` stops the checks.
+**Rollback:** empty `TRETU_STATUS_DISCORD_WEBHOOK_URL` (no messages); `TRETU_STATUS_TARGETS_JSON=[]` and `TRETU_STATUS_MINECRAFT=off`
+stop the checks.
 
 ### 7.4 Legacy accounts: dry run, then import
 

@@ -5,7 +5,7 @@
  */
 import { eq, lt, sql } from "drizzle-orm";
 
-import { platformStatusChecks, platformStatusRollups, platformStatusServices } from "@/db/platform-schema";
+import { platformStatusCerts, platformStatusChecks, platformStatusRollups, platformStatusServices } from "@/db/platform-schema";
 import { inTransaction, type Executor } from "@/lib/platform/db";
 import { nextServiceState, type ServiceRow, type StateChange } from "@/lib/status/alerts";
 import type { CheckResult, ServiceState } from "@/lib/status/check";
@@ -30,7 +30,14 @@ export async function recordCheck(db: Executor, service: string, result: CheckRe
   };
   const r = platformStatusRollups;
   return inTransaction(db, async (tx) => {
-    await tx.insert(platformStatusChecks).values({ service, checkedAt: at, ...result });
+    await tx.insert(platformStatusChecks).values({
+      service,
+      checkedAt: at,
+      state: result.state,
+      responseMs: result.responseMs,
+      httpStatus: result.httpStatus,
+      error: result.error,
+    });
     const buckets = [
       { period: "hour", bucketStart: sql`date_trunc('hour', ${iso}::timestamptz)` },
       { period: "day", bucketStart: sql`date_trunc('day', ${iso}::timestamptz, ${STATUS_TIME_ZONE})` },
@@ -65,7 +72,14 @@ export async function recordCheck(db: Executor, service: string, result: CheckRe
     // Checks are recorded in order; an older one arriving late (clock change) must not rewind the state.
     if (prev && prev.lastCheckedAt > at) return null;
     const { row, change } = nextServiceState(previous, result, at);
-    const values = { ...row, lastCheckedAt: at, lastResponseMs: result.responseMs, lastError: result.error };
+    const values = {
+      ...row,
+      lastCheckedAt: at,
+      lastResponseMs: result.responseMs,
+      lastError: result.error,
+      usersOnline: result.usersOnline ?? null,
+      usersMax: result.usersMax ?? null,
+    };
     await tx
       .insert(platformStatusServices)
       .values({ service, ...values })
@@ -85,6 +99,8 @@ export async function pruneStatus(db: Executor, now: Date = new Date()): Promise
     .delete(platformStatusRollups)
     .where(lt(platformStatusRollups.bucketStart, new Date(now.getTime() - (ROLLUP_RETENTION_DAYS + 1) * DAY_MS)))
     .returning({ service: platformStatusRollups.service });
+  // Certificates of hosts that are no longer checked.
+  await db.delete(platformStatusCerts).where(lt(platformStatusCerts.checkedAt, new Date(now.getTime() - 30 * DAY_MS)));
   return { checks: checks.length, rollups: rollups.length };
 }
 

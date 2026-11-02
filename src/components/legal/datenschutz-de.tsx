@@ -633,8 +633,11 @@ export function DatenschutzDe() {
           <P>
             Unter {SERVICES.status} zeigen wir, ob unsere Dienste erreichbar sind. Dafür ruft unser eigener Server einmal pro Minute
             die technischen Statusadressen unserer Dienste ab und speichert, ob und wie schnell sie geantwortet haben
-            (Einzelprüfungen 7 Tage, Stunden- und Tageswerte 90 Tage). Dabei werden keine personenbezogenen Daten verarbeitet.
-            Für den Aufruf der Statusseite gelten die Angaben zu den Server-Logfiles in <A href="#hosting">Abschnitt 4</A>.
+            (Einzelprüfungen 7 Tage, Stunden- und Tageswerte 90 Tage). Beim Minecraft- und beim TeamSpeak-Server fragen wir
+            außerdem ab, wie viele Spieler bzw. Nutzer gerade verbunden sind, und zeigen diese Zahl an. Die Server liefern
+            dabei technisch bedingt auch Namen bzw. Kennungen verbundener Personen mit; diese werten wir nicht aus und
+            speichern sie nicht, gespeichert wird nur die Anzahl. Rechtsgrundlage ist unser berechtigtes Interesse, über die
+            Erreichbarkeit unserer Dienste zu informieren (Art. 6 Abs. 1 lit. f DSGVO). Für den Aufruf der Statusseite gelten die Angaben zu den Server-Logfiles in <A href="#hosting">Abschnitt 4</A>.
           </P>
         </Sub>
       </Section>
@@ -698,7 +701,10 @@ export function DatenschutzDe() {
               "Besucherstatistik Tretu Play",
               "Prüfsummen nur im Arbeitsspeicher bis zum Tageswechsel; Tagessummen ohne Personenbezug ohne feste Frist",
             ],
-            ["Ergebnisse der Statusprüfungen", "7 Tage (Einzelprüfungen), 90 Tage (Stunden- und Tageswerte), ohne Personenbezug"],
+            [
+              "Ergebnisse der Statusprüfungen",
+              "7 Tage (Einzelprüfungen), 90 Tage (Stunden- und Tageswerte); von Spiel- und TeamSpeak-Servern nur die Anzahl der Verbundenen",
+            ],
             ["Buchungen von Credits, Zahlungsbelege", "10 Jahre (§ 147 AO, § 257 HGB), danach Löschung"],
             ["Kontaktanfragen", "bis zur Erledigung, danach soweit keine Pflichten bestehen"],
             ["Protokolle des Game-Server-Dashboards", "solange der jeweilige Server besteht"],

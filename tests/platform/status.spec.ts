@@ -58,6 +58,10 @@ beforeEach(async () => {
   delete process.env.TRETU_STATUS_TARGETS_JSON;
   delete process.env.TRETU_STATUS_DISCORD_WEBHOOK_URL;
   delete process.env.TRETU_STATUS_NOTICE;
+  delete process.env.TRETU_STATUS_TEAMSPEAK;
+  for (const key of ["TS_QUERY_HOST", "TS_QUERY_USER", "TS_QUERY_PASSWORD"]) delete process.env[key];
+  // Never the real Minecraft server from a test.
+  process.env.TRETU_STATUS_MINECRAFT = "off";
 });
 
 test("check: healthy, degraded (503 + JSON), bad JSON, 502 page, timeout, connection refused", async () => {
@@ -254,4 +258,34 @@ test("GET /api/status: public JSON from the database, cached for 30 s", async ()
   await recordCheck(platformDb, "saga", { state: "down", responseMs: null, httpStatus: null, error: "timeout" }, new Date(Date.now() + 1000));
   assert.equal((await getStatusOverview()).services[0]!.state, "up");
   assert.equal((await getStatusOverview(new Date(Date.now() + 31_000))).services[0]!.state, "down");
+});
+
+test("game servers: TeamSpeak users (ServerQuery stub) and Minecraft down are stored and shown", async () => {
+  process.env.TRETU_STATUS_TARGETS_JSON = "[]";
+  process.env.TRETU_STATUS_MINECRAFT = "127.0.0.1:9";
+  Object.assign(process.env, { TS_QUERY_HOST: "127.0.0.1", TS_QUERY_USER: "serveradmin", TS_QUERY_PASSWORD: "secret" });
+  const createTsClient = () => ({
+    connect: async () => {},
+    clientList: async () => [{}, {}] as never,
+    disconnect: async () => {},
+  });
+  const now = new Date();
+  assert.equal(await runStatusTick(now, { createTsClient }), 2);
+  const services = await platformDb.select().from(platformStatusServices).orderBy(platformStatusServices.service);
+  assert.deepEqual(
+    services.map((s) => [s.service, s.state, s.usersOnline, s.usersMax, s.lastError]),
+    [
+      ["minecraft", "down", null, null, "connection"],
+      ["teamspeak", "up", 2, null, null],
+    ]
+  );
+  await recordCheck(platformDb, "minecraft", { state: "up", responseMs: 12, httpStatus: null, error: null, usersOnline: 5, usersMax: 40 }, new Date(now.getTime() + 60_000));
+  const overview = await loadStatusOverview(platformDb, new Date(now.getTime() + 61_000));
+  assert.deepEqual(
+    overview.services.map((s) => [s.id, s.kind, s.name, s.host, s.state, s.usersOnline, s.usersMax]),
+    [
+      ["minecraft", "minecraft", "Minecraft-Server", "127.0.0.1", "up", 5, 40],
+      ["teamspeak", "teamspeak", "TeamSpeak", "tretu.de", "up", 2, null],
+    ]
+  );
 });

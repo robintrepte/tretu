@@ -58,9 +58,21 @@ There is no separate status service: no extra PM2 process, nginx site or certifi
   in parallel (5 s timeout, user agent `TretuStatus/1.0`). `200` + `"status":"ok"` = **läuft**; an answer that is not
   healthy (`"status":"error"`, a 2xx without health JSON, slower than 3 s) = **gestört**; no answer, no connection or an
   error page such as nginx's `502` = **ausgefallen**.
+- **Minecraft server** (row "Minecraft-Server", `TRETU_STATUS_MINECRAFT`, default `mc.tretu.de:25565`): the
+  standard Server List Ping (handshake with protocol -1, status request; works with every version since 1.7),
+  5 s timeout. An answer = **läuft** with "players online / slots", none = **ausgefallen**.
+- **TeamSpeak server** (row "TeamSpeak"): with `TS_QUERY_*` set, one ServerQuery login per minute through the
+  client in `src/lib/teamspeak` (`clientlist`, users online; keep the query IP whitelisted as for the rank worker);
+  otherwise, with `TRETU_STATUS_TEAMSPEAK=host:port`, a TCP connect (voice is UDP: use a TCP port such as the file
+  transfer port 30033). Neither set: no row.
+- **Certificates:** once an hour the worker reads the TLS certificate of every HTTPS target and of
+  `TRETU_STATUS_CERT_HOSTS` and posts to the Discord webhook 14 and 3 days before it expires (each threshold once per
+  certificate; a renewed certificate starts over). Only with `TRETU_STATUS_DISCORD_WEBHOOK_URL` set. Stored in
+  `platform_status_certs`.
 - **Storage** (migration `0003_status_page`): `platform_status_checks` (one row per check, kept 7 days),
   `platform_status_rollups` (counts per hour and per day in Europe/Berlin, updated with every check, kept 90 days),
-  `platform_status_services` (current state per service, used for alerts). The worker's 10-minute maintenance pass
+  `platform_status_services` (current state per service incl. players / users online, used for alerts),
+  `platform_status_certs` (certificate expiry and warnings sent). The worker's 10-minute maintenance pass
   prunes old rows. About 8 600 rows per day for six services.
 - **The page reads only the database** (cached 30 s per process) and never calls the services. When the worker stops,
   it keeps showing the last results with "Stand: …" and a note that the checks are not running; `deploy/scripts/smoke.sh`
@@ -75,7 +87,10 @@ There is no separate status service: no extra PM2 process, nginx site or certifi
 | Variable | Default | Purpose |
 |---|---|---|
 | `TRETU_STATUS_TARGETS_JSON` | the contract's six hosts | JSON array `[{"id":"saga","url":"https://saga.tretu.de/api/health"}, …]`, optional `name`/`host` per entry; `[]` switches checks and list off. Ids `tretu-web`, `auth`, `saga`, `play`, `hollowmere`, `mc-dashboard` get their names ("Website", "Tretu-Konto", …) automatically. Read by the worker and the page: set it in `.env.local` and reload both. |
-| `TRETU_STATUS_DISCORD_WEBHOOK_URL` | – | Discord webhook (`https://discord.com/api/webhooks/<id>/<token>`) for outage and recovery messages |
+| `TRETU_STATUS_MINECRAFT` | `mc.tretu.de:25565` | Minecraft server for the Server List Ping (`host[:port]`), `off` = no row |
+| `TRETU_STATUS_TEAMSPEAK` | – | `host:port` for a TCP check of TeamSpeak when `TS_QUERY_*` is not set |
+| `TRETU_STATUS_CERT_HOSTS` | – | extra hosts (`host[:port]`, comma-separated) whose certificates are watched, e.g. `map.tretu.de,mcp.hollowmere.tretu.de` |
+| `TRETU_STATUS_DISCORD_WEBHOOK_URL` | – | Discord webhook (`https://discord.com/api/webhooks/<id>/<token>`) for outage, recovery and certificate messages |
 | `TRETU_STATUS_NOTICE` | – | plain-text banner on `/status` |
 
 Changing any of them: edit `.env.local`, then `pm2 reload ecosystem.config.cjs --update-env`. A service that is removed
@@ -176,7 +191,7 @@ the SQLite file was never modified.
 | `TRETU_AUTH_ISSUER`, `TRETU_AUTH_CLIENT_ID`, `TRETU_AUTH_CLIENT_SECRET` | no | Tretu-Konto login (all three) |
 | `TRETU_DISCORD_FALLBACK` | no | keep direct Discord login when Tretu-Konto is on (default `true`) |
 | `TRETU_ADMIN_FROM_ROLES` | no | admin role from the `roles` claim (default `false`) |
-| `TRETU_STATUS_TARGETS_JSON`, `TRETU_STATUS_DISCORD_WEBHOOK_URL`, `TRETU_STATUS_NOTICE` | no | status page, see [Status page](#status-page-tretudestatus) |
+| `TRETU_STATUS_*` (targets, Minecraft, TeamSpeak, certificate hosts, Discord webhook, notice) | no | status page, see [Status page](#status-page-tretudestatus) |
 | `ORCHESTRATOR_EMBEDDED` | no | run jobs inside Next.js (default `true`; PM2 sets `false`) |
 | `SQLITE_DATABASE_PATH` | upgrade only | source file for `npm run db:migrate-sqlite` |
 | `AUTH_RATE_LIMIT` | tests only | `off` disables Better Auth's per-IP limits (e2e) |

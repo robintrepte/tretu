@@ -210,6 +210,8 @@ test("status targets: one /api/health per service, no analytics or status host l
   assert.deepEqual(targets.map((t) => t.id), ["tretu-web", "auth", "saga", "play", "hollowmere", "mc-dashboard"]);
   for (const t of targets) assert.match(t.url, /^https:\/\/([a-z]+\.)?tretu\.de\/api\/health$/);
   assert.equal(files.web.TRETU_STATUS_DISCORD_WEBHOOK_URL, "");
+  assert.equal(files.web.TRETU_STATUS_MINECRAFT, "mc.tretu.de:25565");
+  assert.equal(files.web.TRETU_STATUS_CERT_HOSTS, "map.tretu.de,mcp.hollowmere.tretu.de");
   for (const env of [files.web, files.auth, files.saga, files.play, files.mc]) {
     for (const key of Object.keys(env)) assert.doesNotMatch(key, /UMAMI/);
     for (const value of Object.values(env)) assert.doesNotMatch(value, /stats\.tretu|status\.tretu/);

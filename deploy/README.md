@@ -132,11 +132,9 @@ Each repo starts its processes with `pm2 start ecosystem.config.cjs` and deploys
 The status page is part of tretu.de: the `tretu-platform-worker` polls every app's `/api/health` once a minute and
 stores the results in `tretu_web`; https://tretu.de/status and `GET https://tretu.de/api/status` read them. No extra
 process, nginx site or certificate. Details, states and env vars (`TRETU_STATUS_TARGETS_JSON`,
-`TRETU_STATUS_DISCORD_WEBHOOK_URL`, `TRETU_STATUS_NOTICE`): [DEPLOY.md](../DEPLOY.md#status-page-tretudestatus).
-
-What it does not cover, checked by hand after changes: certificate expiry (certbot renews automatically; check with
-`sudo certbot renew --dry-run`), the game ports (Minecraft 25565, TeamSpeak) and the backups (they alert themselves, see
-above).
+`TRETU_STATUS_DISCORD_WEBHOOK_URL`, `TRETU_STATUS_NOTICE`, …): [DEPLOY.md](../DEPLOY.md#status-page-tretudestatus).
+It also shows the Minecraft server (Server List Ping, players online) and the TeamSpeak server (ServerQuery, users
+online), and warns on Discord 14 and 3 days before a TLS certificate expires. Backups alert on their own (above).
 
 ## Smoke test
 

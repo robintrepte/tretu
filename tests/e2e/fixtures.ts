@@ -20,11 +20,16 @@ export const STATUS_TARGETS = [
   { id: "hollowmere", url: "http://127.0.0.1:9/hollowmere" },
   { id: "mc-dashboard", url: "http://127.0.0.1:9/mc" },
 ];
-/** mc-dashboard has no data on purpose ("Keine Daten"). */
-export const STATUS_SEED: Record<string, { now: "up" | "degraded" | "down"; badDay?: boolean }> = {
+/**
+ * mc-dashboard has no data on purpose ("Keine Daten"). The Minecraft row is the default target (mc.tretu.de:25565),
+ * the TeamSpeak row appears because serve.ts sets TS_QUERY_* (ServerQuery).
+ */
+export const STATUS_SEED: Record<string, { now: "up" | "degraded" | "down"; badDay?: boolean; users?: [number, number | null] }> = {
   "tretu-web": { now: "up" },
   auth: { now: "up" },
   saga: { now: "degraded" },
   play: { now: "down", badDay: true },
   hollowmere: { now: "up" },
+  minecraft: { now: "up", users: [3, 20] },
+  teamspeak: { now: "up", users: [4, null] },
 };

@@ -51,9 +51,9 @@ async function seed() {
   await closeDb();
 }
 
-const statusResult = (state: "up" | "degraded" | "down") =>
+const statusResult = (state: "up" | "degraded" | "down", users?: [number, number | null]) =>
   state === "up"
-    ? { state, responseMs: 87, httpStatus: 200, error: null }
+    ? { state, responseMs: 87, httpStatus: 200, error: null, usersOnline: users?.[0] ?? null, usersMax: users?.[1] ?? null }
     : state === "degraded"
       ? { state, responseMs: 240, httpStatus: 503, error: "checks:db" }
       : { state, responseMs: null, httpStatus: null, error: "timeout" };
@@ -69,9 +69,9 @@ async function seedStatus() {
       await recordCheck(platformDb, service, statusResult(state), new Date(now - day * 24 * 3600_000));
     }
     for (let hour = 23; hour >= 1; hour--) {
-      await recordCheck(platformDb, service, statusResult(hour === 2 ? seed.now : "up"), new Date(now - hour * 3600_000));
+      await recordCheck(platformDb, service, statusResult(hour === 2 ? seed.now : "up", seed.users), new Date(now - hour * 3600_000));
     }
-    await recordCheck(platformDb, service, statusResult(seed.now), new Date(now - 60_000));
+    await recordCheck(platformDb, service, statusResult(seed.now, seed.users), new Date(now - 60_000));
   }
 }
 
@@ -80,7 +80,7 @@ function keepStatusFresh() {
   const refresh = async () => {
     const { platformDb } = await import("../../src/lib/platform/db");
     const { recordCheck } = await import("../../src/lib/status/store");
-    for (const [service, seed] of Object.entries(STATUS_SEED)) await recordCheck(platformDb, service, statusResult(seed.now), new Date());
+    for (const [service, seed] of Object.entries(STATUS_SEED)) await recordCheck(platformDb, service, statusResult(seed.now, seed.users), new Date());
   };
   const timer = setInterval(() => {
     refresh().catch((error: unknown) => console.error("status refresh failed", error));
@@ -110,6 +110,7 @@ async function main() {
       TS_QUERY_PASSWORD: "e2e",
       // Status page: the services the seed wrote history for (never called by the page) and a maintenance note.
       TRETU_STATUS_TARGETS_JSON: JSON.stringify(STATUS_TARGETS),
+      TRETU_STATUS_MINECRAFT: "mc.tretu.de:25565",
       TRETU_STATUS_NOTICE: "Wartung am Sonntag ab 22 Uhr",
     },
   });

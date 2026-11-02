@@ -66,6 +66,14 @@ export default async function StatusPage() {
     return t("hourLabel", { time: `${time.format(from)}–${time.format(to)}` });
   };
   const dayLabel = (date: string) => day.format(new Date(`${date}T12:00:00Z`));
+  const usersLabel = (service: ServiceStatus): string | null => {
+    if (service.state !== "up" || service.usersOnline === null) return null;
+    if (service.kind === "teamspeak") return t("users", { online: service.usersOnline });
+    if (service.kind !== "minecraft") return null;
+    return service.usersMax !== null
+      ? t("playersOf", { online: number.format(service.usersOnline), max: number.format(service.usersMax) })
+      : t("players", { online: service.usersOnline });
+  };
 
   return (
     <div className="w-full px-4 py-12 md:px-6 lg:px-8">
@@ -111,6 +119,7 @@ export default async function StatusPage() {
               stateLabel={t(`state.${service.state}`)}
               responseLabel={service.responseMs !== null ? t("responseMs", { ms: number.format(service.responseMs) }) : null}
               responseTitle={t("responseTime")}
+              usersLabel={usersLabel(service)}
               sinceLabel={service.since && service.state !== "unknown" ? t("since", { time: dateTime.format(new Date(service.since)) }) : null}
               hours={
                 <StatusBars
@@ -169,6 +178,7 @@ function ServiceCard({
   stateLabel,
   responseLabel,
   responseTitle,
+  usersLabel,
   sinceLabel,
   hours,
   days,
@@ -177,6 +187,7 @@ function ServiceCard({
   stateLabel: string;
   responseLabel: string | null;
   responseTitle: string;
+  usersLabel: string | null;
   sinceLabel: string | null;
   hours: ReactNode;
   days: ReactNode;
@@ -192,6 +203,11 @@ function ServiceCard({
         <div className="min-w-0">
           <h3 className="text-lg font-semibold leading-tight text-foreground">{service.name}</h3>
           <p className="text-sm text-muted-foreground">{service.host}</p>
+          {usersLabel ? (
+            <p className="mt-1 text-sm font-medium text-foreground/80 tabular-nums" data-testid="status-users">
+              {usersLabel}
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-col items-end gap-1">
           <span

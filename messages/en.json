@@ -1059,6 +1059,9 @@
     },
     "explanation": "“Degraded” means the service answers but reports a problem or answers very slowly. “Down” means no answer within 5 seconds or an error page. Availability is the share of checks in which the service was not down.",
     "api": "The same data as JSON: <link>/api/status</link>.",
-    "legendLabel": "Legend"
+    "legendLabel": "Legend",
+    "playersOf": "{online} / {max} players online",
+    "players": "{online, plural, one {# player} other {# players}} online",
+    "users": "{online, plural, one {# user} other {# users}} online"
   }
 }
