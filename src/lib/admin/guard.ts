@@ -104,7 +104,8 @@ export async function auditedMutation<T>(
     actorSub: actor.sub,
     action: input.action,
     targetSub: input.targetSub,
-    details: { ...base, ...(extra ?? {}), outcome: "ok" },
+    // `changed: false` (auth had nothing to do, and records nothing itself): kept here as a no-op attempt.
+    details: { ...base, ...(extra ?? {}), outcome: extra?.changed === false ? "noop" : "ok" },
   });
   log("info", "admin.action", { action: input.action });
   return result;

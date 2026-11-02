@@ -11,12 +11,12 @@ export const dynamic = "force-dynamic";
 
 /** Unmerged old accounts (`GET /api/v1/admin/legacy`) with one-click merge preview into a possible match. */
 export default async function LegacyAccountsPage() {
-  await requireAccountAdminPage();
+  const actor = await requireAccountAdminPage();
   const [t, f] = await Promise.all([getTranslations("admin"), adminFormat()]);
   let items: LegacyCandidate[] = [];
   let error: AuthAdminError["code"] | null = null;
   try {
-    items = await authAdmin.legacy();
+    items = await authAdmin.legacy(actor.sub);
   } catch (e) {
     if (!(e instanceof AuthAdminError)) throw e;
     error = e.code;
@@ -32,7 +32,7 @@ export default async function LegacyAccountsPage() {
           <Panel key={c.sub}>
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="min-w-0 space-y-1">
-                <AccountLink sub={c.sub} name={c.username ? `@${c.username}` : c.sub} secondary={[c.email, f.date(c.createdAt)].filter(Boolean).join(" · ")} />
+                <AccountLink sub={c.sub} name={c.username ? `@${c.username}` : c.sub} secondary={[c.email, f.date(c.createdAt), c.usedByApps ? t("legacy.usedByApps") : null].filter(Boolean).join(" · ")} />
                 <div className="flex flex-wrap gap-1.5">
                   {c.legacy.map((l) => (
                     <Pill key={`${l.app}:${l.legacyUserId}`}>

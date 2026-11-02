@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 type Search = { actor?: string; target?: string; action?: string; from?: string; to?: string; before?: string };
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
-const DETAIL_SKIP = new Set(["reason", "outcome", "error"]);
+const DETAIL_SKIP = new Set(["reason", "outcome", "error", "changed"]);
 
 export default async function AuditPage({ searchParams }: { searchParams: Promise<Search> }) {
   await requireAccountAdminPage();
@@ -113,6 +113,10 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                           {e.details.outcome === "failed" ? (
                             <span className="mt-1 block">
                               <Pill tone="danger">{t("audit.failed", { error: String(e.details.error ?? "?") })}</Pill>
+                            </span>
+                          ) : e.details.outcome === "noop" ? (
+                            <span className="mt-1 block">
+                              <Pill>{t("audit.noop")}</Pill>
                             </span>
                           ) : null}
                         </td>

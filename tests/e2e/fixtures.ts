@@ -37,6 +37,9 @@ export const STATUS_SEED: Record<string, { now: "up" | "degraded" | "down"; badD
 /** A signed-in team member without the Tretu admin role (no access to the central admin). */
 export const MEMBER_SESSION_TOKEN = "e2e-member-session-token-0123456789";
 export const MEMBER_SUB = "00000000-0000-4000-8000-0000000000a4";
+/** A second Tretu admin whose Tretu-Konto has no 2FA yet: auth refuses it as actor (`actor_two_factor_required`). */
+export const NO2FA_SESSION_TOKEN = "e2e-no2fa-admin-session-token-0123456";
+export const NO2FA_SUB = "00000000-0000-4000-8000-0000000000a5";
 
 /** The mocked auth.tretu.de admin API (tests/helpers/mock-auth-admin.ts) and the secret tretu.de signs with. */
 export const AUTH_MOCK_PORT = Number(process.env.E2E_AUTH_PORT ?? 3133);

@@ -1,7 +1,8 @@
 /**
  * Hub admin audit log (`platform_admin_audit`): one row per admin action done through tretu.de, including the
  * ones forwarded to auth.tretu.de (auth keeps its own `admin.*` entries as well). Failed attempts are recorded
- * too (`details.outcome = "failed"`), so refused actions stay visible.
+ * too (`details.outcome = "failed"`), so refused actions stay visible; changes that found nothing to do are
+ * `outcome = "noop"`.
  */
 import { and, desc, eq, gte, inArray, lt, lte, type SQL } from "drizzle-orm";
 
@@ -25,7 +26,8 @@ export const ADMIN_ACTIONS = [
 ] as const;
 export type AdminAction = (typeof ADMIN_ACTIONS)[number];
 
-export type AuditDetails = Record<string, unknown> & { reason: string; outcome: "ok" | "failed"; error?: string };
+/** `noop`: the target was already in that state (auth answered `changed: false`). */
+export type AuditDetails = Record<string, unknown> & { reason: string; outcome: "ok" | "noop" | "failed"; error?: string };
 
 export async function recordAdminAudit(
   db: Executor,

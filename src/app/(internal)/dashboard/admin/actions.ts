@@ -9,6 +9,7 @@ import { getTranslations } from "next-intl/server";
 
 import { getAccountAdmin, type AdminActor } from "@/lib/admin/access";
 import {
+  type AccountChange,
   changeRoles,
   lockAccount,
   mergeAccounts,
@@ -19,7 +20,7 @@ import {
   unlockAccount,
   verifyEmail,
 } from "@/lib/admin/accounts";
-import { AuthAdminError } from "@/lib/admin/auth-admin";
+import { ACTOR_ERRORS, AuthAdminError } from "@/lib/admin/auth-admin";
 import { grantBadge, resyncBadges, revokeBadge } from "@/lib/admin/badges-admin";
 import { AdminError } from "@/lib/admin/guard";
 import { summarizeMerge, type MergeSummary } from "@/lib/admin/merge-summary";
@@ -28,7 +29,7 @@ import { log } from "@/lib/observability/logger";
 import { PlatformDbUnavailableError } from "@/lib/platform/db";
 
 export type ActionResult = { ok: true; message: string } | { ok: false; error: string; detail?: string };
-export type PreviewResult = { ok: true; summary: MergeSummary; raw: string } | { ok: false; error: string; detail?: string };
+export type PreviewResult = { ok: true; summary: MergeSummary } | { ok: false; error: string; detail?: string };
 
 const field = (form: FormData, name: string): string => {
   const value = form.get(name);
@@ -39,7 +40,9 @@ async function describe(error: unknown): Promise<{ ok: false; error: string; det
   const t = await getTranslations("admin.errors");
   if (error instanceof AdminError) return { ok: false, error: t(error.code) };
   if (error instanceof AuthAdminError) {
-    const detail = error.detail && ["forbidden", "conflict", "invalid", "not_found"].includes(error.code) ? t("detail", { detail: error.detail }) : undefined;
+    // auth's own message only where it adds something (generic codes); known refusals are fully translated.
+    const generic = ["forbidden", "conflict", "invalid", "not_found"].includes(error.code) && !ACTOR_ERRORS.has(error.code);
+    const detail = error.detail && generic ? t("detail", { detail: error.detail }) : undefined;
     return { ok: false, error: t(`auth.${error.code}`), ...(detail ? { detail } : {}) };
   }
   if (error instanceof PlatformDbUnavailableError) return { ok: false, error: t("platform_unavailable") };
@@ -65,62 +68,61 @@ async function msg(key: string, values?: Record<string, number | string>): Promi
   return t(key, values);
 }
 
+/** The success message, or "nothing to change" when auth found the account already in that state. */
+async function changeMsg(change: AccountChange, key: string): Promise<string> {
+  return change.changed ? msg(key) : msg("account.actions.unchanged");
+}
+
 /* --------------------------------- accounts -------------------------------- */
 
 export async function addRoleAction(form: FormData): Promise<ActionResult> {
   return run(async (actor) => {
-    await changeRoles(actor, field(form, "sub"), { add: [field(form, "role")], reason: field(form, "reason") });
-    return msg("account.actions.rolesChanged");
+    return changeMsg(await changeRoles(actor, field(form, "sub"), { add: [field(form, "role")], reason: field(form, "reason") }), "account.actions.rolesChanged");
   });
 }
 
 export async function removeRoleAction(form: FormData): Promise<ActionResult> {
   return run(async (actor) => {
-    await changeRoles(actor, field(form, "sub"), { remove: [field(form, "role")], reason: field(form, "reason") });
-    return msg("account.actions.rolesChanged");
+    return changeMsg(await changeRoles(actor, field(form, "sub"), { remove: [field(form, "role")], reason: field(form, "reason") }), "account.actions.rolesChanged");
   });
 }
 
 export async function revokeSessionsAction(form: FormData): Promise<ActionResult> {
   return run(async (actor) => {
-    await revokeSessions(actor, field(form, "sub"), { reason: field(form, "reason") });
-    return msg("account.actions.sessionsRevoked");
+    return changeMsg(await revokeSessions(actor, field(form, "sub"), { reason: field(form, "reason") }), "account.actions.sessionsRevoked");
   });
 }
 
 export async function lockAction(form: FormData): Promise<ActionResult> {
   return run(async (actor) => {
     // `until` comes from <input type="datetime-local"> (browser time) converted to ISO on the client.
-    await lockAccount(actor, field(form, "sub"), { reason: field(form, "reason"), until: field(form, "untilIso") || undefined });
-    return msg("account.actions.locked");
+    const change = await lockAccount(actor, field(form, "sub"), { reason: field(form, "reason"), until: field(form, "untilIso") || undefined });
+    return changeMsg(change, "account.actions.locked");
   });
 }
 
 export async function unlockAction(form: FormData): Promise<ActionResult> {
   return run(async (actor) => {
-    await unlockAccount(actor, field(form, "sub"), { reason: field(form, "reason") });
-    return msg("account.actions.unlocked");
+    return changeMsg(await unlockAccount(actor, field(form, "sub"), { reason: field(form, "reason") }), "account.actions.unlocked");
   });
 }
 
 export async function resetTwoFactorAction(form: FormData): Promise<ActionResult> {
   return run(async (actor) => {
-    await resetTwoFactor(actor, field(form, "sub"), { reason: field(form, "reason") });
-    return msg("account.actions.twoFactorReset");
+    return changeMsg(await resetTwoFactor(actor, field(form, "sub"), { reason: field(form, "reason") }), "account.actions.twoFactorReset");
   });
 }
 
 export async function removeLinkAction(form: FormData): Promise<ActionResult> {
   return run(async (actor) => {
-    await removeLink(actor, field(form, "sub"), { reason: field(form, "reason"), provider: field(form, "provider") });
-    return msg("account.actions.linkRemoved");
+    const change = await removeLink(actor, field(form, "sub"), { reason: field(form, "reason"), provider: field(form, "provider") });
+    return changeMsg(change, "account.actions.linkRemoved");
   });
 }
 
 export async function verifyEmailAction(form: FormData): Promise<ActionResult> {
   return run(async (actor) => {
-    await verifyEmail(actor, field(form, "sub"), { reason: field(form, "reason") });
-    return msg("account.actions.emailVerified");
+    return changeMsg(await verifyEmail(actor, field(form, "sub"), { reason: field(form, "reason") }), "account.actions.emailVerified");
   });
 }
 
@@ -131,8 +133,8 @@ export async function previewMergeAction(input: { from: string; into: string }):
     return { ok: false, error: t("forbidden") };
   }
   try {
-    const raw = await previewMerge(actor, { from: input.from, into: input.into });
-    return { ok: true, summary: summarizeMerge(raw), raw: JSON.stringify(raw, null, 2).slice(0, 20_000) };
+    const preview = await previewMerge(actor, { from: input.from, into: input.into });
+    return { ok: true, summary: summarizeMerge(preview.plan) };
   } catch (error) {
     return describe(error);
   }

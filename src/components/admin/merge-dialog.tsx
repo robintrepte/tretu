@@ -22,7 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { mergeAction, previewMergeAction } from "@/app/(internal)/dashboard/admin/actions";
 import type { MergeSummary } from "@/lib/admin/merge-summary";
 
-type Preview = { summary: MergeSummary; raw: string };
+type Preview = { summary: MergeSummary };
 
 /**
  * Two steps (the first runs on open when both accounts are given): a dry-run preview from auth (what moves, what is dropped), then the merge itself with a required
@@ -61,7 +61,7 @@ export function MergeDialog({
     reset();
     try {
       const result = await previewMergeAction({ from: fromValue.trim(), into: intoValue.trim() });
-      if (result.ok) setPreview({ summary: result.summary, raw: result.raw });
+      if (result.ok) setPreview({ summary: result.summary });
       else setError({ error: result.error, detail: result.detail });
     } catch {
       setError({ error: tc("networkError") });
@@ -155,20 +155,17 @@ export function MergeDialog({
         {s ? (
           <div className="space-y-2 rounded-xl border border-border/60 bg-muted/30 p-3.5 text-sm" data-testid="merge-summary">
             <p className="font-medium">{t("previewTitle")}</p>
-            {s.recognized ? (
-              <ul className="list-inside list-disc space-y-1 text-muted-foreground">
-                <li>{t("moveProviders", { list: list(s.move.providers) })}</li>
-                <li>{t("moveGameLinks", { list: list(s.move.gameLinks) })}</li>
-                <li>{t("movePasskeys", { count: s.move.passkeys })}</li>
-                <li>{t("moveLegacy", { list: list(s.move.legacy) })}</li>
-                {s.drop.providers.length ? <li>{t("dropProviders", { list: list(s.drop.providers) })}</li> : null}
-                {s.drop.gameLinks.length ? <li>{t("dropGameLinks", { list: list(s.drop.gameLinks) })}</li> : null}
-              </ul>
-            ) : null}
-            <details className="text-xs">
-              <summary className="cursor-pointer text-muted-foreground">{t("raw")}</summary>
-              <pre className="mt-2 max-h-56 overflow-auto rounded-lg bg-background/80 p-2">{preview.raw}</pre>
-            </details>
+            <p className="text-muted-foreground">{t("direction", { from: s.from, into: s.into })}</p>
+            <ul className="list-inside list-disc space-y-1 text-muted-foreground">
+              <li>{t("moveProviders", { list: list(s.move.providers) })}</li>
+              <li>{t("moveGameLinks", { list: list(s.move.gameLinks) })}</li>
+              <li>{t("movePasskeys", { count: s.move.passkeys })}</li>
+              <li>{t("moveLegacy", { list: list(s.move.legacy) })}</li>
+              {s.drop.providers.length ? <li>{t("dropProviders", { list: list(s.drop.providers) })}</li> : null}
+              {s.drop.gameLinks.length ? <li>{t("dropGameLinks", { list: list(s.drop.gameLinks) })}</li> : null}
+              <li>{t("deleted", { name: s.from, sessions: s.fromSessions })}</li>
+              {s.fromUsedByApps ? <li>{t("usedByApps", { name: s.from })}</li> : null}
+            </ul>
           </div>
         ) : null}
         {preview ? (

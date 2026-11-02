@@ -1,65 +1,40 @@
 /**
- * Readable summary of auth's merge dry-run / result (`POST /api/v1/admin/merge`, built from
- * `lib/legacy/admin.ts` `planMerge` in auth: `{ from, into, move: {providers, gameLinks, passkeys, legacy},
- * drop: {providers, gameLinks} }`, possibly wrapped as `{ plan, … }`). Unknown shapes fall back to raw JSON.
+ * Readable summary of auth's merge plan (`POST /api/v1/admin/merge` → `plan`, built by `planMerge` in
+ * auth/lib/legacy/admin.ts): which sign-in methods, game links, passkeys and old-app links move from `from` to
+ * `into`, and which are dropped because `into` already has one of the same kind.
  */
+import type { MergePlan } from "@/lib/admin/auth-admin";
+
 export type MergeSummary = {
-  recognized: boolean;
-  from: string | null;
-  into: string | null;
+  from: string;
+  into: string;
   move: { providers: string[]; gameLinks: string[]; passkeys: number; legacy: string[] };
   drop: { providers: string[]; gameLinks: string[] };
+  /** Sessions of `from` that end with the merge. */
+  fromSessions: number;
+  /** `from` was used with an app (the apps drop that local user on `user.deleted`). */
+  fromUsedByApps: boolean;
 };
 
-type Obj = Record<string, unknown>;
-const isObj = (v: unknown): v is Obj => Boolean(v) && typeof v === "object" && !Array.isArray(v);
+type Provider = MergePlan["move"]["providers"][number];
+type GameLink = MergePlan["move"]["gameLinks"][number];
 
-function label(item: unknown, keys: string[]): string | null {
-  if (typeof item === "string") return item;
-  if (!isObj(item)) return null;
-  for (const key of keys) if (typeof item[key] === "string" && item[key]) return item[key] as string;
-  return null;
-}
+const provider = (p: Provider) => (p.providerId === "credential" ? "password" : p.displayName ? `${p.providerId} (${p.displayName})` : p.providerId);
+const game = (g: GameLink) => (g.displayName ? `${g.provider} (${g.displayName})` : g.provider);
+const name = (a: MergePlan["from"]) => (a.username ? `@${a.username}` : (a.email ?? a.id));
 
-function labels(list: unknown, keys: string[]): string[] {
-  return Array.isArray(list) ? list.map((i) => label(i, keys)).filter((v): v is string => Boolean(v)) : [];
-}
-
-function legacyLabels(list: unknown): string[] {
-  if (!Array.isArray(list)) return [];
-  return list
-    .map((l) => {
-      if (typeof l === "string") return l;
-      if (!isObj(l)) return null;
-      const name = (l.legacyUsername as string | undefined) || (l.legacyUserId as string | undefined);
-      return l.app ? `${String(l.app)}: ${String(name ?? "")}` : name ?? null;
-    })
-    .filter((v): v is string => Boolean(v));
-}
-
-function who(value: unknown): string | null {
-  if (typeof value === "string") return value;
-  return label(value, ["username", "name", "email", "sub", "id"]);
-}
-
-export function summarizeMerge(raw: unknown): MergeSummary {
-  const plan = isObj(raw) && isObj(raw.plan) ? raw.plan : isObj(raw) && isObj(raw.summary) ? raw.summary : raw;
-  const move = isObj(plan) ? (isObj(plan.move) ? plan.move : isObj(plan.moved) ? plan.moved : null) : null;
-  const drop = isObj(plan) ? (isObj(plan.drop) ? plan.drop : isObj(plan.dropped) ? plan.dropped : null) : null;
-  const passkeys = move?.passkeys;
+export function summarizeMerge(plan: MergePlan): MergeSummary {
   return {
-    recognized: Boolean(move),
-    from: isObj(plan) ? who(plan.from) : null,
-    into: isObj(plan) ? who(plan.into) : null,
+    from: name(plan.from),
+    into: name(plan.into),
     move: {
-      providers: labels(move?.providers, ["providerId", "provider"]),
-      gameLinks: labels(move?.gameLinks, ["provider", "providerId"]),
-      passkeys: typeof passkeys === "number" ? passkeys : Array.isArray(passkeys) ? passkeys.length : 0,
-      legacy: legacyLabels(move?.legacy),
+      providers: plan.move.providers.map(provider),
+      gameLinks: plan.move.gameLinks.map(game),
+      passkeys: plan.move.passkeys.length,
+      legacy: plan.move.legacy.map((l) => `${l.app}: ${l.legacyUsername ?? l.legacyUserId}`),
     },
-    drop: {
-      providers: labels(drop?.providers, ["providerId", "provider"]),
-      gameLinks: labels(drop?.gameLinks, ["provider", "providerId"]),
-    },
+    drop: { providers: plan.drop.providers.map(provider), gameLinks: plan.drop.gameLinks.map(game) },
+    fromSessions: plan.from.sessions,
+    fromUsedByApps: plan.from.usedByApps,
   };
 }

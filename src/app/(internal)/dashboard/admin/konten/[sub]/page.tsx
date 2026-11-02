@@ -24,7 +24,7 @@ import { CopyButton } from "@/components/dashboard/copy-button";
 import { Hint, Panel } from "@/components/dashboard/panel";
 import { requireAccountAdminPage } from "@/lib/admin/access";
 import { getAccountView, SUB_PATTERN } from "@/lib/admin/accounts";
-import type { AdminUserDetail } from "@/lib/admin/auth-admin";
+import { ACTOR_ERRORS, isRemovableLink, type AdminUserDetail, type AuthAuditEntry } from "@/lib/admin/auth-admin";
 import { actionMessageKey, adminFormat } from "@/lib/admin/format";
 import { BADGES } from "@/lib/platform/badges";
 
@@ -43,6 +43,15 @@ function Row({ children, actions, testId }: { children: ReactNode; actions?: Rea
   );
 }
 
+/** Who did an `admin.*` change at auth and why (from the entry's `meta`). */
+function authAuditNote(entry: AuthAuditEntry): string | null {
+  const meta = entry.meta ?? {};
+  const by = typeof meta.actorUsername === "string" ? `@${meta.actorUsername}` : meta.by === "cli" ? "CLI" : null;
+  const reason = typeof meta.reason === "string" ? meta.reason.slice(0, 200) : null;
+  const parts = [by, reason].filter(Boolean);
+  return parts.length ? parts.join(" · ") : null;
+}
+
 function safeDecode(value: string): string {
   try {
     return decodeURIComponent(value);
@@ -58,7 +67,7 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
   const [t, f] = await Promise.all([getTranslations("admin"), adminFormat()]);
   if (!SUB_PATTERN.test(sub)) return <Hint tone="danger">{t("account.notFound")}</Hint>;
 
-  const view = await getAccountView(sub, f.locale);
+  const view = await getAccountView(actor, sub, f.locale);
   const user: AdminUserDetail | null = view.auth.ok ? view.auth.user : null;
   const p = view.platform;
   const displayName = user?.name || user?.username || p?.name || p?.username || sub;
@@ -71,7 +80,7 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
     ? [
         ["minecraft", user.links.minecraftName ? `${user.links.minecraftName} (${user.links.minecraft ?? "?"})` : user.links.minecraft],
         ["steam", providerIds.has("steam") ? null : user.links.steam],
-        ["teamspeak", user.links.teamspeak],
+        ["teamspeak", user.links.teamspeakName ? `${user.links.teamspeakName} (${user.links.teamspeak ?? "?"})` : user.links.teamspeak],
         ["discord", providerIds.has("discord") ? null : user.links.discord],
       ]
     : [];
@@ -116,13 +125,18 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
 
       {!view.auth.ok ? (
         <Hint tone={view.auth.error === "not_found" ? "danger" : "warning"}>
-          {view.auth.error === "not_found" ? t("account.notFound") : `${t("account.authError")} ${t(`errors.auth.${view.auth.error}`)}`}
+          {view.auth.error === "not_found"
+            ? t("account.notFound")
+            : ACTOR_ERRORS.has(view.auth.error)
+              ? t(`errors.auth.${view.auth.error}`)
+              : `${t("account.authError")} ${t(`errors.auth.${view.auth.error}`)}`}
         </Hint>
       ) : null}
 
       {user?.locked ? (
         <Hint tone="danger">
           {t("account.lockedBanner")} {user.lockedUntil ? t("account.lockedUntil", { date: f.dateTime(user.lockedUntil) }) : t("account.lockedOpenEnded")}
+          {user.lockedAt ? ` · ${t("account.lockedSince", { date: f.dateTime(user.lockedAt) })}` : null}
           {user.lockedReason ? ` · ${t("account.lockedReason", { reason: user.lockedReason })}` : null}
         </Hint>
       ) : null}
@@ -161,6 +175,7 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
                   <Pill tone={user.emailVerified ? "success" : "warning"}>{user.emailVerified ? t("account.emailVerified") : t("account.emailUnverified")}</Pill>
                 ) : null}
               </Field>
+              <Field label={t("account.locale")}>{user.locale ? t(`account.locales.${user.locale}`) : t("common.none")}</Field>
               <Field label={t("account.created")}>{f.dateTime(user.createdAt)}</Field>
               <Field label={t("account.lastSignIn")}>{user.lastSignInAt ? f.dateTime(user.lastSignInAt) : t("common.never")}</Field>
               {username ? (
@@ -247,11 +262,15 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
                   key={`${pr.provider}:${pr.accountId ?? ""}`}
                   testId={`provider-${pr.provider}`}
                   actions={
-                    <ReasonDialog action={removeLinkAction} hidden={{ ...hidden, provider: pr.provider }} trigger={t("account.actions.removeLink")} triggerSize="xs" testId={`action-remove-link-${pr.provider}`} title={t("account.actions.removeLinkTitle", { provider: providerName(pr.provider) })} description={t("account.actions.removeLinkDescription")} confirmLabel={t("account.actions.removeLink")} destructive />
+                    // The password is not a link: it is changed by the user at auth.tretu.de.
+                    isRemovableLink(pr.provider) ? (
+                      <ReasonDialog action={removeLinkAction} hidden={{ ...hidden, provider: pr.provider }} trigger={t("account.actions.removeLink")} triggerSize="xs" testId={`action-remove-link-${pr.provider}`} title={t("account.actions.removeLinkTitle", { provider: providerName(pr.provider) })} description={t("account.actions.removeLinkDescription")} confirmLabel={t("account.actions.removeLink")} destructive />
+                    ) : undefined
                   }
                 >
                   <span className="font-medium">{providerName(pr.provider)}</span>
                   <span className="text-xs text-muted-foreground">
+                    {pr.displayName ? ` · ${pr.displayName}` : ""}
                     {pr.accountId ? ` · ${pr.accountId}` : ""}
                     {pr.createdAt ? ` · ${t("account.providerSince", { date: f.date(pr.createdAt) })}` : ""}
                   </span>
@@ -433,6 +452,11 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
                       {" "}
                       <Pill tone="danger">{t("audit.failed", { error: String(e.details.error ?? "?") })}</Pill>
                     </>
+                  ) : e.details.outcome === "noop" ? (
+                    <>
+                      {" "}
+                      <Pill>{t("audit.noop")}</Pill>
+                    </>
                   ) : null}
                   <span className="block text-xs text-muted-foreground">
                     {f.dateTime(e.createdAt)} · {e.actorName ?? e.actorSub}
@@ -453,8 +477,9 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
             ) : (
               <List>
                 {user.audit.slice(0, 50).map((e, i) => (
-                  <Row key={e.id ?? i}>
+                  <Row key={e.id ?? i} testId="auth-audit-row">
                     <span className="font-mono text-xs">{e.action}</span>
+                    {authAuditNote(e) ? <span className="text-xs text-muted-foreground"> · {authAuditNote(e)}</span> : null}
                     {!e.success ? (
                       <>
                         {" "}

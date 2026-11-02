@@ -57,7 +57,16 @@
       "not_found": "auth.tretu.de kennt dieses Konto nicht.",
       "conflict": "auth.tretu.de meldet einen Konflikt.",
       "invalid": "auth.tretu.de hat die Eingabe abgelehnt.",
-      "rate_limited": "auth.tretu.de bremst gerade. Bitte warte einen Moment."
+      "rate_limited": "auth.tretu.de bremst gerade. Bitte warte einen Moment.",
+      "forbidden_app": "auth.tretu.de nimmt Verwaltungsanfragen nur von tretu.de an (TRETU_APP_ID muss „tretu-web“ sein).",
+      "actor_not_admin": "Dein Tretu-Konto hat auf auth.tretu.de keine Admin-Rolle (mehr) oder ist gesperrt.",
+      "actor_two_factor_required": "Aktiviere 2FA in Mein Konto, um die Verwaltung zu nutzen.",
+      "self_action": "Das kannst du nicht bei deinem eigenen Konto tun.",
+      "last_admin": "Das ist der letzte aktive Admin. Ohne ihn hätte Tretu keinen Admin mehr: vergib die Rolle zuerst an jemand anderen.",
+      "last_sign_in_method": "Das ist die einzige Anmeldemethode des Kontos und kann nicht entfernt werden.",
+      "no_email": "Dieses Konto hat keine E-Mail-Adresse.",
+      "merge_refused": "auth.tretu.de lehnt diese Zusammenführung ab: dasselbe Konto, oder das alte Konto hat die Admin-Rolle (entferne sie zuerst).",
+      "payload_too_large": "Die Anfrage ist zu groß für auth.tretu.de."
     },
     "detail": "Antwort von auth.tretu.de: {detail}"
   },
@@ -98,7 +107,6 @@
     "badgesDescription": "Pro Tag (letzte 30 Tage).",
     "badgesSeries": "Abzeichen",
     "statusTitle": "Dienste",
-    "statusPlaceholder": "Der Dienststatus erscheint hier, sobald die Statusprüfungen auf tretu.de laufen.",
     "statusStates": {
       "up": "Läuft",
       "degraded": "Eingeschränkt",
@@ -109,7 +117,17 @@
     "linksDescription": "Jede App verwaltet ihre eigenen Inhalte selbst.",
     "noAdmin": "keine Web-Verwaltung",
     "providersTitle": "Anmeldemethoden",
-    "platformUnavailable": "Plattform-Daten sind gerade nicht verfügbar."
+    "platformUnavailable": "Plattform-Daten sind gerade nicht verfügbar.",
+    "actorBlocked": {
+      "actor_two_factor_required": "auth.tretu.de lässt die Konto-Verwaltung nur mit Zwei-Faktor-Anmeldung zu. Richte sie unter „Sicherheit“ ein und lade diese Seite danach neu.",
+      "actor_not_admin": "Die Konto-Verwaltung ist gesperrt, bis dein Tretu-Konto wieder die Admin-Rolle hat. Melde dich danach neu an.",
+      "openAccount": "Mein Konto öffnen"
+    },
+    "statusPage": "Statusseite",
+    "statusStale": "Die Prüfungen laufen gerade nicht (letzte Prüfung {date}). Läuft der Plattform-Worker?",
+    "statusNoChecks": "Noch keine Prüfung. Läuft der Plattform-Worker?",
+    "statusNoTargets": "Es sind keine Dienste zur Prüfung eingerichtet (TRETU_STATUS_TARGETS_JSON).",
+    "statusUnavailable": "Der Dienststatus ist gerade nicht verfügbar (Datenbank)."
   },
   "accounts": {
     "title": "Konten",
@@ -232,7 +250,8 @@
       "unlocked": "Konto entsperrt.",
       "twoFactorReset": "2FA zurückgesetzt.",
       "linkRemoved": "Verknüpfung entfernt.",
-      "emailVerified": "E-Mail-Adresse als bestätigt markiert."
+      "emailVerified": "E-Mail-Adresse als bestätigt markiert.",
+      "unchanged": "Keine Änderung nötig: das Konto war schon in diesem Zustand."
     },
     "providerNames": {
       "credential": "Passwort",
@@ -244,7 +263,13 @@
       "minecraft": "Minecraft",
       "teamspeak": "TeamSpeak",
       "password": "Passwort"
-    }
+    },
+    "locale": "Sprache",
+    "locales": {
+      "de": "Deutsch",
+      "en": "Englisch"
+    },
+    "lockedSince": "seit {date}"
   },
   "merge": {
     "title": "Konten zusammenführen",
@@ -262,10 +287,12 @@
     "dropProviders": "Entfallen (Ziel hat schon eine): {list}",
     "dropGameLinks": "Entfallende Spiele-Verknüpfungen: {list}",
     "nothing": "nichts",
-    "raw": "Antwort von auth.tretu.de",
     "confirm": "Zusammenführen",
     "done": "Konten zusammengeführt.",
-    "swap": "Richtung tauschen"
+    "swap": "Richtung tauschen",
+    "direction": "{from} wird in {into} übernommen.",
+    "deleted": "{name} wird gelöscht, {sessions, plural, =0 {ohne offene Sitzungen} one {# Sitzung endet} other {# Sitzungen enden}}.",
+    "usedByApps": "{name} wurde schon in einer App genutzt: die Apps entfernen diesen Nutzer nach der Zusammenführung."
   },
   "legacy": {
     "title": "Altkonten",
@@ -277,7 +304,8 @@
       "email": "gleiche E-Mail",
       "username": "ähnlicher Name"
     },
-    "mergeInto": "In {name} zusammenführen"
+    "mergeInto": "In {name} zusammenführen",
+    "usedByApps": "schon in einer App genutzt"
   },
   "wallet": {
     "title": "Wallet",
@@ -373,7 +401,7 @@
   },
   "audit": {
     "title": "Protokoll",
-    "intro": "Alle Admin-Aktionen auf tretu.de, auch die an auth.tretu.de weitergereichten. Fehlgeschlagene Versuche sind markiert.",
+    "intro": "Alle Admin-Aktionen auf tretu.de, auch die an auth.tretu.de weitergereichten. Fehlgeschlagene Versuche und Aktionen ohne Änderung sind markiert.",
     "filters": {
       "actor": "Admin (Tretu-ID)",
       "target": "Konto (Tretu-ID)",
@@ -407,6 +435,7 @@
       "badge_grant": "Abzeichen vergeben",
       "badge_revoke": "Abzeichen entzogen",
       "badge_resync": "Abzeichen neu abgeglichen"
-    }
+    },
+    "noop": "keine Änderung nötig"
   }
 }

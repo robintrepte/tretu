@@ -82,10 +82,14 @@ export async function platformKpis(db: Executor = platformDb, now: Date = new Da
 
 export type AccountKpis = { ok: true; stats: AdminStats } | { ok: false; error: AuthAdminError["code"] };
 
-/** Tretu-Konten numbers from auth; a friendly error code when auth is down or not configured. */
-export async function accountKpis(): Promise<AccountKpis> {
+/**
+ * Tretu-Konten numbers from auth, asked as `actorSub` (so this is also the up-front check that the admin may use the
+ * account admin: `actor_two_factor_required` / `actor_not_admin`); a friendly error code when auth refuses, is down
+ * or is not configured.
+ */
+export async function accountKpis(actorSub: string): Promise<AccountKpis> {
   try {
-    return { ok: true, stats: await authAdmin.stats() };
+    return { ok: true, stats: await authAdmin.stats(actorSub) };
   } catch (error) {
     if (error instanceof AuthAdminError) return { ok: false, error: error.code };
     throw error;

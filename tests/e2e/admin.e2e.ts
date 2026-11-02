@@ -5,7 +5,7 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { serializeSignedCookie } from "better-call";
 
-import { E2E_SECRET, MEMBER_SESSION_TOKEN, SESSION_TOKEN, USERS } from "./fixtures";
+import { E2E_SECRET, MEMBER_SESSION_TOKEN, NO2FA_SESSION_TOKEN, SESSION_TOKEN, USERS } from "./fixtures";
 
 async function signIn(context: BrowserContext, baseURL: string, token = SESSION_TOKEN) {
   const header = await serializeSignedCookie("tretu.session_token", token, E2E_SECRET);
@@ -34,12 +34,28 @@ test("overview: account KPIs from auth, noindex and no caching", async ({ page, 
   expect(res?.headers()["x-robots-tag"]).toBe("noindex, nofollow");
   expect(res?.headers()["cache-control"]).toMatch(/no-store/);
   await expect(page.getByRole("heading", { level: 1, name: "Übersicht" })).toBeVisible();
-  await expect(page.getByTestId("kpi-total")).toContainText("3");
+  await expect(page.getByTestId("kpi-total")).toContainText("4");
+  await expect(page.getByTestId("admin-actor-blocked")).toHaveCount(0);
+  // Service status from the status tables (seeded like the platform worker writes them).
+  await expect(page.getByTestId("service-saga")).toContainText("Eingeschränkt");
+  await expect(page.getByTestId("service-play")).toContainText("Ausgefallen");
+  await expect(page.getByTestId("service-minecraft")).toContainText("3/20 online");
   await expect(page.getByTestId("app-admin-links")).toContainText("saga.tretu.de/admin");
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
   // Anonymous visitors never see it.
   const anonymous = await request.get("/dashboard/admin", { maxRedirects: 0 });
   expect(anonymous.status()).toBe(307);
+});
+
+test("an admin without 2FA at auth gets a clear message instead of the account data", async ({ page, context, baseURL }) => {
+  await signIn(context, baseURL!, NO2FA_SESSION_TOKEN);
+  await page.goto("/dashboard/admin");
+  const banner = page.getByTestId("admin-actor-blocked");
+  await expect(banner).toContainText("Aktiviere 2FA in Mein Konto, um die Verwaltung zu nutzen.");
+  await expect(banner.getByTestId("admin-account-link")).toHaveAttribute("href", /\/konto\?tab=sicherheit$/);
+  await expect(page.getByTestId("kpi-accounts")).toHaveCount(0);
+  await page.goto("/dashboard/admin/konten?q=Steamy");
+  await expect(page.getByText("Aktiviere 2FA in Mein Konto, um die Verwaltung zu nutzen.")).toBeVisible();
 });
 
 test("search → detail → lock with a reason → audit row", async ({ page, context, baseURL }) => {

@@ -44,6 +44,7 @@ import { badgeCatalog, badgeHolders, grantBadge, resyncBadges, revokeBadge, sync
 import { adminMutationLimiter, AdminError } from "../src/lib/admin/guard";
 import { summarizeMerge } from "../src/lib/admin/merge-summary";
 import { accountKpis, platformKpis } from "../src/lib/admin/overview";
+import { getServiceStatuses } from "../src/lib/admin/service-status";
 import { adjustBalance, reverseTransaction, walletOfUser, walletOverview } from "../src/lib/admin/wallet-admin";
 import { syncUserAfterSignIn } from "../src/lib/auth/sync";
 import { applyTretuRoles, isUserLocked } from "../src/lib/auth/tretu-account";
@@ -53,6 +54,8 @@ import { upsertDirectoryUser } from "../src/lib/platform/directory";
 import { ingestEvents } from "../src/lib/platform/events";
 import { lockProgress, settleProgress, incrementStat } from "../src/lib/platform/progress";
 import { bookTransaction, peekBalance } from "../src/lib/platform/wallet";
+import { clearStatusCache } from "../src/lib/status/read";
+import { recordCheck } from "../src/lib/status/store";
 
 const SECRET = "web-secret-for-admin-tests-0123456789";
 const ADMIN = "00000000-0000-4000-8000-00000000ad01";
@@ -114,12 +117,13 @@ beforeEach(async () => {
         links: { discord: "424242", minecraft: "uuid-1", minecraftName: "LenaMC", steam: "76561197960287930" },
         providers: [
           { provider: "credential", accountId: USER, createdAt: "2026-01-01T00:00:00.000Z" },
-          { provider: "discord", accountId: "424242", createdAt: "2026-01-02T00:00:00.000Z" },
+          { provider: "discord", accountId: "424242", displayName: "lena#0", createdAt: "2026-01-02T00:00:00.000Z" },
+          { provider: "steam", accountId: "76561197960287930", displayName: "LenaSteam", createdAt: "2026-01-03T00:00:00.000Z" },
         ],
-        sessions: [{ id: "s1", createdAt: "2026-10-01T00:00:00.000Z", expiresAt: "2026-12-01T00:00:00.000Z", ipAddress: "203.0.113.4" }],
+        sessions: [{ id: "s1", createdAt: "2026-10-01T00:00:00.000Z", expiresAt: "2099-12-01T00:00:00.000Z", ipAddress: "203.0.113.4", client: "saga" }],
         legacyLinks: [{ app: "hollowmere", legacyUserId: "nakama-77", legacyUsername: "lena_old", importedAt: "2026-02-01T00:00:00.000Z", method: "import" }],
       }),
-      mockUser({ sub: OTHER, username: "lena_2", email: "lena@example.org", legacyLinks: [{ app: "saga", legacyUserId: "9", legacyUsername: "lena", importedAt: "2026-02-01T00:00:00.000Z", method: "import" }] }),
+      mockUser({ sub: OTHER, username: "lena_2", name: "Lena 2", email: "lena@example.org", legacyLinks: [{ app: "saga", legacyUserId: "9", legacyUsername: "lena", importedAt: "2026-02-01T00:00:00.000Z", method: "import" }] }),
     ],
   });
   process.env.TRETU_AUTH_ISSUER = auth.url;
@@ -138,18 +142,49 @@ after(async () => {
 
 /* --------------------------------- reading --------------------------------- */
 
-test("search and detail go to auth signed as tretu-web; unsigned calls are refused by the mock", async () => {
-  const result = await authAdmin.search("lena");
-  assert.deepEqual(result.items.map((u) => u.username).sort(), ["lena", "lena_2"]);
+test("search and detail go to auth signed as tretu-web, always naming the acting admin", async () => {
+  const result = await authAdmin.search(ADMIN, "lena");
+  // Exact match first (username "lena"), then the newest.
+  assert.deepEqual(result.items.map((u) => u.username), ["lena", "lena_2"]);
   assert.equal(lastRequest()!.app, "tretu-web");
-  assert.match(lastRequest()!.path, /^\/api\/v1\/admin\/users\?q=lena&limit=50$/);
+  assert.equal(lastRequest()!.path, `/api/v1/admin/users?q=lena&limit=50&actorSub=${ADMIN}`);
 
-  // Every identifier works (here: the Steam ID).
-  assert.equal((await authAdmin.search("76561197960287930")).items[0]?.sub, USER);
+  // Every identifier works (here: the Steam ID); `email` may be null, links carry the TeamSpeak name.
+  auth.users.get(USER)!.links.teamspeak = "ts-uid=";
+  auth.users.get(USER)!.links.teamspeakName = "LenaTS";
+  const bySteam = (await authAdmin.search(ADMIN, "76561197960287930")).items[0];
+  assert.equal(bySteam?.sub, USER);
+  assert.equal(bySteam?.links.teamspeakName, "LenaTS");
+  assert.equal((await authAdmin.search(ADMIN, "lena_2")).items[0]?.email, "lena@example.org");
+
+  // The query is signed exactly as sent: spaces, plus signs, umlauts and slashes survive.
+  for (const q of ["Lena 2", "a+b/c?d&e", "Jürgen ~'()!"]) await authAdmin.search(ADMIN, q);
+  assert.match(auth.requests.at(-3)!.path, /\?q=Lena\+2&/);
+
+  // Cursor pagination (limit clamped to auth's 1–100).
+  const page1 = await authAdmin.search(ADMIN, "lena", { limit: 1 });
+  assert.equal(page1.items.length, 1);
+  assert.ok(page1.nextCursor);
+  const page2 = await authAdmin.search(ADMIN, "lena", { limit: 1, cursor: page1.nextCursor });
+  assert.deepEqual(page2.items.map((u) => u.username), ["lena_2"]);
+  assert.equal(page2.nextCursor, null);
+  await authAdmin.search(ADMIN, "lena", { limit: 500 });
+  assert.match(lastRequest()!.path, /limit=100&/);
+  await assert.rejects(authAdmin.search(ADMIN, "lena", { cursor: "not-a-cursor" }), (e: unknown) => e instanceof AuthAdminError && e.code === "invalid");
 
   // A wrong secret is a 401 → "unauthorized" (operator problem), not a crash.
   process.env.TRETU_APP_SECRET = "wrong-secret";
-  await assert.rejects(authAdmin.search("lena"), (e: unknown) => e instanceof AuthAdminError && e.code === "unauthorized");
+  await assert.rejects(authAdmin.search(ADMIN, "lena"), (e: unknown) => e instanceof AuthAdminError && e.code === "unauthorized");
+});
+
+test("reads are refused for actors who are no admin, are locked or have no 2FA", async () => {
+  await assert.rejects(authAdmin.stats(OTHER), (e: unknown) => e instanceof AuthAdminError && e.code === "actor_not_admin");
+  auth.users.get(ADMIN)!.twoFactor = false;
+  await assert.rejects(authAdmin.user(ADMIN, USER), (e: unknown) => e instanceof AuthAdminError && e.code === "actor_two_factor_required");
+  assert.deepEqual(await accountKpis(ADMIN), { ok: false, error: "actor_two_factor_required" });
+  auth.users.get(ADMIN)!.twoFactor = true;
+  Object.assign(auth.users.get(ADMIN)!, { locked: true, lockedUntil: null });
+  await assert.rejects(authAdmin.legacy(ADMIN), (e: unknown) => e instanceof AuthAdminError && e.code === "actor_not_admin");
 });
 
 test("account view combines auth detail, platform data, app deep links and the hub audit", async () => {
@@ -162,10 +197,21 @@ test("account view combines auth detail, platform data, app deep links and the h
   await platformDb.update(platformUserProgress).set({ xp: 350 }).where(eq(platformUserProgress.sub, USER));
   await bookTransaction(platformDb, { sub: USER, app: "saga", idempotencyKey: "k1", kind: "grant", amount: 40, reason: "Test" });
 
-  const view = await getAccountView(USER);
+  const view = await getAccountView(actor, USER);
   assert.ok(view.auth.ok);
-  assert.equal(view.auth.ok && view.auth.user.legacyLinks[0]?.legacyUserId, "nakama-77");
-  assert.equal(view.auth.ok && view.auth.user.sessions.length, 1);
+  const detail = view.auth.user;
+  assert.equal(detail.legacyLinks[0]?.legacyUserId, "nakama-77");
+  assert.deepEqual(detail.sessions.map((x) => [x.ipAddress, x.client]), [["203.0.113.4", "saga"]]);
+  assert.equal(detail.locale, "de");
+  assert.deepEqual(
+    detail.providers.map((x) => [x.provider, x.accountId, x.displayName]),
+    [
+      ["password", null, null],
+      ["discord", "424242", "lena#0"],
+      ["steam", "76561197960287930", "LenaSteam"],
+    ]
+  );
+  assert.equal(lastRequest()!.path, `/api/v1/admin/users/${USER}?actorSub=${ADMIN}`);
   assert.equal(view.platform?.level.level, 3);
   assert.equal(view.platform?.balance, 540); // welcome bonus 500 + 40
   const links = Object.fromEntries(view.apps.map((a) => [a.app, a]));
@@ -176,17 +222,17 @@ test("account view combines auth detail, platform data, app deep links and the h
 
   // auth down: the page still renders platform data with a friendly error code.
   auth.failWith = 503;
-  const degraded = await getAccountView(USER);
+  const degraded = await getAccountView(actor, USER);
   assert.deepEqual(degraded.auth, { ok: false, error: "unavailable" });
   assert.equal(degraded.platform?.balance, 540);
 });
 
 test("auth unreachable or not configured: friendly error codes", async () => {
   process.env.TRETU_AUTH_ISSUER = "http://127.0.0.1:9";
-  await assert.rejects(authAdmin.user(USER), (e: unknown) => e instanceof AuthAdminError && e.code === "unavailable");
+  await assert.rejects(authAdmin.user(ADMIN, USER), (e: unknown) => e instanceof AuthAdminError && e.code === "unavailable");
   delete process.env.TRETU_AUTH_ISSUER;
-  await assert.rejects(authAdmin.stats(), (e: unknown) => e instanceof AuthAdminError && e.code === "not_configured");
-  assert.deepEqual(await accountKpis(), { ok: false, error: "not_configured" });
+  await assert.rejects(authAdmin.stats(ADMIN), (e: unknown) => e instanceof AuthAdminError && e.code === "not_configured");
+  assert.deepEqual(await accountKpis(ADMIN), { ok: false, error: "not_configured" });
 });
 
 /* --------------------------------- mutations ------------------------------- */
@@ -195,7 +241,7 @@ test("every account mutation forwards actorSub + reason and writes an audit row"
   const lena = await localUser(USER, "Lena");
   const reason = "Support-Ticket #12";
 
-  await changeRoles(actor, USER, { add: ["moderator"], reason });
+  assert.deepEqual(await changeRoles(actor, USER, { add: ["moderator"], reason }), { changed: true, auditDetails: { changed: true } });
   assert.deepEqual(lastRequest()!.body, { actorSub: ADMIN, reason, add: ["moderator"] });
   assert.ok(auth.users.get(USER)!.roles.includes("moderator"));
   await changeRoles(actor, USER, { remove: ["moderator"], reason });
@@ -239,6 +285,26 @@ test("every account mutation forwards actorSub + reason and writes an audit row"
   assert.equal(rows[6]!.details.provider, "minecraft");
   // Every forwarded call was signed by tretu-web.
   assert.ok(auth.requests.every((r) => r.app === "tretu-web"));
+  // auth recorded each change in the target's activity log (with the admin and the reason) and on the admin.
+  assert.deepEqual(
+    auth.users.get(USER)!.audit.map((a) => a.event),
+    ["admin.roles_changed", "admin.roles_changed", "admin.sessions_revoked", "admin.locked", "admin.unlocked", "admin.two_factor_reset", "admin.link_removed", "admin.email_verified"]
+  );
+  assert.equal(auth.users.get(USER)!.audit[3]!.meta!.actorSub, ADMIN);
+  assert.equal(auth.users.get(ADMIN)!.audit.filter((a) => a.event === "admin.performed").length, 8);
+});
+
+test("a change auth finds nothing to do is answered changed:false and audited here as a no-op", async () => {
+  const reason = "Doppelt geklickt";
+  const result = await unlockAccount(actor, USER, { reason });
+  assert.equal(result.changed, false);
+  await removeLink(actor, USER, { reason, provider: "teamspeak" });
+  const rows = await auditRows();
+  assert.deepEqual(rows.map((r) => [r.action, r.details.outcome]), [
+    ["account.unlock", "noop"],
+    ["account.link.remove", "noop"],
+  ]);
+  assert.equal(auth.users.get(USER)!.audit.length, 0, "auth records nothing for changed:false");
 });
 
 test("refusals: invalid reason (not audited), self-actions, auth 403/409 (audited as failed), rate limit", async () => {
@@ -249,17 +315,37 @@ test("refusals: invalid reason (not audited), self-actions, auth 403/409 (audite
   assert.equal(auth.requests.length, 0, "nothing reached auth");
   assert.equal((await auditRows()).length, 0);
 
-  // An actor without the admin role at auth: 403, recorded as failed.
+  // The password is no removable link (refused here, never sent).
+  await assert.rejects(removeLink(actor, USER, { reason: "Test it", provider: "password" }), (e: unknown) => e instanceof AdminError && e.code === "invalid_input");
+  assert.equal(auth.requests.length, 0);
+
+  // An actor without the admin role at auth: 403 actor_not_admin, recorded as failed.
   const impostor: AdminActor = { userId: 0, sub: OTHER, name: "x" };
-  await assert.rejects(lockAccount(impostor, USER, { reason: "Test it" }), (e: unknown) => e instanceof AuthAdminError && e.code === "forbidden" && /not an admin/.test(e.detail ?? ""));
+  await assert.rejects(lockAccount(impostor, USER, { reason: "Test it" }), (e: unknown) => e instanceof AuthAdminError && e.code === "actor_not_admin");
+  // An admin without 2FA: 403 actor_two_factor_required.
+  auth.users.get(ADMIN)!.twoFactor = false;
+  await assert.rejects(verifyEmail(actor, USER, { reason: "Test it" }), (e: unknown) => e instanceof AuthAdminError && e.code === "actor_two_factor_required");
+  auth.users.get(ADMIN)!.twoFactor = true;
   // Last sign-in method: 409.
-  auth.users.get(USER)!.providers = [{ provider: "credential", accountId: USER, createdAt: "2026-01-01T00:00:00.000Z" }];
-  await assert.rejects(removeLink(actor, USER, { reason: "Test it", provider: "credential" }), (e: unknown) => e instanceof AuthAdminError && e.code === "conflict");
+  auth.users.get(USER)!.providers = [{ provider: "discord", accountId: "424242", createdAt: "2026-01-01T00:00:00.000Z" }];
+  await assert.rejects(removeLink(actor, USER, { reason: "Test it", provider: "discord" }), (e: unknown) => e instanceof AuthAdminError && e.code === "last_sign_in_method");
+  // No address to verify: 409 no_email.
+  auth.users.get(USER)!.email = null;
+  await assert.rejects(verifyEmail(actor, USER, { reason: "Test it" }), (e: unknown) => e instanceof AuthAdminError && e.code === "no_email");
+  // Merging an admin away: 409 merge_refused.
+  await assert.rejects(mergeAccounts(actor, { from: ADMIN, into: USER, reason: "Test it" }), (e: unknown) => e instanceof AuthAdminError && e.code === "merge_refused");
+  // Unknown account: 404.
+  await assert.rejects(unlockAccount(actor, "00000000-0000-4000-8000-0000000000ff", { reason: "Test it" }), (e: unknown) => e instanceof AuthAdminError && e.code === "not_found");
   const failed = await auditRows();
   assert.deepEqual(failed.map((r) => [r.action, r.details.outcome, r.details.error]), [
-    ["account.lock", "failed", "forbidden"],
-    ["account.link.remove", "failed", "conflict"],
+    ["account.lock", "failed", "actor_not_admin"],
+    ["account.email.verify", "failed", "actor_two_factor_required"],
+    ["account.link.remove", "failed", "last_sign_in_method"],
+    ["account.email.verify", "failed", "no_email"],
+    ["account.merge", "failed", "merge_refused"],
+    ["account.unlock", "failed", "not_found"],
   ]);
+  auth.users.get(USER)!.email = "lena@example.org";
 
   // Burst of 10, then rate limited (per admin).
   adminMutationLimiter.reset();
@@ -270,35 +356,47 @@ test("refusals: invalid reason (not audited), self-actions, auth 403/409 (audite
 test("merge: dry-run preview (not audited), then the merge (audited on the surviving account)", async () => {
   const preview = await previewMerge(actor, { from: OTHER, into: USER });
   assert.equal(lastRequest()!.body!.dryRun, true);
-  const summary = summarizeMerge(preview);
-  assert.equal(summary.recognized, true);
+  assert.equal(preview.dryRun, true);
+  const summary = summarizeMerge(preview.plan);
+  assert.deepEqual([summary.from, summary.into], ["@lena_2", "@lena"]);
   assert.deepEqual(summary.move.legacy, ["saga: lena"]);
-  assert.deepEqual(summary.drop.providers, ["credential"]);
+  assert.deepEqual(summary.drop.providers, ["password"]);
+  assert.equal(summary.fromSessions, 0);
   assert.equal((await auditRows()).length, 0);
+  assert.equal(auth.users.has(OTHER), true, "a preview changes nothing");
 
-  await mergeAccounts(actor, { from: OTHER, into: USER, reason: "Gleiche Person (E-Mail)" });
+  const merged = await mergeAccounts(actor, { from: OTHER, into: USER, reason: "Gleiche Person (E-Mail)" });
+  assert.ok(!merged.dryRun && merged.merged);
+  assert.equal(merged.user?.sub, USER);
   assert.equal(lastRequest()!.body!.dryRun, false);
   assert.equal(auth.users.has(OTHER), false);
   const [row] = await auditRows("account.merge");
   assert.equal(row!.targetSub, USER);
   assert.equal(row!.details.from, OTHER);
+  assert.deepEqual(row!.details.moved, { providers: [], gameLinks: [], passkeys: 0, legacy: ["saga:9"] });
 
   await assert.rejects(previewMerge(actor, { from: USER, into: USER }), (e: unknown) => e instanceof AdminError && e.code === "invalid_input");
 });
 
 test("legacy list and stats are parsed from auth", async () => {
-  const legacy = await authAdmin.legacy();
+  const legacy = await authAdmin.legacy(ADMIN);
+  assert.equal(lastRequest()!.path, `/api/v1/admin/legacy?actorSub=${ADMIN}`);
 
   const lena2 = legacy.find((c) => c.sub === OTHER);
   assert.ok(lena2);
-  assert.deepEqual(lena2.legacy.map((l) => l.app), ["saga"]);
-  assert.deepEqual(lena2.possibleMatches.map((m) => [m.sub, m.reasons]), [[USER, ["email"]]]);
+  assert.equal(lena2.username, "lena_2");
+  assert.deepEqual(lena2.legacy.map((l) => [l.app, l.legacyUsername, l.method]), [["saga", "lena", "import"]]);
+  // Same email and the same name up to the `_2` suffix.
+  assert.deepEqual(lena2.possibleMatches.map((m) => [m.sub, m.reasons]), [[USER, ["email", "username"]]]);
+  assert.ok(legacy.find((c) => c.sub === USER), "the hollowmere import is listed too");
 
-  const kpis = await accountKpis();
+  const kpis = await accountKpis(ADMIN);
   assert.ok(kpis.ok);
   assert.equal(kpis.ok && kpis.stats.users.total, 3);
   assert.equal(kpis.ok && kpis.stats.users.admins, 1);
-  assert.equal(kpis.ok && kpis.stats.signInsPerDay.length, 2);
+  // 90 Berlin days, oldest first.
+  assert.equal(kpis.ok && kpis.stats.signInsPerDay.length, 90);
+  assert.ok(kpis.ok && kpis.stats.signUpsPerDay[0]!.day < kpis.stats.signUpsPerDay[89]!.day);
 });
 
 /* ---------------------------------- wallet --------------------------------- */
@@ -518,6 +616,37 @@ test("overview KPIs: active users per app and day, badges per day", async () => 
   assert.equal(kpis.credits.length, 30);
 });
 
+test("service status on the overview comes from the status tables (same data as /status)", async () => {
+  process.env.TRETU_STATUS_TARGETS_JSON = JSON.stringify([
+    { id: "saga", url: "http://127.0.0.1:9/saga" },
+    { id: "auth", url: "http://127.0.0.1:9/auth" },
+  ]);
+  process.env.TRETU_STATUS_MINECRAFT = "mc.example.org:25565";
+  for (const key of ["TS_QUERY_HOST", "TRETU_STATUS_TEAMSPEAK"]) delete process.env[key];
+  try {
+    const now = new Date();
+    await recordCheck(platformDb, "saga", { state: "degraded", responseMs: 240, httpStatus: 503, error: "checks:db" }, new Date(now.getTime() - 30_000));
+    await recordCheck(platformDb, "minecraft", { state: "up", responseMs: 12, httpStatus: null, error: null, usersOnline: 3, usersMax: 20 }, new Date(now.getTime() - 30_000));
+    clearStatusCache();
+    const report = await getServiceStatuses(now);
+    assert.ok(report.available);
+    assert.equal(report.stale, false);
+    const byId = Object.fromEntries(report.services.map((x) => [x.id, x]));
+    assert.deepEqual(Object.keys(byId), ["saga", "auth", "minecraft"]);
+    assert.deepEqual([byId.saga!.name, byId.saga!.state, byId.saga!.detail, byId.saga!.url], ["Saga", "degraded", "240 ms", "https://saga.tretu.de"]);
+    assert.deepEqual([byId.auth!.state, byId.auth!.checkedAt, byId.auth!.detail], ["unknown", null, null]);
+    assert.deepEqual([byId.minecraft!.state, byId.minecraft!.detail, byId.minecraft!.url], ["up", "3/20 online", null]);
+    // Without any check for minutes the worker counts as stopped.
+    clearStatusCache();
+    const later = await getServiceStatuses(new Date(now.getTime() + 10 * 60_000));
+    assert.equal(later.available && later.stale, true);
+  } finally {
+    delete process.env.TRETU_STATUS_TARGETS_JSON;
+    delete process.env.TRETU_STATUS_MINECRAFT;
+    clearStatusCache();
+  }
+});
+
 test("audit log filters: actor, target, action, date and pagination", async () => {
   for (let i = 0; i < 3; i++) await verifyEmail(actor, USER, { reason: `Fall ${i}` });
   await platformDb.insert(platformAdminAudit).values({ actorSub: OTHER, action: "badge.grant", targetSub: ADMIN, details: { reason: "alt", outcome: "ok" }, createdAt: new Date("2026-01-05T10:00:00Z") });
@@ -536,18 +665,14 @@ test("audit log filters: actor, target, action, date and pagination", async () =
   assert.equal(page1.items[0]!.actorName, null, "unknown subs stay unnamed");
 });
 
-test("merge summary falls back gracefully for unknown shapes", () => {
-  assert.equal(summarizeMerge({ ok: true }).recognized, false);
-  const s = summarizeMerge({ from: "a", into: "b", moved: { providers: ["discord"], passkeys: 2, legacy: [{ app: "play", legacyUserId: "1" }] } });
-  assert.deepEqual([s.from, s.into, s.move.providers, s.move.passkeys, s.move.legacy], ["a", "b", ["discord"], 2, ["play: 1"]]);
-});
-
 test("auth responses with only the required fields still parse (lenient shapes)", async () => {
   const { adminUserDetailSchema, adminStatsSchema } = await import("../src/lib/admin/auth-admin");
   const user = adminUserDetailSchema.parse({ sub: USER });
   assert.deepEqual([user.roles, user.twoFactor, user.locked, user.providers, user.audit, user.createdAt], [[], false, false, [], [], null]);
   const withAudit = adminUserDetailSchema.parse({ sub: USER, audit: [{ event: "login", createdAt: "2026-10-01T00:00:00Z" }, "garbage"] });
   assert.deepEqual(withAudit.audit.map((a) => a.action), ["login"]);
+  // An unknown locale degrades to null instead of failing the page.
+  assert.equal(adminUserDetailSchema.parse({ sub: USER, locale: "fr" }).locale, null);
   const stats = adminStatsSchema.parse({ users: { total: 1 } });
   assert.deepEqual([stats.users.admins, stats.signUpsPerDay, stats.providers], [0, [], {}]);
 });

@@ -16,6 +16,8 @@ import {
   E2E_SECRET,
   MEMBER_SESSION_TOKEN,
   MEMBER_SUB,
+  NO2FA_SESSION_TOKEN,
+  NO2FA_SUB,
   SESSION_TOKEN,
   STATUS_SEED,
   STATUS_TARGETS,
@@ -68,6 +70,10 @@ async function seed() {
   const [member] = await db.insert(users).values({ displayName: "Member", tretuSub: MEMBER_SUB, tretuRoles: [] }).returning();
   await db.insert(authSessions).values({ token: MEMBER_SESSION_TOKEN, userId: member!.id, expiresAt: new Date(Date.now() + 24 * 3600_000) });
   await grantRoleWithSource(db, member!.id, "operator", "local");
+  // A Tretu admin without 2FA at auth (the overview explains why the account admin stays closed).
+  const [no2fa] = await db.insert(users).values({ displayName: "Neu-Admin", tretuSub: NO2FA_SUB, tretuRoles: ["admin"] }).returning();
+  await db.insert(authSessions).values({ token: NO2FA_SESSION_TOKEN, userId: no2fa!.id, expiresAt: new Date(Date.now() + 24 * 3600_000) });
+  await grantRoleWithSource(db, no2fa!.id, "admin", "tretu");
   await seedStatus();
   await closePlatformDb();
   await closeDb();
@@ -128,12 +134,13 @@ async function startAuthMock() {
         lastSignInAt: "2026-10-30T12:00:00.000Z",
         links: { steam: STEAM_ID, discord: "424242", minecraftName: "SteamyMC", minecraft: "uuid-steamy", teamspeak: TS_UID },
         providers: [
-          { provider: "steam", accountId: STEAM_ID, createdAt: at },
-          { provider: "discord", accountId: "424242", createdAt: at },
+          { provider: "steam", accountId: STEAM_ID, displayName: "Steamy", createdAt: at },
+          { provider: "discord", accountId: "424242", displayName: "steamy", createdAt: at },
         ],
-        sessions: [{ id: "sess-1", createdAt: "2026-10-30T12:00:00.000Z", expiresAt: "2026-12-30T12:00:00.000Z", ipAddress: "203.0.113.9", client: "play" }],
+        sessions: [{ id: "sess-1", createdAt: "2026-10-30T12:00:00.000Z", expiresAt: "2099-12-30T12:00:00.000Z", ipAddress: "203.0.113.9", client: "play" }],
       }),
       mockUser({ sub: USERS.hidden.sub, username: USERS.hidden.username, name: USERS.hidden.name, createdAt: at }),
+      mockUser({ sub: NO2FA_SUB, username: "neuadmin", name: "Neu-Admin", roles: ["admin"], twoFactor: false, createdAt: at }),
     ],
   });
 }

@@ -21,7 +21,7 @@ import { users } from "@/db/schema";
 import type { AdminActor } from "@/lib/admin/access";
 import { ecosystemApp } from "@/lib/admin/apps";
 import { listAdminAudit, type AuditRow } from "@/lib/admin/audit";
-import { authAdmin, AuthAdminError, type AdminUserDetail, type MergeResponse } from "@/lib/admin/auth-admin";
+import { authAdmin, AuthAdminError, isRemovableLink, type AdminUserDetail, type MergeResponse, type MutationResult } from "@/lib/admin/auth-admin";
 import { AdminError, auditedMutation, takeMutationToken, validateReason } from "@/lib/admin/guard";
 import { applyTretuLock, endLocalSessions } from "@/lib/auth/tretu-account";
 import { getBadge } from "@/lib/platform/badges";
@@ -31,7 +31,6 @@ import { peekBalance } from "@/lib/platform/wallet";
 
 export const SUB_PATTERN = /^[A-Za-z0-9_.:@+-]{1,128}$/;
 const ROLE_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
-const PROVIDER_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
 
 export function assertSub(sub: unknown): string {
   if (typeof sub !== "string" || !SUB_PATTERN.test(sub)) throw new AdminError("invalid_input", "sub");
@@ -158,11 +157,11 @@ export type AccountView = {
   local: LocalHubUser | null;
 };
 
-export async function getAccountView(sub: string, locale: "de" | "en" = "de"): Promise<AccountView> {
+export async function getAccountView(actor: AdminActor, sub: string, locale: "de" | "en" = "de"): Promise<AccountView> {
   assertSub(sub);
   const [authResult, platformResult, auditResult, local] = await Promise.all([
     authAdmin
-      .user(sub)
+      .user(actor.sub, sub)
       .then((user) => ({ ok: true as const, user }))
       .catch((error: unknown) => {
         if (error instanceof AuthAdminError) return { ok: false as const, error: error.code };
@@ -196,30 +195,40 @@ async function endHubSessions(sub: string): Promise<number> {
   return id ? endLocalSessions(db, id) : 0;
 }
 
+/** What an account change reports back: `changed: false` = auth had nothing to do (audited as a no-op here). */
+export type AccountChange = { changed: boolean; auditDetails: Record<string, unknown> };
+
+const outcome = (result: MutationResult, extra: Record<string, unknown> = {}, changed = result.changed): AccountChange => ({
+  changed,
+  auditDetails: { changed, ...extra },
+});
+
 function roleList(value: unknown): string[] {
   if (value === undefined || value === null) return [];
-  if (!Array.isArray(value) || value.length > 20) throw new AdminError("invalid_input", "roles");
+  if (!Array.isArray(value) || value.length > 16) throw new AdminError("invalid_input", "roles");
   const list = [...new Set(value.map((r) => (typeof r === "string" ? r.trim().toLowerCase() : "")))];
   if (list.some((r) => !ROLE_PATTERN.test(r))) throw new AdminError("invalid_input", "roles");
   return list;
 }
 
-export async function changeRoles(actor: AdminActor, subInput: string, input: { add?: unknown; remove?: unknown; reason: unknown }) {
+export async function changeRoles(actor: AdminActor, subInput: string, input: { add?: unknown; remove?: unknown; reason: unknown }): Promise<AccountChange> {
   const sub = assertSub(subInput);
   const add = roleList(input.add);
   const remove = roleList(input.remove).filter((r) => !add.includes(r));
   if (!add.length && !remove.length) throw new AdminError("invalid_input", "roles");
   if (sub === actor.sub && remove.includes("admin")) throw new AdminError("self_action");
-  return auditedMutation(actor, { action: "account.roles", targetSub: sub, reason: input.reason, details: { add, remove } }, (reason) =>
-    authAdmin.setRoles(sub, { actorSub: actor.sub, reason, ...(add.length ? { add } : {}), ...(remove.length ? { remove } : {}) })
+  return auditedMutation(actor, { action: "account.roles", targetSub: sub, reason: input.reason, details: { add, remove } }, async (reason) =>
+    outcome(await authAdmin.setRoles(sub, { actorSub: actor.sub, reason, ...(add.length ? { add } : {}), ...(remove.length ? { remove } : {}) }))
   );
 }
 
-export async function revokeSessions(actor: AdminActor, subInput: string, input: { reason: unknown }) {
+export async function revokeSessions(actor: AdminActor, subInput: string, input: { reason: unknown }): Promise<AccountChange> {
   const sub = assertSub(subInput);
   return auditedMutation(actor, { action: "account.sessions.revoke", targetSub: sub, reason: input.reason }, async (reason) => {
-    await authAdmin.revokeSessions(sub, { actorSub: actor.sub, reason });
-    return { auditDetails: { hubSessionsEnded: await endHubSessions(sub) } };
+    const result = await authAdmin.revokeSessions(sub, { actorSub: actor.sub, reason });
+    const hubSessionsEnded = await endHubSessions(sub);
+    // Ending tretu.de sessions is a change even when auth had none left.
+    return outcome(result, { hubSessionsEnded }, result.changed || hubSessionsEnded > 0);
   });
 }
 
@@ -231,7 +240,7 @@ function parseUntil(value: unknown, now: Date): Date | null {
   return d;
 }
 
-export async function lockAccount(actor: AdminActor, subInput: string, input: { reason: unknown; until?: unknown }, now: Date = new Date()) {
+export async function lockAccount(actor: AdminActor, subInput: string, input: { reason: unknown; until?: unknown }, now: Date = new Date()): Promise<AccountChange> {
   const sub = assertSub(subInput);
   if (sub === actor.sub) throw new AdminError("self_action");
   const until = parseUntil(input.until, now);
@@ -239,46 +248,47 @@ export async function lockAccount(actor: AdminActor, subInput: string, input: { 
     actor,
     { action: "account.lock", targetSub: sub, reason: input.reason, details: { until: until?.toISOString() ?? null } },
     async (reason) => {
-      await authAdmin.lock(sub, { actorSub: actor.sub, reason, ...(until ? { until: until.toISOString() } : {}) });
+      const result = await authAdmin.lock(sub, { actorSub: actor.sub, reason, ...(until ? { until: until.toISOString() } : {}) });
       // Effective here right away; auth's user.updated confirms it shortly after.
       const id = await localUserId(sub);
       const ended = id ? (await applyTretuLock(db, id, { locked: true, until }, now)).sessionsEnded : 0;
-      return { auditDetails: { hubSessionsEnded: ended } };
+      return outcome(result, { hubSessionsEnded: ended });
     }
   );
 }
 
-export async function unlockAccount(actor: AdminActor, subInput: string, input: { reason: unknown }) {
+export async function unlockAccount(actor: AdminActor, subInput: string, input: { reason: unknown }): Promise<AccountChange> {
   const sub = assertSub(subInput);
   return auditedMutation(actor, { action: "account.unlock", targetSub: sub, reason: input.reason }, async (reason) => {
-    await authAdmin.unlock(sub, { actorSub: actor.sub, reason });
+    const result = await authAdmin.unlock(sub, { actorSub: actor.sub, reason });
     const id = await localUserId(sub);
     if (id) await applyTretuLock(db, id, { locked: false, until: null });
-    return {};
+    return outcome(result);
   });
 }
 
-export async function resetTwoFactor(actor: AdminActor, subInput: string, input: { reason: unknown }) {
+export async function resetTwoFactor(actor: AdminActor, subInput: string, input: { reason: unknown }): Promise<AccountChange> {
   const sub = assertSub(subInput);
   return auditedMutation(actor, { action: "account.two_factor.reset", targetSub: sub, reason: input.reason }, async (reason) => {
-    await authAdmin.resetTwoFactor(sub, { actorSub: actor.sub, reason });
-    return { auditDetails: { hubSessionsEnded: await endHubSessions(sub) } };
+    const result = await authAdmin.resetTwoFactor(sub, { actorSub: actor.sub, reason });
+    // Only a real reset signs the user out here too (auth does the same on its side).
+    return outcome(result, { hubSessionsEnded: result.changed ? await endHubSessions(sub) : 0 });
   });
 }
 
-export async function removeLink(actor: AdminActor, subInput: string, input: { reason: unknown; provider: unknown }) {
+export async function removeLink(actor: AdminActor, subInput: string, input: { reason: unknown; provider: unknown }): Promise<AccountChange> {
   const sub = assertSub(subInput);
   const provider = typeof input.provider === "string" ? input.provider.trim() : "";
-  if (!PROVIDER_PATTERN.test(provider)) throw new AdminError("invalid_input", "provider");
-  return auditedMutation(actor, { action: "account.link.remove", targetSub: sub, reason: input.reason, details: { provider } }, (reason) =>
-    authAdmin.removeLink(sub, { actorSub: actor.sub, reason, provider })
+  if (!isRemovableLink(provider)) throw new AdminError("invalid_input", "provider");
+  return auditedMutation(actor, { action: "account.link.remove", targetSub: sub, reason: input.reason, details: { provider } }, async (reason) =>
+    outcome(await authAdmin.removeLink(sub, { actorSub: actor.sub, reason, provider }))
   );
 }
 
-export async function verifyEmail(actor: AdminActor, subInput: string, input: { reason: unknown }) {
+export async function verifyEmail(actor: AdminActor, subInput: string, input: { reason: unknown }): Promise<AccountChange> {
   const sub = assertSub(subInput);
-  return auditedMutation(actor, { action: "account.email.verify", targetSub: sub, reason: input.reason }, (reason) =>
-    authAdmin.verifyEmail(sub, { actorSub: actor.sub, reason })
+  return auditedMutation(actor, { action: "account.email.verify", targetSub: sub, reason: input.reason }, async (reason) =>
+    outcome(await authAdmin.verifyEmail(sub, { actorSub: actor.sub, reason }))
   );
 }
 
@@ -300,7 +310,17 @@ export async function previewMerge(actor: AdminActor, input: { from: unknown; in
 /** Merges old account `from` into `into` (auth sends user.deleted {mergedInto}; the platform moves wallet + stats). */
 export async function mergeAccounts(actor: AdminActor, input: { from: unknown; into: unknown; reason: unknown }): Promise<MergeResponse> {
   const { from, into } = mergePair(input);
-  return auditedMutation(actor, { action: "account.merge", targetSub: into, reason: input.reason, details: { from } }, (reason) =>
-    authAdmin.merge({ actorSub: actor.sub, reason, from, into, dryRun: false })
-  );
+  return auditedMutation(actor, { action: "account.merge", targetSub: into, reason: input.reason, details: { from } }, async (reason) => {
+    const result = await authAdmin.merge({ actorSub: actor.sub, reason, from, into, dryRun: false });
+    return Object.assign(result, {
+      auditDetails: {
+        moved: {
+          providers: result.plan.move.providers.map((p) => p.providerId),
+          gameLinks: result.plan.move.gameLinks.map((g) => g.provider),
+          passkeys: result.plan.move.passkeys.length,
+          legacy: result.plan.move.legacy.map((l) => `${l.app}:${l.legacyUserId}`),
+        },
+      },
+    });
+  });
 }

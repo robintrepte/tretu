@@ -1,4 +1,5 @@
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, ShieldAlert } from "lucide-react";
+import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 
 import { DailyChart } from "@/components/admin/charts";
@@ -7,9 +8,11 @@ import { Hint, Panel } from "@/components/dashboard/panel";
 import { requireAccountAdminPage } from "@/lib/admin/access";
 import { appName, ECOSYSTEM_APPS } from "@/lib/admin/apps";
 import { adminFormat } from "@/lib/admin/format";
+import { ACTOR_ERRORS } from "@/lib/admin/auth-admin";
 import { accountKpis, platformKpis, type PlatformKpis } from "@/lib/admin/overview";
 import { getServiceStatuses, type ServiceState } from "@/lib/admin/service-status";
 import { walletOverview } from "@/lib/admin/wallet-admin";
+import { getAuthIssuer } from "@/lib/platform/env";
 
 export const dynamic = "force-dynamic";
 
@@ -21,15 +24,19 @@ const STATE_TONE: Record<ServiceState, "success" | "warning" | "danger" | "neutr
 };
 
 export default async function AdminOverviewPage() {
-  await requireAccountAdminPage();
+  const actor = await requireAccountAdminPage();
   const [t, f, accounts, platform, wallet, status] = await Promise.all([
     getTranslations("admin"),
     adminFormat(),
-    accountKpis(),
+    accountKpis(actor.sub),
     platformKpis().catch(() => null as PlatformKpis | null),
     walletOverview().catch(() => null),
     getServiceStatuses(),
   ]);
+
+  // "Mein Konto" at auth.tretu.de, where two-factor sign-in is turned on.
+  const issuer = getAuthIssuer();
+  const accountUrl = issuer ? `${issuer}/konto?tab=sicherheit` : null;
 
   const authDays = accounts.ok
     ? (() => {
@@ -49,6 +56,22 @@ export default async function AdminOverviewPage() {
     <section className="space-y-6">
       <PageHeader title={t("overview.title")} intro={t("overview.intro")} />
 
+      {!accounts.ok && ACTOR_ERRORS.has(accounts.error) ? (
+        // Checked up front: auth only lets admins with two-factor sign-in use the account admin.
+        <div role="alert" className="flex gap-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm" data-testid="admin-actor-blocked">
+          <ShieldAlert className="mt-0.5 size-5 shrink-0 text-amber-600 dark:text-amber-300" aria-hidden />
+          <div className="space-y-1">
+            <p className="font-semibold">{t(`errors.auth.${accounts.error}`)}</p>
+            <p className="text-muted-foreground">{t(`overview.actorBlocked.${accounts.error}`)}</p>
+            {accountUrl ? (
+              <a href={accountUrl} className="inline-flex items-center gap-1 font-medium underline-offset-2 hover:underline" data-testid="admin-account-link">
+                {t("overview.actorBlocked.openAccount")} <ExternalLink className="size-3" aria-hidden />
+              </a>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       <Panel title={t("overview.accountsTitle")}>
         {accounts.ok ? (
           <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5" data-testid="kpi-accounts">
@@ -58,7 +81,7 @@ export default async function AdminOverviewPage() {
             <Kpi label={t("overview.kpi.locked")} value={f.number(accounts.stats.users.locked)} />
             <Kpi label={t("overview.kpi.admins")} value={f.number(accounts.stats.users.admins)} />
           </div>
-        ) : (
+        ) : ACTOR_ERRORS.has(accounts.error) ? null : (
           <Hint tone="warning">
             {t("overview.authUnavailable")} {t(`errors.auth.${accounts.error}`)}
           </Hint>
@@ -164,21 +187,34 @@ export default async function AdminOverviewPage() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Panel title={t("overview.statusTitle")}>
-          {status.available ? (
-            <ul className="divide-y divide-border/60 text-sm" data-testid="service-status">
-              {status.services.map((s) => (
-                <li key={s.id} className="flex items-center justify-between gap-3 py-2">
-                  <span className="min-w-0 truncate">{s.name}</span>
-                  <span className="flex items-center gap-2">
-                    {s.checkedAt ? <span className="text-xs text-muted-foreground">{f.dateTime(s.checkedAt)}</span> : null}
-                    <Pill tone={STATE_TONE[s.state]}>{t(`overview.statusStates.${s.state}`)}</Pill>
-                  </span>
-                </li>
-              ))}
-            </ul>
+        <Panel
+          title={t("overview.statusTitle")}
+          actions={
+            <Link href="/status" className="text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">
+              {t("overview.statusPage")} →
+            </Link>
+          }
+        >
+          {status.available && status.services.length ? (
+            <>
+              {status.stale ? (
+                <Hint tone="warning">{status.updatedAt ? t("overview.statusStale", { date: f.dateTime(status.updatedAt) }) : t("overview.statusNoChecks")}</Hint>
+              ) : null}
+              <ul className="divide-y divide-border/60 text-sm" data-testid="service-status">
+                {status.services.map((s) => (
+                  <li key={s.id} className="flex items-center justify-between gap-3 py-2" data-testid={`service-${s.id}`}>
+                    <span className="min-w-0 truncate">{s.name}</span>
+                    <span className="flex items-center gap-2">
+                      {s.detail ? <span className="text-xs tabular-nums text-muted-foreground">{s.detail}</span> : null}
+                      {s.checkedAt ? <span className="hidden text-xs text-muted-foreground sm:inline">{f.dateTime(s.checkedAt)}</span> : null}
+                      <Pill tone={STATE_TONE[s.state]}>{t(`overview.statusStates.${s.state}`)}</Pill>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </>
           ) : (
-            <Hint>{t("overview.statusPlaceholder")}</Hint>
+            <Hint>{status.available ? t("overview.statusNoTargets") : t("overview.statusUnavailable")}</Hint>
           )}
         </Panel>
         <Panel title={t("overview.linksTitle")} description={t("overview.linksDescription")}>

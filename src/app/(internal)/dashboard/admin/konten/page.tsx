@@ -7,13 +7,13 @@ import { Hint, Panel } from "@/components/dashboard/panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { requireAccountAdminPage } from "@/lib/admin/access";
-import { authAdmin, AuthAdminError, type AdminSearchResult } from "@/lib/admin/auth-admin";
+import { ACTOR_ERRORS, authAdmin, AuthAdminError, type AdminSearchResult } from "@/lib/admin/auth-admin";
 import { adminFormat } from "@/lib/admin/format";
 
 export const dynamic = "force-dynamic";
 
 export default async function AccountsPage({ searchParams }: { searchParams: Promise<{ q?: string; cursor?: string }> }) {
-  await requireAccountAdminPage();
+  const actor = await requireAccountAdminPage();
   const params = await searchParams;
   const q = (params.q ?? "").trim().slice(0, 200);
   const cursor = (params.cursor ?? "").slice(0, 500) || null;
@@ -24,7 +24,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
   let detail: string | null = null;
   if (q) {
     try {
-      result = await authAdmin.search(q, { cursor, limit: 50 });
+      result = await authAdmin.search(actor.sub, q, { cursor, limit: 50 });
     } catch (e) {
       if (!(e instanceof AuthAdminError)) throw e;
       error = e.code;
@@ -57,7 +57,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
       {error ? (
         <Hint tone="danger">
           {t(`errors.auth.${error}`)}
-          {detail && error !== "unavailable" ? ` ${t("errors.detail", { detail })}` : null}
+          {detail && error !== "unavailable" && !ACTOR_ERRORS.has(error) ? ` ${t("errors.detail", { detail })}` : null}
         </Hint>
       ) : null}
 

@@ -57,7 +57,16 @@
       "not_found": "auth.tretu.de does not know this account.",
       "conflict": "auth.tretu.de reports a conflict.",
       "invalid": "auth.tretu.de rejected the input.",
-      "rate_limited": "auth.tretu.de is throttling requests. Please wait a moment."
+      "rate_limited": "auth.tretu.de is throttling requests. Please wait a moment.",
+      "forbidden_app": "auth.tretu.de accepts admin requests from tretu.de only (TRETU_APP_ID must be “tretu-web”).",
+      "actor_not_admin": "Your Tretu account no longer holds the admin role on auth.tretu.de, or it is locked.",
+      "actor_two_factor_required": "Turn on 2FA in My account to use the admin.",
+      "self_action": "You cannot do that to your own account.",
+      "last_admin": "This is the last active admin. Without it Tretu would have no admin left: give the role to someone else first.",
+      "last_sign_in_method": "This is the account's only way to sign in and cannot be removed.",
+      "no_email": "This account has no email address.",
+      "merge_refused": "auth.tretu.de refuses this merge: same account, or the old account holds the admin role (remove it first).",
+      "payload_too_large": "The request is too large for auth.tretu.de."
     },
     "detail": "Answer from auth.tretu.de: {detail}"
   },
@@ -98,7 +107,6 @@
     "badgesDescription": "Per day (last 30 days).",
     "badgesSeries": "Badges",
     "statusTitle": "Services",
-    "statusPlaceholder": "Service status appears here once the status checks run on tretu.de.",
     "statusStates": {
       "up": "Up",
       "degraded": "Degraded",
@@ -109,7 +117,17 @@
     "linksDescription": "Every app manages its own content.",
     "noAdmin": "no web admin",
     "providersTitle": "Sign-in methods",
-    "platformUnavailable": "Platform data is not available right now."
+    "platformUnavailable": "Platform data is not available right now.",
+    "actorBlocked": {
+      "actor_two_factor_required": "auth.tretu.de only allows the account admin with two-factor sign-in. Set it up under “Security”, then reload this page.",
+      "actor_not_admin": "The account admin stays closed until your Tretu account holds the admin role again. Sign in again afterwards.",
+      "openAccount": "Open My account"
+    },
+    "statusPage": "Status page",
+    "statusStale": "The checks are not running right now (last check {date}). Is the platform worker running?",
+    "statusNoChecks": "No check yet. Is the platform worker running?",
+    "statusNoTargets": "No services are set up for checks (TRETU_STATUS_TARGETS_JSON).",
+    "statusUnavailable": "Service status is not available right now (database)."
   },
   "accounts": {
     "title": "Accounts",
@@ -232,7 +250,8 @@
       "unlocked": "Account unlocked.",
       "twoFactorReset": "2FA reset.",
       "linkRemoved": "Link removed.",
-      "emailVerified": "Email address marked as verified."
+      "emailVerified": "Email address marked as verified.",
+      "unchanged": "Nothing to change: the account was already in that state."
     },
     "providerNames": {
       "credential": "Password",
@@ -244,7 +263,13 @@
       "minecraft": "Minecraft",
       "teamspeak": "TeamSpeak",
       "password": "Password"
-    }
+    },
+    "locale": "Language",
+    "locales": {
+      "de": "German",
+      "en": "English"
+    },
+    "lockedSince": "since {date}"
   },
   "merge": {
     "title": "Merge accounts",
@@ -262,10 +287,12 @@
     "dropProviders": "Dropped (target already has one): {list}",
     "dropGameLinks": "Dropped game links: {list}",
     "nothing": "nothing",
-    "raw": "Answer from auth.tretu.de",
     "confirm": "Merge",
     "done": "Accounts merged.",
-    "swap": "Swap direction"
+    "swap": "Swap direction",
+    "direction": "{from} is merged into {into}.",
+    "deleted": "{name} is deleted, {sessions, plural, =0 {with no open sessions} one {# session ends} other {# sessions end}}.",
+    "usedByApps": "{name} was already used with an app: the apps remove that user after the merge."
   },
   "legacy": {
     "title": "Old accounts",
@@ -277,7 +304,8 @@
       "email": "same email",
       "username": "similar name"
     },
-    "mergeInto": "Merge into {name}"
+    "mergeInto": "Merge into {name}",
+    "usedByApps": "already used with an app"
   },
   "wallet": {
     "title": "Wallet",
@@ -373,7 +401,7 @@
   },
   "audit": {
     "title": "Audit log",
-    "intro": "Every admin action on tretu.de, including those forwarded to auth.tretu.de. Failed attempts are marked.",
+    "intro": "Every admin action on tretu.de, including those forwarded to auth.tretu.de. Failed attempts are marked; actions that changed nothing are marked too.",
     "filters": {
       "actor": "Admin (Tretu ID)",
       "target": "Account (Tretu ID)",
@@ -407,6 +435,7 @@
       "badge_grant": "Badge granted",
       "badge_revoke": "Badge revoked",
       "badge_resync": "Badges resynced"
-    }
+    },
+    "noop": "nothing to change"
   }
 }
