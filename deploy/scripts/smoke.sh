@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Smoke test of the whole ecosystem: every /api/health, auth's OIDC discovery + JWKS, Umami, Uptime Kuma and a
-# signed platform ping (contract §3). Prints a pass/fail table; exit code 1 if anything failed.
+# Smoke test of the whole ecosystem: every /api/health, auth's OIDC discovery + JWKS, the status data behind
+# tretu.de/status and a signed platform ping (contract §3). Prints a pass/fail table; exit code 1 if anything failed.
 #
 #   deploy/scripts/smoke.sh                                    # production hosts, ping skipped without a secret
 #   deploy/scripts/smoke.sh --env-file /srv/tretu/.env.local   # signs the ping with TRETU_APP_SECRET from there
@@ -9,7 +9,7 @@
 #
 # Options:
 #   --domain <d>       base domain (default tretu.de): web=https://d, auth=https://auth.d, saga, play, hollowmere,
-#                      mc=https://mc.d, stats=https://stats.d, status=https://status.d
+#                      mc=https://mc.d
 #   --map name=url     override one base URL (names above)
 #   --only a,b         run only these targets;  --skip a,b  leave these out
 #   --env-file <file>  read TRETU_APP_ID / TRETU_APP_SECRET for the signed ping (default app tretu-web)
@@ -46,8 +46,6 @@ command -v node >/dev/null || { echo "node is required" >&2; exit 2; }
 : "${base[play]:=https://play.${domain}}"
 : "${base[hollowmere]:=https://hollowmere.${domain}}"
 : "${base[mc]:=https://mc.${domain}}"
-: "${base[stats]:=https://stats.${domain}}"
-: "${base[status]:=https://status.${domain}}"
 for k in "${!base[@]}"; do base[$k]="${base[$k]%/}"; done
 
 app_id="${SMOKE_APP_ID:-}"
@@ -103,16 +101,22 @@ check_health() {
 
 for name in web auth saga play hollowmere mc; do check_health "$name"; done
 
-if selected stats; then
-  url="${base[stats]}/api/heartbeat"
+# tretu.de/status: the platform worker's checks must be recent (a stopped worker shows up as stale).
+if selected web; then
+  url="${base[web]}/api/status"
   fetch "$url"
-  if [ "$code" = "200" ]; then record "umami" "$url" PASS "heartbeat"; else record "umami" "$url" FAIL "HTTP $code"; fi
-fi
-
-if selected status; then
-  url="${base[status]}/"
-  fetch "$url"
-  if [[ "$code" =~ ^(2|3) ]]; then record "uptime kuma" "$url" PASS "HTTP $code"; else record "uptime kuma" "$url" FAIL "HTTP $code"; fi
+  services="$(json '(j.services||[]).length')"
+  stale="$(json 'j.stale')"
+  updated="$(json 'j.updatedAt')"
+  if [ "$code" != "200" ]; then
+    record "status page" "$url" FAIL "HTTP $code"
+  elif [ "${services:-0}" -lt 1 ] 2>/dev/null; then
+    record "status page" "$url" FAIL "no services (TRETU_STATUS_TARGETS_JSON empty?)"
+  elif [ "$stale" != "false" ]; then
+    record "status page" "$url" FAIL "no recent checks (updated ${updated:-never}): is tretu-platform-worker running?"
+  else
+    record "status page" "$url" PASS "${services} services, updated ${updated}"
+  fi
 fi
 
 if selected auth; then

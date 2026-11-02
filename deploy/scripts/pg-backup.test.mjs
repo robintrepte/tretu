@@ -3,8 +3,9 @@
  * (PGHOST/PGUSER or localhost/postgres) with throwaway databases. Skipped when no Postgres is reachable.
  */
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdtempSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, before, test } from "node:test";
@@ -78,4 +79,48 @@ test("retention removes old dumps; a missing database fails the backup", { skip:
   const missing = run("pg-backup.sh", [], { BACKUP_DATABASES: `${db} ${db}_does_not_exist` });
   assert.equal(missing.status, 1);
   assert.match(missing.stdout, /does_not_exist\s+MISSING/);
+});
+
+test("a failed run posts one German message to BACKUP_ALERT_WEBHOOK_URL, a good run none", { skip: !reachable && "no local Postgres" }, async () => {
+  const posts = [];
+  const server = createServer((req, res) => {
+    let body = "";
+    req.on("data", (d) => (body += d));
+    req.on("end", () => {
+      posts.push({ method: req.method, type: req.headers["content-type"], body: JSON.parse(body) });
+      res.writeHead(204).end();
+    });
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const webhook = `http://127.0.0.1:${server.address().port}/api/webhooks/1/secret-token`;
+  // spawn (not spawnSync): the webhook stand-in runs in this process.
+  const runAsync = (script, extra) =>
+    new Promise((resolve) => {
+      const child = spawn("bash", [path.join(here, script)], { env: { ...env, BACKUP_DIR: backupDir, BACKUP_DATABASES: db, BACKUP_ALERT_WEBHOOK_URL: webhook, ...extra } });
+      let out = "";
+      child.stdout.on("data", (d) => (out += d));
+      child.stderr.on("data", (d) => (out += d));
+      child.on("exit", (code) => resolve({ code, out }));
+    });
+  try {
+    const ok = await runAsync("pg-backup.sh", {});
+    assert.equal(ok.code, 0, ok.out);
+    assert.equal(posts.length, 0);
+
+    const failed = await runAsync("pg-backup.sh", { BACKUP_DATABASES: `${db} ${db}_does_not_exist` });
+    assert.equal(failed.code, 1);
+    assert.equal(posts.length, 1);
+    assert.equal(posts[0].method, "POST");
+    assert.equal(posts[0].type, "application/json");
+    assert.match(posts[0].body.content, /^Tretu-Backup auf .+ ist fehlgeschlagen \(Exit-Code 1\)/);
+    assert.deepEqual(posts[0].body.allowed_mentions, { parse: [] });
+    assert.ok(!failed.out.includes("secret-token"), "webhook URL never printed");
+
+    const stale = await runAsync("pg-restore-test.sh", { MAX_AGE_HOURS: "0" });
+    assert.equal(stale.code, 1);
+    assert.equal(posts.length, 2);
+    assert.match(posts[1].body.content, /^Tretu-Restore-Test auf .+ ist fehlgeschlagen/);
+  } finally {
+    server.close();
+  }
 });

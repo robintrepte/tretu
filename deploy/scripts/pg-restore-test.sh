@@ -5,12 +5,16 @@
 #   sudo -u postgres deploy/scripts/pg-restore-test.sh saga play  # some
 #   KEEP=1 … keeps the restored databases for inspection.
 # Env: BACKUP_DIR (default /var/backups/tretu-postgres), BACKUP_DATABASES, MAX_AGE_HOURS (26: the newest dump
-# must be younger, so a silently stopped backup fails this test too), RESTORE_PING_URL (Uptime Kuma push).
+# must be younger, so a silently stopped backup fails this test too), BACKUP_ALERT_WEBHOOK_URL (Discord webhook:
+# a failed run posts a short message there).
 set -euo pipefail
+# shellcheck source=alert.sh
+source "$(dirname "${BASH_SOURCE[0]}")/alert.sh"
+trap 'alert_on_failure $? "Tretu-Restore-Test"' EXIT
 
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/tretu-postgres}"
 MAX_AGE_HOURS="${MAX_AGE_HOURS:-26}"
-if [ $# -gt 0 ]; then dbs=("$@"); else read -r -a dbs <<<"${BACKUP_DATABASES:-tretu_web tretu_auth saga play mc_dashboard nakama umami}"; fi
+if [ $# -gt 0 ]; then dbs=("$@"); else read -r -a dbs <<<"${BACKUP_DATABASES:-tretu_web tretu_auth saga play mc_dashboard nakama}"; fi
 
 failed=0
 printf '%-16s %-8s %8s %10s  %s\n' DATABASE RESULT TABLES ROWS DUMP
@@ -51,5 +55,4 @@ for db in "${dbs[@]}"; do
 done
 
 if [ "$failed" -gt 0 ]; then echo "$failed restore test(s) FAILED" >&2; exit 1; fi
-if [ -n "${RESTORE_PING_URL:-}" ]; then curl -fsS --max-time 10 "${RESTORE_PING_URL}?status=up&msg=OK" >/dev/null || true; fi
 echo "restore test passed"
