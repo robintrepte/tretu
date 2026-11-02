@@ -174,7 +174,7 @@ export async function ingestEvents(events: EventEnvelope[], now: Date = new Date
 type ProcessStatus = "processed" | "stored" | "ignored";
 
 /**
- * A legacy account was merged into another Tretu-Konto (auth's claim flow sends
+ * A legacy account was merged into another Tretu-Konto (an admin merge in auth, `npm run admin -- merge`, sends
  * `user.deleted` with `data.mergedInto`). Before the old sub is erased, its wallet balance and
  * stats move to the surviving account. Idempotent: the bookings use deterministic keys, and the
  * stats copy only runs while the old stats still exist (they are erased right after).
