@@ -19,8 +19,8 @@
     {
       "idx": 2,
       "version": "7",
-      "when": 1793589774097,
-      "tag": "0002_badge_grants_steam",
+      "when": 1793590380446,
+      "tag": "0002_badge_grants_steam_teamspeak",
       "breakpoints": true
     }
   ]

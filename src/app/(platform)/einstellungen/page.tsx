@@ -8,7 +8,7 @@ import { accountUrl } from "@/lib/platform/format";
 import { getTranslations } from "@/lib/platform/i18n";
 import { getNotificationSettings } from "@/lib/platform/notifications";
 import { getVisibility } from "@/lib/platform/profile";
-import { getTsLinkState, teamspeakSyncEnabled } from "@/lib/platform/teamspeak";
+import { getTsLinkState, teamspeakConfigured } from "@/lib/platform/teamspeak";
 
 import { getPageContext, loadSafely } from "../_components/page-context";
 import { LoginRequired, PlatformPage, Unavailable } from "../_components/platform-page";
@@ -22,7 +22,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function SettingsPage() {
   const ctx = await getPageContext();
   const { t } = ctx;
-  const tsEnabled = teamspeakSyncEnabled();
+  const tsEnabled = teamspeakConfigured();
   const data =
     ctx.available && ctx.user
       ? await loadSafely(async () => ({

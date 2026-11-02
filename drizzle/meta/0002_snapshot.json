@@ -1,5 +1,5 @@
 {
-  "id": "0013aa3a-c165-4972-a37e-d4a46b8ca04b",
+  "id": "25d4f649-9eb0-483f-8eae-36dbecea0805",
   "prevId": "aeb57a5e-f26d-42a3-8b6d-a2fa147d96ea",
   "version": "7",
   "dialect": "postgresql",
@@ -1186,6 +1186,12 @@
         "verified_at": {
           "name": "verified_at",
           "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "link_error": {
+          "name": "link_error",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },

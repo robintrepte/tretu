@@ -15,6 +15,8 @@ export type JobType =
   | "badge.sync.teamspeak"
   | "badge.revoke.discord"
   | "badge.revoke.teamspeak"
+  | "auth.link.teamspeak"
+  | "auth.unlink.teamspeak"
   | "user.fetch";
 export type JobRow = typeof platformJobs.$inferSelect;
 

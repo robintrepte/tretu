@@ -53,7 +53,7 @@ App IDs: `tretu-web`, `auth`, `saga`, `play`, `hollowmere`, `mc-dashboard`.
 - Claims (ID token and userinfo):
   - `sub` – permanent Tretu ID (UUID string). Apps store it as `tretu_sub` / `tretuSub` (unique).
   - `preferred_username`, `name`, `picture`, `email`, `email_verified`, `locale` (`"de"` | `"en"`)
-  - with scope `tretu`: `roles` (string[], global only, e.g. `["admin"]`), `discord_id`, `minecraft_uuid`, `minecraft_name`, `steam_id` (each string or absent)
+  - with scope `tretu`: `roles` (string[], global only, e.g. `["admin"]`), `discord_id`, `minecraft_uuid`, `minecraft_name`, `steam_id` (64-bit SteamID as a decimal string), `teamspeak_uid` (TeamSpeak unique identifier) (each string or absent)
 - Registered clients and redirect URIs:
 
 | client_id | type | redirect URIs |
@@ -71,9 +71,13 @@ App IDs: `tretu-web`, `auth`, `saga`, `play`, `hollowmere`, `mc-dashboard`.
 - Account page ("Mein Konto"): `https://auth.tretu.de/konto`. Apps link there from their user menu.
 
 ### Auth admin API (server-to-server, signed per §3)
-- `POST ${issuer}/api/v1/links` `{ "sub", "provider": "minecraft"|"steam", "providerAccountId", "displayName" }` → `200 {"ok":true}`; `409` if that providerAccountId is linked to another sub.
-- `DELETE ${issuer}/api/v1/links` `{ "sub", "provider" }` → `200`.
-- `GET ${issuer}/api/v1/users/{sub}` → `{ sub, username, name, picture, locale, roles, links:{discord?,minecraft?,minecraftName?,steam?}, createdAt }`.
+- `POST ${issuer}/api/v1/links` `{ "sub", "provider": "minecraft"|"steam"|"teamspeak", "providerAccountId", "displayName" }` → `200 {"ok":true}` (replaces that sub's existing link of the provider); `409` if that providerAccountId is linked to another sub.
+- `DELETE ${issuer}/api/v1/links` `{ "sub", "provider" }` → `200` (`404` = nothing linked, treated as done by callers).
+- `GET ${issuer}/api/v1/users/{sub}` → `{ sub, username, name, picture, locale, roles, links:{discord?,minecraft?,minecraftName?,steam?,teamspeak?}, createdAt }`.
+- **TeamSpeak** links are proven on tretu.de only (nickname code on `https://tretu.de/einstellungen#teamspeak`): tretu.de
+  (app `tretu-web`) registers them with `provider:"teamspeak"`, `providerAccountId` = the TeamSpeak unique identifier,
+  `displayName` = nickname, and deletes them on unlink. Mein Konto shows the link and links to `/einstellungen#teamspeak`;
+  unlinking in Mein Konto emits `user.updated` without `links.teamspeak`, and tretu.de then unlinks locally.
 - `GET ${issuer}/api/v1/users?username=<name>` → same shape or `404`.
 Auth emits events to the platform (§4): `user.created`, `user.updated` (profile, locale, roles or links changed), `user.deleted`, each with `data` = the user shape above (deleted: `{}`).
 
@@ -193,3 +197,8 @@ Notifications
 - **Unknown subs.** Read-only platform routes answer `404 user_not_found` when auth cannot confirm a sub.
 - **Hollowmere** sends events only for players signed in with a Tretu-Konto; its `/api/health` is served by the
   `hollowmere-mcp` process (PM2, port 8787), proxied by nginx.
+- **Steam** (round 2): sign-in and link/unlink in auth (Steam OpenID 2.0, provider id `steam`); `links.steam` / `steam_id`
+  carry the 64-bit SteamID. tretu.de shows a linked-Steam link (`https://steamcommunity.com/profiles/<id>`) on the public
+  profile, only where the profile itself may be seen.
+- **Account deletion** removes the Discord roles and TeamSpeak server groups the platform granted for badges (merges:
+  they move to the surviving account when it has the same Discord / TeamSpeak identity).

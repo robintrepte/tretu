@@ -34,6 +34,7 @@ export const authUserSchema = z.object({
       minecraft: optionalString(64),
       minecraftName: optionalString(64),
       steam: optionalString(64),
+      teamspeak: optionalString(128),
     })
     .nullish(),
   createdAt: optionalString(64),
@@ -61,7 +62,7 @@ export function steamProfileUrl(steamId: string): string {
 function cleanLinks(links: AuthUser["links"]): PlatformUserLinks {
   const out: PlatformUserLinks = {};
   if (!links) return out;
-  for (const key of ["discord", "minecraft", "minecraftName", "steam"] as const) {
+  for (const key of ["discord", "minecraft", "minecraftName", "steam", "teamspeak"] as const) {
     if (links[key]) out[key] = links[key];
   }
   return out;
@@ -147,6 +148,36 @@ function selfSecret(): string | null {
 }
 
 export class AuthUnavailableError extends Error {}
+
+/**
+ * Signed request to the auth admin API (as `tretu-web`, 5 s timeout). Returns the raw response;
+ * throws AuthUnavailableError when not configured.
+ */
+export async function authRequest(
+  method: "GET" | "POST" | "DELETE",
+  pathWithQuery: string,
+  body?: unknown,
+  fetchImpl: (url: string, init: RequestInit) => Promise<Response> = fetch
+): Promise<Response> {
+  const issuer = getAuthIssuer();
+  const secret = selfSecret();
+  if (!issuer || !secret) throw new AuthUnavailableError("auth admin API not configured");
+  const url = new URL(issuer + pathWithQuery);
+  const raw = body === undefined ? "" : JSON.stringify(body);
+  const headers = signedHeaders(SELF_APP_ID, secret, { method, pathWithQuery: url.pathname + url.search, body: raw });
+  return fetchImpl(url.toString(), {
+    method,
+    headers: raw ? { ...headers, "content-type": "application/json" } : headers,
+    body: raw || undefined,
+    signal: AbortSignal.timeout(5000),
+    cache: "no-store",
+  });
+}
+
+/** True when tretu.de can call auth's admin API (issuer + own secret). */
+export function authAdminConfigured(): boolean {
+  return Boolean(getAuthIssuer() && selfSecret());
+}
 
 async function authGet(pathWithQuery: string): Promise<unknown | null> {
   const issuer = getAuthIssuer();

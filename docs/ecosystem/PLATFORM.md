@@ -40,7 +40,12 @@ Browser routes for the pages (session via `getPlatformUser()`, same-origin check
 `GET|PUT /me/settings`, `GET /me/wallet`, `POST /me/wallet/daily`, `GET|POST|DELETE /me/teamspeak`.
 
 Pages: `/u/[username]` (also accepts a sub), `/freunde`, `/benachrichtigungen`, `/wallet`, `/abzeichen`,
-`/einstellungen`. German default, English via the `NEXT_LOCALE` cookie.
+`/einstellungen` (TeamSpeak section at `#teamspeak`). German default, English via the `NEXT_LOCALE` cookie.
+
+Profile page: level, badges, stats and **linked accounts** – Discord, Minecraft (name), Steam (link to
+`https://steamcommunity.com/profiles/<id>`, only valid individual SteamID64s) and TeamSpeak (no ids shown). All of it is
+only rendered where the profile may be seen (visibility public / friends / private); restricted pages show name and
+avatar only. Owners without Steam see "Steam verbinden" (→ Mein Konto) when `TRETU_AUTH_ISSUER` is set.
 
 ## Processing rules (events)
 
@@ -65,7 +70,8 @@ Pages: `/u/[username]` (also accepts a sub), `/freunde`, `/benachrichtigungen`, 
 - Badges (`src/lib/platform/badges.ts`) are re-evaluated after every change and awarded exactly once
   (primary key sub+badge): one-time XP + credits (wallet key `badge:<key>:<sub>`), a `badge` notification,
   `badge.earned {badge,title,xp,credits}`, Discord/TS sync jobs.
-- `user.created/updated` (from auth) upsert the directory (`platform_users`); older `occurredAt` than the
+- `user.created/updated` (from auth) upsert the directory (`platform_users`, incl. `links.steam` → `steam_id` and
+  `links.teamspeak`); older `occurredAt` than the
   last applied one is ignored; a username taken by a stale row moves to the new owner. `user.updated` is
   forwarded to all subscribed apps (except auth). A new Discord link queues the Discord sync.
 - `user.deleted` erases everything of that sub (directory, stats, progress, badges, achievements, apps,
@@ -140,7 +146,8 @@ secret, 5 s timeout. Non-2xx/timeouts retry after 30 s, 1, 2, 4 … min (capped 
 creation, then `failed`. Rows are claimed with `FOR UPDATE SKIP LOCKED`, so several workers are safe.
 
 `platform_jobs` (same backoff; push gives up after 1 h, role removals after 7 days): `push.send`,
-`badge.sync.discord`, `badge.sync.teamspeak`, `badge.revoke.discord`, `badge.revoke.teamspeak`, `user.fetch`.
+`badge.sync.discord`, `badge.sync.teamspeak`, `badge.revoke.discord`, `badge.revoke.teamspeak`,
+`auth.link.teamspeak`, `auth.unlink.teamspeak`, `user.fetch`.
 
 Worker: `scripts/platform-worker.ts` (`npm run platform:worker`, `-- --once` for a single pass). Loop: webhooks
 + jobs (every 2 s when idle), presence expiry (30 s), every 10 min badge-sync reconciliation (first removes
@@ -164,10 +171,19 @@ after 7 days, failed after 30 days, notifications after 180 days). PM2 entry for
   (the bot needs *Manage Roles* and a role above the badge roles). `discord_id` comes from the directory
   (`links.discord` of the auth user). Not a member / no link → `skipped`.
 - TeamSpeak reuses `src/lib/teamspeak` (ServerQuery client, `TS_QUERY_*` config of the rank worker, identity =
-  TS unique identifier → `client_database_id`). Since auth has no TeamSpeak link, users link their TS
-  identity on `/einstellungen`: they put a code (`TRT-XXXXX`, 15 min) into their TS nickname and click
+  TS unique identifier → `client_database_id`). Users link their TS identity on `/einstellungen#teamspeak` (shown
+  whenever `TS_QUERY_*` is set): they put a code (`TRT-XXXXX`, 15 min) into their TS nickname and click
   *Prüfen*; the online client with that code is stored (uid + database id). Groups are added with
   `servergroupaddclient`; "already member" counts as done.
+- **TeamSpeak is a linked account of the Tretu-Konto** (`src/lib/platform/ts-auth-link.ts`): a completed link is
+  registered at auth (`POST ${TRETU_AUTH_ISSUER}/api/v1/links {sub, provider:"teamspeak", providerAccountId:<uid>,
+  displayName:<nickname>}`, signed as `tretu-web`), unlinking sends `DELETE /api/v1/links {sub, provider:"teamspeak"}`.
+  Both are durable jobs (`auth.link.teamspeak`, `auth.unlink.teamspeak`, retried with backoff for 24 h); the link is also
+  tried right away so a refusal shows on the page. The jobs check the local state when they run (link → unlink → link
+  converges). `409` (identity linked to another Tretu-Konto) undoes the local link, takes back badge groups, shows the
+  reason on `/einstellungen#teamspeak` and sends a notification. auth's `user.updated` whose `links.teamspeak` no longer
+  matches the local identity (unlinked in Mein Konto) unlinks locally and takes back badge groups. Off without
+  `TRETU_AUTH_ISSUER` + `TRETU_APP_SECRET`.
 - State per (sub, badge, target) in `platform_badge_sync` (idempotent). A `done` row records what was granted:
   `granted_to` (Discord user id / TS client database id) and `granted_ref` (role id / server group id).
 - **Taking grants back** (`badge.revoke.discord` = `DELETE …/members/{id}/roles/{role}`, `badge.revoke.teamspeak` =
@@ -198,7 +214,8 @@ Categories (settings per user): social (friend requests), invite, achievement (b
 
 ## Data model (Postgres, all tables `platform_*`)
 
-users (directory: sub, username, name, picture, locale, roles, links, discord_id, auth_created_at,
+users (directory: sub, username, name, picture, locale, roles, links {discord, minecraft, minecraftName, steam,
+teamspeak}, discord_id, steam_id, auth_created_at,
 source_updated_at, fetched_at) · deleted_users (tombstones) · profile_settings (visibility
 public/friends/private, default public) · events · user_stats (sub, key, value) · user_progress (xp,
 level) · daily_counters (sub, Berlin day, counter) · user_apps · user_badges · user_achievements ·
@@ -226,7 +243,7 @@ push_subscriptions.
 ## Development and tests
 
 ```bash
-DATABASE_URL=postgres://postgres@localhost:5432/tretu_platform npm run platform:db:push -- --force
+DATABASE_URL=postgres://postgres@localhost:5432/tretu_platform npm run db:migrate
 DATABASE_URL=… TRETU_PLATFORM_DEV_SUB=00000000-0000-4000-8000-000000000001 npm run platform:seed-dev
 DATABASE_URL=… TRETU_PLATFORM_DEV_SUB=00000000-0000-4000-8000-000000000001 npm run dev   # /u/robin, /freunde …
 npm run test:platform   # uses tretu_platform_test (created + schema applied automatically;
@@ -234,5 +251,5 @@ npm run test:platform   # uses tretu_platform_test (created + schema applied aut
 ```
 
 Schema changes: edit `src/db/platform-schema.ts`, then `npm run db:generate` (new file in `drizzle/`, additive only)
-and `npm run db:migrate`. `0002_badge_grants_steam.sql` adds `platform_badge_sync.granted_to/granted_ref` and
-`platform_users.steam_id` (backfilled from `links`).
+and `npm run db:migrate`. `0002_badge_grants_steam_teamspeak.sql` adds `platform_badge_sync.granted_to/granted_ref`,
+`platform_ts_links.link_error` and `platform_users.steam_id` (backfilled from `links`).

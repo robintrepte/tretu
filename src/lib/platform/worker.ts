@@ -12,6 +12,7 @@ import { platformDb } from "@/lib/platform/db";
 import { AuthUnavailableError, refreshStub } from "@/lib/platform/directory";
 import { runDueJobs, type JobOutcome, type JobRow } from "@/lib/platform/jobs";
 import { pruneNotifications } from "@/lib/platform/notifications";
+import { tsAuthLinkJob, tsAuthUnlinkJob } from "@/lib/platform/ts-auth-link";
 import { deliverDueWebhooks } from "@/lib/platform/outbox";
 import { expirePresence } from "@/lib/platform/presence";
 import { sendPushJob } from "@/lib/platform/push";
@@ -41,6 +42,8 @@ export async function runDeliveryTick(now: Date = new Date()): Promise<number> {
       "badge.sync.discord": (job) => discordSyncJob(platformDb, job),
       "badge.revoke.discord": (job) => discordRevokeJob(platformDb, job),
       "user.fetch": userFetchJob,
+      "auth.link.teamspeak": (job) => tsAuthLinkJob(platformDb, job),
+      "auth.unlink.teamspeak": (job) => tsAuthUnlinkJob(platformDb, job),
     },
     { now, limit: 50 }
   );

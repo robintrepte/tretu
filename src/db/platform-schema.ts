@@ -31,6 +31,8 @@ export type PlatformUserLinks = {
   minecraft?: string;
   minecraftName?: string;
   steam?: string;
+  /** TeamSpeak unique identifier, registered at auth by tretu.de's TeamSpeak link. */
+  teamspeak?: string;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -204,6 +206,8 @@ export const platformTsLinks = pgTable(
     verifyCode: text("verify_code"),
     codeExpiresAt: tz("code_expires_at"),
     verifiedAt: tz("verified_at"),
+    /** Why the last link was undone (e.g. `ts_identity_taken_auth`: auth has it on another Tretu-Konto). Cleared on restart. */
+    linkError: text("link_error"),
     updatedAt: updatedAt(),
   },
   (t) => [uniqueIndex("platform_ts_links_uid_idx").on(t.tsUid)]

@@ -12,6 +12,7 @@ import { inTransaction, platformDb, type Executor } from "@/lib/platform/db";
 import { authUserSchema, ensureStub, isErased, upsertDirectoryUser } from "@/lib/platform/directory";
 import { getEconomy, xpForStatIncrement } from "@/lib/platform/economy";
 import { eraseUser } from "@/lib/platform/erasure";
+import { applyAuthTeamspeakLink } from "@/lib/platform/ts-auth-link";
 import { badRequest } from "@/lib/platform/errors";
 import { emitPlatformEvent } from "@/lib/platform/outbox";
 import { addToDailyCounter, addXp, incrementStat, lockProgress, settleProgress } from "@/lib/platform/progress";
@@ -229,6 +230,8 @@ async function processUserEvent(tx: Executor, event: EventEnvelope, now: Date): 
   if (event.type === "user.updated") {
     await emitPlatformEvent(tx, { type: "user.updated", sub, data: event.data, exceptApps: ["auth"], now });
   }
+  // TeamSpeak unlinked (or replaced) in Mein Konto: unlink here too and take back badge groups.
+  await applyAuthTeamspeakLink(tx, sub, previous?.links, current.links);
   if ((previous?.discordId ?? null) !== (current.discordId ?? null)) {
     // Roles granted to the old Discord account are taken back, the new one gets them (if linked).
     await releaseStaleGrants(tx, { sub, target: "discord", previousIdentity: previous?.discordId ?? null });
