@@ -85,12 +85,47 @@ There is no separate status service: no extra PM2 process, nginx site or certifi
   posted: a single failed check or a service that stays down never repeats the message.
 - **Maintenance note (optional):** `TRETU_STATUS_NOTICE="Wartung am Sonntag ab 22 Uhr"` shows a banner on the page (and
   in `/api/status`); remove it and reload to hide it.
+- **Overall status:** the worst state among the services that count: every service except those with
+  `"excludeFromOverall": true` and those in maintenance. None counts: "Wartungsarbeiten" when one is in maintenance, else
+  "keine Daten". Excluded services are still shown (with "Zählt nicht zum Gesamtstatus") and still alert.
+- **Maintenance of one service:** `"maintenance": true` or `"maintenance": "<note>"`, optionally with
+  `"until": "<ISO time with offset>"`. Until then the service is shown as **Wartung** (with the note and "Wartung bis …"),
+  is left out of the overall status, and posts **no** Discord alerts (also no certificate warnings for its host). Its
+  checks are still stored (uptime bars stay honest). At `until` the maintenance ends by itself; if the service is still
+  down then, the outage is announced right away (problems that started and ended within the maintenance are not).
+  Without `until` it lasts until the option is removed and the processes are reloaded.
+
+Per-service options, the same for every kind of service:
+
+```jsonc
+// TRETU_STATUS_TARGETS_JSON: options next to id/url
+[
+  {"id":"tretu-web","url":"http://127.0.0.1:3020/api/health","host":"tretu.de"},
+  {"id":"saga","url":"https://saga.tretu.de/api/health","maintenance":"Umzug auf einen neuen Server","until":"2026-11-05T18:00:00+01:00"},
+  {"id":"hollowmere","url":"https://hollowmere.tretu.de/api/health","excludeFromOverall":true},
+  {"id":"play","url":"https://play.tretu.de/api/health","maintenance":true}
+]
+// TRETU_STATUS_MINECRAFT / TRETU_STATUS_TEAMSPEAK: host[:port] as before, or a JSON object
+{"address":"mc.tretu.de:25565","maintenance":"Neue Map wird aufgebaut","until":"2026-11-03T20:00:00+01:00"}
+{"address":"ts.tretu.de:30033","excludeFromOverall":true}   // TeamSpeak via ServerQuery: "address" may be left out
+```
+
+| Option | Type | Effect |
+|---|---|---|
+| `excludeFromOverall` | `true` / `false` (default) | shown, never part of the overall status |
+| `maintenance` | `true`, `"<note>"` (≤ 300 chars) or `false` (default) | "Wartung", not in the overall status, no Discord alerts |
+| `until` | ISO 8601 with offset, e.g. `2026-11-05T18:00:00+01:00` | end of the maintenance (ignored without `maintenance`) |
+
+In `/api/status` every service has `state` (`up`, `degraded`, `down`, `unknown` or `maintenance`), `checkState` (the
+latest check, also during maintenance), `maintenance` (`{note, until}` or `null`) and `inOverall`; `status` is the
+overall state (it can also be `maintenance`). An invalid value is logged (`status.targets_invalid`) and ignored: the
+web services fall back to the contract's hosts, a game server to its default address without options.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `TRETU_STATUS_TARGETS_JSON` | the contract's six hosts | JSON array `[{"id":"saga","url":"https://saga.tretu.de/api/health"}, …]`, optional `name`/`host` per entry; `[]` switches checks and list off. Ids `tretu-web`, `auth`, `saga`, `play`, `hollowmere`, `mc-dashboard` get their names ("Website", "Tretu-Konto", …) automatically. Read by the worker and the page: set it in `.env.local` and reload both. |
-| `TRETU_STATUS_MINECRAFT` | `mc.tretu.de:25565` | Minecraft server for the Server List Ping (`host[:port]`), `off` = no row |
-| `TRETU_STATUS_TEAMSPEAK` | – | `host:port` for a TCP check of TeamSpeak when `TS_QUERY_*` is not set |
+| `TRETU_STATUS_TARGETS_JSON` | the contract's six hosts | JSON array `[{"id":"saga","url":"https://saga.tretu.de/api/health"}, …]`, optional `name`/`host` and the options above per entry; `[]` switches checks and list off. Ids `tretu-web`, `auth`, `saga`, `play`, `hollowmere`, `mc-dashboard` get their names ("Website", "Tretu-Konto", …) automatically. Read by the worker and the page: set it in `.env.local` and reload both. |
+| `TRETU_STATUS_MINECRAFT` | `mc.tretu.de:25565` | Minecraft server for the Server List Ping (`host[:port]`), `off` = no row, or `{"address"?, …options}` |
+| `TRETU_STATUS_TEAMSPEAK` | – | `host:port` for a TCP check of TeamSpeak when `TS_QUERY_*` is not set, or `{"address"?, …options}` |
 | `TRETU_STATUS_CERT_HOSTS` | – | extra hosts (`host[:port]`, comma-separated) whose certificates are watched, e.g. `map.tretu.de,mcp.hollowmere.tretu.de` |
 | `TRETU_STATUS_DISCORD_WEBHOOK_URL` | – | Discord webhook (`https://discord.com/api/webhooks/<id>/<token>`) for outage, recovery and certificate messages |
 | `TRETU_STATUS_NOTICE` | – | plain-text banner on `/status` |
@@ -315,3 +350,11 @@ TeamSpeak (`TS_*`), Hetzner/Cloudflare/CurseForge fallbacks and the remaining va
 `npm run smoke` runs `deploy/scripts/smoke.sh` with this checkout's `.env.local`, so the signed platform ping uses
 `TRETU_APP_ID` / `TRETU_APP_SECRET` from there (`SMOKE_ENV_FILE` points it at another file). Options pass through:
 `npm run smoke -- --only web,auth`.
+
+**Webhook test:** `npm run smoke -- --webhook-test saga` (comma list, or `all` for every app with a `webhook`) POSTs a
+harmless signed event to the app's webhook URL from `TRETU_APPS_JSON`, exactly like the platform worker does (contract
+§3/§4: `x-tretu-app: platform`, signed with that app's secret, envelope `{"type":"platform.ping","app":"platform",
+"sub":null,"data":{}}`). Every app answers unknown types with `204` → **PASS**; `401` means the app's `TRETU_APP_SECRET`
+and its secret in `TRETU_APPS_JSON` differ (or the clock is off by more than 5 minutes), `404` that the app's webhook is
+switched off. The secrets are read by node from the env file and never printed. Add `--only webhook` to skip the other
+checks: `npm run smoke -- --webhook-test all --only webhook`. Run it after adding or changing an app's webhook.

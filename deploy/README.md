@@ -12,7 +12,7 @@ rollbacks). Tools in this folder:
 | `env/*.example` | env templates for every app (tretu-web, tretu-auth, saga, play, Hollowmere `server/.env` + Nakama `local.yml`, mc-dashboard, Postgres roles), rendered by `generate-secrets.mjs --templates deploy/env` |
 | `scripts/generate-secrets.mjs` | one consistent set of secrets → filled env files (mode 600), `--import` keeps running apps' values |
 | `scripts/create-databases.sh` | one least-privileged role + database per app, idempotent |
-| `scripts/smoke.sh` | every `/api/health`, OIDC discovery + JWKS, the status data (`/api/status` fresh), signed platform ping → pass/fail table |
+| `scripts/smoke.sh` | every `/api/health`, OIDC discovery + JWKS, the status data (`/api/status` fresh), signed platform ping, optionally `--webhook-test <app>\|all` (signed test webhook, expects 204) → pass/fail table |
 | `scripts/check-nginx.sh` | `nginx -t` for site files without root or real certificates |
 | `scripts/pg-backup.sh`, `scripts/pg-restore-test.sh`, `scripts/alert.sh`, `systemd/tretu-pg-*` | nightly dumps, weekly restore test, Discord message when either fails |
 
@@ -140,6 +140,7 @@ online), and warns on Discord 14 and 3 days before a TLS certificate expires. Ba
 
 ```bash
 deploy/scripts/smoke.sh --env-file /srv/tretu/.env.local     # signed ping as tretu-web; --only/--skip/--map, see --help
+deploy/scripts/smoke.sh --env-file /srv/tretu/.env.local --webhook-test all --only webhook   # every app's webhook
 ```
 
 ## CI
