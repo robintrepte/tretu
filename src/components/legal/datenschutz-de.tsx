@@ -18,7 +18,7 @@ export const DATENSCHUTZ_TOC_DE = [
   { id: "game-server", title: "Game-Server-Dashboard (Team)" },
   { id: "email", title: "E-Mail-Versand und Kontakt" },
   { id: "zahlungen", title: "Zahlungen und Tretu-Credits" },
-  { id: "statistik", title: "Besucherstatistik und Statusseite" },
+  { id: "statistik", title: "Statistik und Statusseite" },
   { id: "empfaenger", title: "Empfänger und Auftragsverarbeiter" },
   { id: "drittland", title: "Übermittlung in Drittländer" },
   { id: "speicherdauer", title: "Speicherdauer" },
@@ -58,7 +58,7 @@ export function DatenschutzDe() {
           <li>die Browser-Spielesammlung Tretu Play unter {SERVICES.play},</li>
           <li>das Spiel Hollowmere (Website {SERVICES.hollowmere}, Web-Version und Desktop-Apps),</li>
           <li>den Tretu-Minecraft-Server und sein Dashboard unter {SERVICES.minecraft},</li>
-          <li>unsere Besucherstatistik ({SERVICES.stats}) und Statusseite ({SERVICES.status}),</li>
+          <li>die Statusseite unserer Dienste ({SERVICES.status}),</li>
           <li>unsere Community-Server auf TeamSpeak und Discord sowie unsere Profile in sozialen Netzwerken.</li>
         </UL>
         <P>
@@ -71,8 +71,8 @@ export function DatenschutzDe() {
         <UL>
           <li>Wir verkaufen keine Daten, zeigen keine Werbung und verfolgen dich nicht über fremde Websites hinweg.</li>
           <li>
-            Unsere Server stehen bei Hetzner in Deutschland. Statistik (Umami) und Statusseite (Uptime Kuma) betreiben wir selbst –
-            ohne Cookies.
+            Unsere Server stehen bei Hetzner in Deutschland. Analyse- oder Tracking-Dienste setzen wir nicht ein; nur Tretu Play
+            zählt Seitenaufrufe mit einer eigenen Statistik ohne Cookies, die nur Tagessummen speichert.
           </li>
           <li>
             Wir setzen nur technisch notwendige Cookies und Speichereinträge ein. Inhalte von Twitch, Discord und TSViewer laden
@@ -122,7 +122,7 @@ export function DatenschutzDe() {
         <Sub title="Hosting">
           <P>
             Alle Dienste laufen auf Servern, die wir bei der Hetzner Online GmbH, Industriestr. 25, 91710 Gunzenhausen,
-            Deutschland, betreiben. Die Server für Websites, Datenbanken, Tretu-Konto, Spiele-Backends und Statistik stehen in
+            Deutschland, betreiben. Die Server für Websites, Datenbanken, Tretu-Konto und Spiele-Backends stehen in
             Rechenzentren in Deutschland. Hetzner verarbeitet die Daten als Auftragsverarbeiter in unserem Auftrag (Art. 28
             DSGVO). Rechtsgrundlage ist unser berechtigtes Interesse an einem sicheren, wirtschaftlichen Betrieb (Art. 6 Abs. 1
             lit. f DSGVO) bzw. die Erfüllung des Nutzungsvertrags (Art. 6 Abs. 1 lit. b DSGVO).
@@ -445,6 +445,30 @@ export function DatenschutzDe() {
           Einstellungen selbst löschen; in vergangenen Partien anderer bleibt nur der damals verwendete Anzeigename ohne
           Verbindung zu deinem Konto erhalten.
         </P>
+        <Sub title="Besucherstatistik von Tretu Play">
+          <P>
+            Tretu Play zählt Seitenaufrufe mit einer eigenen Statistik auf unserem Server, ohne Cookies und ohne externe
+            Dienste. Gezählt werden Seiten, die du im Browser aufrufst; Aufrufe durch erkennbare Bots und Programme werden nicht
+            mitgezählt. Ausgewertet werden dabei nur Angaben, die dein Browser bei jedem Seitenaufruf ohnehin mitsendet: die
+            aufgerufene Seite (Adressen einzelner Räume und Profile werden zu je einem Eintrag zusammengefasst), die Domain der
+            Website, von der du kommst, bzw. eine Kampagnenangabe in der Adresse („utm_source“), der Gerätetyp (Smartphone, Tablet
+            oder Computer, abgeleitet aus der Browser-Kennung) und die Sprache (aus der Adresse, dem Sprach-Cookie oder der
+            Spracheinstellung deines Browsers).
+          </P>
+          <P>
+            Damit wir Besucher eines Tages nur einmal zählen, berechnet der Server aus deiner IP-Adresse, deiner Browser-Kennung
+            und einem Zufallswert, der jeden Tag neu erzeugt wird, eine gekürzte Prüfsumme (Hash). Zufallswert und Prüfsummen
+            liegen nur im Arbeitsspeicher, werden nie gespeichert und mit dem ersten Seitenaufruf nach Mitternacht (deutscher
+            Zeit) bzw. bei einem Neustart des Servers verworfen; über mehrere Tage oder zu dir lassen sie sich nicht
+            zurückverfolgen. In der Datenbank speichern wir ausschließlich Tagessummen – Aufrufe und Besucher je Seite, Herkunft,
+            Gerätetyp und Sprache – ohne Bezug zu einzelnen Personen. Diese Summen sehen nur die Administratoren von Tretu Play;
+            wir bewahren sie ohne feste Frist auf.
+          </P>
+          <P>
+            Rechtsgrundlage ist unser berechtigtes Interesse, zu verstehen, wie Tretu Play genutzt wird, und das Angebot zu
+            verbessern (Art. 6 Abs. 1 lit. f DSGVO). Du kannst dem jederzeit widersprechen (<A href="#widerspruch">Abschnitt 22</A>).
+          </P>
+        </Sub>
       </Section>
 
       <Section id="hollowmere" title="11. Hollowmere">
@@ -596,23 +620,21 @@ export function DatenschutzDe() {
         </P>
       </Section>
 
-      <Section id="statistik" title="17. Besucherstatistik und Statusseite">
-        <Sub title="Umami (selbst betrieben)">
+      <Section id="statistik" title="17. Statistik und Statusseite">
+        <Sub title="Keine Analyse- oder Tracking-Dienste">
           <P>
-            Auf Websites, auf denen wir sie aktiviert haben, messen wir die Nutzung mit Umami, das wir unter {SERVICES.stats} auf
-            unserem eigenen Server betreiben. Umami setzt keine Cookies und speichert nichts auf deinem Gerät. Erfasst werden die
-            aufgerufene Seite, die verweisende Website, Browser, Betriebssystem, Gerätetyp, Bildschirmgröße, Sprache und das aus der
-            IP-Adresse abgeleitete Land. Die IP-Adresse selbst wird nicht gespeichert; zur Zählung von Besuchen wird sie zusammen mit
-            der Browser-Kennung und einem regelmäßig wechselnden Zufallswert zu einer Kennung verrechnet, die keinen Rückschluss auf
-            dich zulässt. Die Daten verlassen unseren Server nicht. Rechtsgrundlage ist unser berechtigtes Interesse, unser Angebot
-            zu verstehen und zu verbessern (Art. 6 Abs. 1 lit. f DSGVO). Tretu Play zählt Seitenaufrufe zusätzlich mit einer eigenen,
-            ebenfalls cookiefreien Statistik, die nur Tagessummen speichert.
+            Auf {SERVICES.hub}, {SERVICES.auth}, in Saga, bei Hollowmere und im Minecraft-Dashboard setzen wir keine Analyse- oder
+            Tracking-Werkzeuge ein (etwa Analyse-Skripte oder Zählpixel), weder eigene noch von Dritten. Tretu Play zählt Seitenaufrufe mit einer eigenen
+            Statistik ohne Cookies, die nur Tagessummen speichert (<A href="#play">Abschnitt 10</A>). Spielstatistiken in
+            Hollowmere erheben wir nur mit deiner Einwilligung (<A href="#hollowmere">Abschnitt 11</A>).
           </P>
         </Sub>
-        <Sub title="Statusseite (Uptime Kuma, selbst betrieben)">
+        <Sub title="Statusseite">
           <P>
-            Unter {SERVICES.status} zeigen wir, ob unsere Dienste erreichbar sind. Die Software Uptime Kuma betreiben wir selbst; sie
-            prüft regelmäßig unsere Schnittstellen und verarbeitet beim Aufruf der Statusseite nur die Logdaten nach Abschnitt 4.
+            Unter {SERVICES.status} zeigen wir, ob unsere Dienste erreichbar sind. Dafür ruft unser eigener Server einmal pro Minute
+            die technischen Statusadressen unserer Dienste ab und speichert, ob und wie schnell sie geantwortet haben
+            (Einzelprüfungen 7 Tage, Stunden- und Tageswerte 90 Tage). Dabei werden keine personenbezogenen Daten verarbeitet.
+            Für den Aufruf der Statusseite gelten die Angaben zu den Server-Logfiles in <A href="#hosting">Abschnitt 4</A>.
           </P>
         </Sub>
       </Section>
@@ -672,6 +694,11 @@ export function DatenschutzDe() {
             ["Anwesenheit (online/spielt)", "2 Minuten nach dem letzten Lebenszeichen"],
             ["Gastkonten (Play)", "automatisch 30 Tage nach Ablauf der letzten Sitzung"],
             ["Auslastungsdaten TeamSpeak / Spielserver-Status", "30 Tage bzw. 2 Tage, ohne Personenbezug"],
+            [
+              "Besucherstatistik Tretu Play",
+              "Prüfsummen nur im Arbeitsspeicher bis zum Tageswechsel; Tagessummen ohne Personenbezug ohne feste Frist",
+            ],
+            ["Ergebnisse der Statusprüfungen", "7 Tage (Einzelprüfungen), 90 Tage (Stunden- und Tageswerte), ohne Personenbezug"],
             ["Buchungen von Credits, Zahlungsbelege", "10 Jahre (§ 147 AO, § 257 HGB), danach Löschung"],
             ["Kontaktanfragen", "bis zur Erledigung, danach soweit keine Pflichten bestehen"],
             ["Protokolle des Game-Server-Dashboards", "solange der jeweilige Server besteht"],

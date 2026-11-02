@@ -40,8 +40,8 @@ export function ImpressumEn() {
         <P>
           This legal notice applies to tretu.de and to all services of the {OPERATOR.brand} brand, in particular the Tretu
           account ({SERVICES.auth}), Saga ({SERVICES.saga}), Tretu Play ({SERVICES.play}), Hollowmere ({SERVICES.hollowmere} and
-          the game apps), the Minecraft server with its dashboard ({SERVICES.minecraft}), our statistics and status pages (
-          {SERVICES.stats}, {SERVICES.status}), our community servers on TeamSpeak and Discord and our social media profiles.
+          the game apps), the Minecraft server with its dashboard ({SERVICES.minecraft}), our status page ({SERVICES.status}), our community
+          servers on TeamSpeak and Discord and our social media profiles.
         </P>
       </Section>
 
