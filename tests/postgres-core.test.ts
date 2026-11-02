@@ -134,6 +134,16 @@ test("health report: pending migrations fail it, an overdue platform backlog mar
     assert.equal((await healthReport()).checks.worker, "ok", "being worked on");
     await db.execute(sql`delete from platform_jobs`);
 
+    // A webhook row of an app without a webhook waits on purpose (parked); one of saga is overdue work.
+    const insertRow = (app: string) =>
+      db.execute(sql`insert into platform_outbox (event_id, target_app, type, payload, next_attempt_at)
+                     values (gen_random_uuid(), ${app}, 'level.up', '{}', now() - interval '2 days')`);
+    await insertRow("play");
+    assert.equal((await healthReport()).checks.worker, "ok", "parked rows are not overdue");
+    await insertRow("saga");
+    assert.equal((await healthReport()).checks.worker, "stale");
+    await db.execute(sql`delete from platform_outbox`);
+
     const [last] = (await db.execute(sql`select id from drizzle.__drizzle_migrations order by id desc limit 1`)) as unknown as { id: number }[];
     await db.execute(sql`delete from drizzle.__drizzle_migrations where id = ${last.id}`);
     const pending = await healthReport();

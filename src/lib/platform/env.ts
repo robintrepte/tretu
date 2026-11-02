@@ -53,6 +53,20 @@ export function getWebhookSubscribers(): { app: string; url: string; secret: str
     .map(([app, cfg]) => ({ app, url: cfg.webhook as string, secret: cfg.secret }));
 }
 
+/** Configured apps that never take platform webhooks unless a `webhook` is set for them (auth is the source of user.*, tretu-web is the platform). */
+const NON_RECEIVING_APPS = new Set(["auth", "tretu-web"]);
+
+/**
+ * Apps platform events are queued for (contract §4): every app in TRETU_APPS_JSON with a `webhook`, plus every other
+ * configured app except auth and tretu-web. Rows of an app without a webhook wait in the outbox ("parked") until the
+ * webhook is configured (src/lib/platform/outbox.ts).
+ */
+export function getWebhookReceivers(): string[] {
+  return Object.entries(getAppsConfig())
+    .filter(([app, cfg]) => Boolean(cfg.webhook) || !NON_RECEIVING_APPS.has(app))
+    .map(([app]) => app);
+}
+
 /** Public base URL of tretu.de (profile links). */
 export function getPlatformBaseUrl(): string {
   const raw = process.env.TRETU_PLATFORM_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://tretu.de";

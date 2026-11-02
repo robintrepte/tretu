@@ -111,7 +111,8 @@
       "up": "Up",
       "degraded": "Degraded",
       "down": "Down",
-      "unknown": "Unknown"
+      "unknown": "Unknown",
+      "maintenance": "Maintenance"
     },
     "linksTitle": "App admins",
     "linksDescription": "Every app manages its own content.",
@@ -127,7 +128,21 @@
     "statusStale": "The checks are not running right now (last check {date}). Is the platform worker running?",
     "statusNoChecks": "No check yet. Is the platform worker running?",
     "statusNoTargets": "No services are set up for checks (TRETU_STATUS_TARGETS_JSON).",
-    "statusUnavailable": "Service status is not available right now (database)."
+    "statusUnavailable": "Service status is not available right now (database).",
+    "webhooksTitle": "Webhook delivery",
+    "webhooksDescription": "Events tretu.de sends to the apps (the platform worker's queue).",
+    "webhookTable": {
+      "app": "App",
+      "webhook": "Webhook",
+      "pending": "Waiting",
+      "parked": "No webhook",
+      "failed": "Failed",
+      "oldest": "Oldest waiting"
+    },
+    "webhookConfigured": "configured",
+    "webhookMissing": "missing",
+    "webhooksParked": "Events for apps without a webhook wait for up to 7 days: add the webhook to TRETU_APPS_JSON and restart the platform worker to deliver them.",
+    "webhooksRetry": "Send failed deliveries again: <code>npm run platform:outbox -- retry</code>"
   },
   "accounts": {
     "title": "Accounts",

@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 
 import { db } from "@/db";
+import { getWebhookSubscribers } from "@/lib/platform/env";
 import packageJson from "../../package.json";
 import migrationJournal from "../../drizzle/meta/_journal.json";
 
@@ -45,9 +46,12 @@ async function checkMigrations(): Promise<"ok" | "pending"> {
 async function checkWorker(): Promise<"ok" | "stale" | "off"> {
   if (!process.env.TRETU_APPS_JSON?.trim()) return "off";
   const minutes = WORKER_OVERDUE_MINUTES;
+  // Rows of apps without a webhook wait on purpose (parked, src/lib/platform/outbox.ts): not overdue work.
+  const subscribed = getWebhookSubscribers().map((s) => s.app);
+  const deliverable = subscribed.length ? sql`target_app in (${sql.join(subscribed.map((app) => sql`${app}`), sql`, `)})` : sql`false`;
   const rows = await db.execute(sql`
     select (
-      exists (select 1 from platform_outbox where status = 'pending'
+      exists (select 1 from platform_outbox where status = 'pending' and ${deliverable}
               and next_attempt_at < now() - make_interval(mins => ${minutes})
               and (locked_until is null or locked_until < now()))
       or exists (select 1 from platform_jobs where status = 'pending'

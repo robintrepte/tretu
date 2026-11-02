@@ -10,7 +10,7 @@ import { log } from "@/lib/observability/logger";
 import { getPlatformDb, isPlatformDbConfigured, type Executor } from "@/lib/platform/db";
 import type { ServiceState } from "@/lib/status/check";
 import { STATUS_TIME_ZONE } from "@/lib/status/store";
-import { statusTargets, type StatusTarget } from "@/lib/status/targets";
+import { maintenanceActive, statusTargets, type Maintenance, type StatusTarget } from "@/lib/status/targets";
 
 export const CACHE_MS = 30_000;
 /** Without a check for this long the data counts as stale (the worker runs every minute). */
@@ -18,7 +18,8 @@ export const STALE_AFTER_MS = 3 * 60_000;
 export const HOURS = 24;
 export const DAYS = 90;
 
-export type DisplayState = ServiceState | "unknown";
+/** A check result, "unknown" without one, or "maintenance" while a configured maintenance is in effect. */
+export type DisplayState = ServiceState | "unknown" | "maintenance";
 
 export type Bucket = {
   /** ISO start of the hour, or the calendar day `YYYY-MM-DD` (Europe/Berlin). */
@@ -35,8 +36,15 @@ export type ServiceStatus = {
   kind: StatusTarget["kind"];
   name: string;
   host: string;
+  /** "maintenance" while in maintenance, else the latest check's state. */
   state: DisplayState;
-  /** Start of the current state (ISO). */
+  /** The latest check's state, also during maintenance. */
+  checkState: ServiceState | "unknown";
+  /** The maintenance in effect (null when none). */
+  maintenance: Maintenance | null;
+  /** Whether the service counts for the overall status (not excluded by configuration, not in maintenance). */
+  inOverall: boolean;
+  /** Start of the latest check's state (ISO). */
   since: string | null;
   checkedAt: string | null;
   responseMs: number | null;
@@ -53,6 +61,7 @@ export type ServiceStatus = {
 };
 
 export type StatusOverview = {
+  /** Worst state of the services that count ({@link overallState}). */
   status: DisplayState;
   /** Time of the newest check of any service (ISO), null without any. */
   updatedAt: string | null;
@@ -65,7 +74,28 @@ export type StatusOverview = {
   services: ServiceStatus[];
 };
 
-const SEVERITY: Record<DisplayState, number> = { up: 0, unknown: 1, degraded: 2, down: 3 };
+const SEVERITY: Record<ServiceState | "unknown", number> = { up: 0, unknown: 1, degraded: 2, down: 3 };
+
+/**
+ * Overall status: the worst state among the services that count (`inOverall`). Without any: "maintenance" when a
+ * service is in maintenance, else "unknown".
+ */
+export function overallState(services: Pick<ServiceStatus, "checkState" | "inOverall" | "maintenance">[]): DisplayState {
+  const counted = services.filter((s) => s.inOverall);
+  if (!counted.length) return services.some((s) => s.maintenance) ? "maintenance" : "unknown";
+  return counted.reduce<ServiceState | "unknown">((worst, s) => (SEVERITY[s.checkState] > SEVERITY[worst] ? s.checkState : worst), "up");
+}
+
+/** The configuration part of a service row (state, maintenance, overall) at `now`. */
+function displayFields(target: StatusTarget, checkState: ServiceState | "unknown", now: Date) {
+  const maintenance = maintenanceActive(target.maintenance, now) ? target.maintenance : null;
+  return {
+    state: (maintenance ? "maintenance" : checkState) as DisplayState,
+    checkState,
+    maintenance,
+    inOverall: !maintenance && !target.excludeFromOverall,
+  };
+}
 
 const dayFormat = new Intl.DateTimeFormat("en-CA", { timeZone: STATUS_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" });
 
@@ -153,7 +183,7 @@ export async function loadStatusOverview(db: Executor, now: Date = new Date(), t
       kind: target.kind,
       name: target.name,
       host: target.host,
-      state: (row?.state as ServiceState | undefined) ?? "unknown",
+      ...displayFields(target, (row?.state as ServiceState | undefined) ?? "unknown", now),
       since: row?.since.toISOString() ?? null,
       checkedAt: row?.lastCheckedAt.toISOString() ?? null,
       responseMs: row?.lastResponseMs ?? null,
@@ -167,10 +197,9 @@ export async function loadStatusOverview(db: Executor, now: Date = new Date(), t
     };
   });
 
-  const status = list.reduce<DisplayState>((worst, s) => (SEVERITY[s.state] > SEVERITY[worst] ? s.state : worst), list.length ? "up" : "unknown");
   return {
     ...empty,
-    status,
+    status: overallState(list),
     updatedAt: newest ? new Date(newest).toISOString() : null,
     stale: newest ? now.getTime() - newest > STALE_AFTER_MS : true,
     services: list,
@@ -183,7 +212,10 @@ const globalCache = globalThis as unknown as { __tretuStatusCache?: Cache };
 /** The overview for the page and `/api/status`: cached {@link CACHE_MS}, last good value on database errors. */
 export async function getStatusOverview(now: Date = new Date()): Promise<StatusOverview> {
   const targets = statusTargets();
-  const key = JSON.stringify([targets.map((t) => [t.id, t.kind, t.name, t.host]), process.env.TRETU_STATUS_NOTICE ?? ""]);
+  const key = JSON.stringify([
+    targets.map((t) => [t.id, t.kind, t.name, t.host, t.excludeFromOverall, t.maintenance]),
+    process.env.TRETU_STATUS_NOTICE ?? "",
+  ]);
   const cached = globalCache.__tretuStatusCache;
   if (cached && cached.key === key && now.getTime() - cached.at < CACHE_MS) return cached.value;
   const unavailable = (): StatusOverview => ({
@@ -198,7 +230,7 @@ export async function getStatusOverview(now: Date = new Date()): Promise<StatusO
       kind: t.kind,
       name: t.name,
       host: t.host,
-      state: "unknown",
+      ...displayFields(t, "unknown", now),
       since: null,
       checkedAt: null,
       responseMs: null,

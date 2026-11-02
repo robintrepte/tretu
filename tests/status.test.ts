@@ -4,8 +4,8 @@ import test from "node:test";
 
 import { alertMessage, describeError, discordWebhookUrl, formatDuration, nextServiceState, type ServiceRow } from "../src/lib/status/alerts";
 import { classifyResponse, SLOW_MS, type CheckResult } from "../src/lib/status/check";
-import { berlinDay, lastDays, lastHours } from "../src/lib/status/read";
-import { parseStatusTargets } from "../src/lib/status/targets";
+import { berlinDay, lastDays, lastHours, overallState, type ServiceStatus } from "../src/lib/status/read";
+import { maintenanceActive, parseStatusTargets } from "../src/lib/status/targets";
 
 const ok = (ms = 50): CheckResult => ({ state: "up", responseMs: ms, httpStatus: 200, error: null });
 const down = (error = "timeout"): CheckResult => ({ state: "down", responseMs: null, httpStatus: null, error });
@@ -132,4 +132,73 @@ test("bar ranges: 24 hours and 90 Berlin calendar days, oldest first", () => {
   assert.equal(days.at(-1), "2026-03-01");
   assert.equal(days.at(-2), "2026-02-28");
   assert.equal(days[0], "2025-12-02");
+});
+
+test("target options: excludeFromOverall and maintenance (true or a note, optional until)", () => {
+  const { targets, error } = parseStatusTargets(
+    JSON.stringify([
+      { id: "saga", url: "https://saga.tretu.de/api/health", maintenance: "Umzug auf einen neuen Server", until: "2026-11-05T18:00:00+01:00" },
+      { id: "play", url: "https://play.tretu.de/api/health", maintenance: true },
+      { id: "hollowmere", url: "https://hollowmere.tretu.de/api/health", excludeFromOverall: true, maintenance: false },
+      { id: "auth", url: "https://auth.tretu.de/api/health" },
+    ])
+  );
+  assert.equal(error, undefined);
+  assert.deepEqual(
+    targets.map((t) => [t.id, t.excludeFromOverall, t.maintenance]),
+    [
+      ["saga", false, { note: "Umzug auf einen neuen Server", until: "2026-11-05T17:00:00.000Z" }],
+      ["play", false, { note: null, until: null }],
+      ["hollowmere", true, null],
+      ["auth", false, null],
+    ]
+  );
+  const saga = targets[0]!.maintenance;
+  assert.equal(maintenanceActive(saga, new Date("2026-11-05T16:59:59Z")), true);
+  assert.equal(maintenanceActive(saga, new Date("2026-11-05T17:00:00Z")), false, "ends by itself at until");
+  assert.equal(maintenanceActive(targets[1]!.maintenance, new Date("2030-01-01T00:00:00Z")), true, "without until: until removed");
+  assert.equal(maintenanceActive(null), false);
+
+  for (const bad of [{ maintenance: "" }, { maintenance: 1 }, { until: "nächsten Freitag", maintenance: true }, { until: "2026-11-05T18:00:00", maintenance: true }, { excludeFromOverall: "yes" }]) {
+    const parsed = parseStatusTargets(JSON.stringify([{ id: "saga", url: "https://saga.tretu.de/api/health", ...bad }]));
+    assert.ok(parsed.error, JSON.stringify(bad));
+    assert.equal(parsed.targets.length, 6, "invalid config falls back to the defaults");
+  }
+});
+
+test("overall status: worst of the services that count; excluded and maintenance services never count", () => {
+  type Row = Pick<ServiceStatus, "checkState" | "inOverall" | "maintenance">;
+  const svc = (checkState: Row["checkState"], inOverall = true, maintenance: Row["maintenance"] = null): Row => ({ checkState, inOverall, maintenance });
+  assert.equal(overallState([svc("up"), svc("up")]), "up");
+  assert.equal(overallState([svc("up"), svc("degraded"), svc("unknown")]), "degraded");
+  assert.equal(overallState([svc("up"), svc("unknown")]), "unknown");
+  assert.equal(overallState([svc("up"), svc("down"), svc("degraded")]), "down");
+  // One service down, but excluded or in maintenance: the rest decides.
+  assert.equal(overallState([svc("up"), svc("down", false)]), "up");
+  assert.equal(overallState([svc("degraded"), svc("down", false, { note: "Umzug", until: null })]), "degraded");
+  // Nothing counts.
+  assert.equal(overallState([svc("down", false, { note: null, until: null })]), "maintenance");
+  assert.equal(overallState([svc("down", false)]), "unknown");
+  assert.equal(overallState([]), "unknown");
+});
+
+test("alerts in maintenance: state tracked, nothing announced, a problem outlasting it is announced afterwards", () => {
+  let row: ServiceRow | null = null;
+  const at = (min: number) => new Date(Date.UTC(2026, 10, 2, 12, min));
+  const step = (result: CheckResult, min: number, silent = false) => {
+    const next = nextServiceState(row, result, at(min), { silent });
+    row = next.row;
+    return next.change;
+  };
+  assert.equal(step(ok(), 0), null);
+  for (let m = 1; m <= 4; m++) assert.equal(step(down(), m, true), null, `maintenance minute ${m}`);
+  assert.deepEqual([row!.state, row!.consecutive, row!.alertedState], ["down", 4, "up"]);
+  // Maintenance over, still down: announced with the start of the outage.
+  assert.deepEqual(step(down(), 5), { kind: "down", problemSince: at(1), error: "timeout" });
+  assert.deepEqual(step(ok(), 6), { kind: "recovered", problemSince: at(1), error: null });
+
+  // Down and recovered within the maintenance: no "läuft wieder" for an outage nobody was told about.
+  for (let m = 7; m <= 9; m++) step(down(), m, true);
+  assert.equal(step(ok(), 10, true), null);
+  assert.equal(step(ok(), 11), null);
 });

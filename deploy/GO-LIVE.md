@@ -239,6 +239,11 @@ https://tretu.de/api/status | head -c 300`. To try the webhook without touching 
 `{"id":"alarmtest","url":"https://tretu.de/gibt-es-nicht"}` to `TRETU_STATUS_TARGETS_JSON` and reload: after two
 minutes one "alarmtest … ist ausgefallen" message arrives (and nothing more); remove the entry and reload again.
 
+Planned work on one service (e.g. Hollowmere not live yet, a server move): give its entry `"maintenance":"<note>"`
+(optionally `"until":"2026-11-05T18:00:00+01:00"`) or `"excludeFromOverall":true`, then reload. It shows "Wartung",
+does not turn the overall status red and sends no Discord alerts until `until` (DEPLOY.md, "Status page"). The
+Minecraft and TeamSpeak rows take the same options as JSON: `TRETU_STATUS_MINECRAFT='{"address":"mc.tretu.de:25565","maintenance":true}'`.
+
 **Rollback:** empty `TRETU_STATUS_DISCORD_WEBHOOK_URL` (no messages); `TRETU_STATUS_TARGETS_JSON=[]` and `TRETU_STATUS_MINECRAFT=off`
 stop the checks.
 
@@ -271,6 +276,12 @@ each: backup, check `TRETU_AUTH_*` (7, above), install the env file, deploy its 
 sign in with a test Tretu-Konto and with an old local account (it must land on the old account through the
 `legacy_ids` claim), then the next one.
 
+Platform webhooks: every app in `TRETU_APPS_JSON` gets its events queued from the start; until its `webhook` is set
+there they wait ("parked", up to 7 days). Once the app is live, make sure its `webhook` is in `TRETU_APPS_JSON` in
+`/srv/tretu/.env.local`, `pm2 reload ecosystem.config.cjs --update-env`, then
+`npm run smoke -- --webhook-test <app> --only webhook` (in `/srv/tretu`) must PASS (`204`); the waiting events are then
+delivered. `npm run platform:outbox -- status` shows the backlog per app, `-- retry --app <app>` re-sends failed ones.
+
 | App | Switch on | Check | Rollback |
 |---|---|---|---|
 | tretu.de | already deployed in 7.1: open it to members (end of the maintenance window) | "Mit Tretu-Konto anmelden" is the only button; an old member lands on their old account (same roles); `select count(*) from users where tretu_sub is not null` grows | previous release + `.env.local.before-tretu` (7.1 rollback); the old Discord accounts are still in the database |
@@ -288,6 +299,7 @@ to switch off without removing, remove `DISCORD_BOT_TOKEN` instead).
 
 ```bash
 /srv/tretu/deploy/scripts/smoke.sh --env-file /srv/tretu/.env.local    # every row PASS
+cd /srv/tretu && npm run smoke -- --webhook-test all --only webhook && npm run platform:outbox -- status
 ```
 
 - https://tretu.de/status: every service "Läuft", "Stand" from the last minute; `certbot certificates`: every
@@ -297,6 +309,8 @@ to switch off without removing, remove `DISCORD_BOT_TOKEN` instead).
 - Delete the test account in Mein Konto: it disappears from every app, its profile on tretu.de 404s, and Discord
   roles / TeamSpeak groups granted for badges are removed (worker log `platform.badge_sync.released`, jobs
   `badge.revoke.*` done).
+- Webhook backlog (`platform:outbox -- status` or "Webhook-Zustellung" in the admin overview): no `PARKED`, `FAILED`
+  or `EXPIRED` rows; otherwise fix the app's `webhook` and `npm run platform:outbox -- retry`.
 - `systemctl list-timers 'tretu-pg-*'`, `pm2 ls` (no restarts piling up), `pm2 logs --lines 50` (no errors, no secrets).
 
 ## 9. Afterwards

@@ -226,9 +226,14 @@ export const platformOutbox = pgTable(
     type: text("type").notNull(),
     sub: text("sub"),
     payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
-    /** pending | delivered | failed */
+    /**
+     * pending | delivered | failed (gave up after 24 h of retries) | expired (the app had no webhook for 7 days).
+     * A pending row of an app without a webhook is "parked": not attempted until the webhook is configured.
+     */
     status: text("status").notNull().default("pending"),
     attempts: integer("attempts").notNull().default(0),
+    /** First delivery attempt; the 24 h retry window starts here (null: not attempted yet, or re-queued). */
+    firstAttemptAt: tz("first_attempt_at"),
     nextAttemptAt: tz("next_attempt_at").notNull().defaultNow(),
     lockedUntil: tz("locked_until"),
     lastError: text("last_error"),

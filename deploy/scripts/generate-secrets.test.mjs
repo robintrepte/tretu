@@ -51,7 +51,7 @@ test("one TRETU_APP_SECRET per app, identical in TRETU_APPS_JSON on tretu.de and
   assert.equal(apps.saga.webhook, "https://saga.tretu.de/api/tretu/webhook");
   assert.equal(apps.play.webhook, "https://play.tretu.de/api/tretu/webhook");
   assert.equal(apps["mc-dashboard"].webhook, "https://mc.tretu.de/api/tretu/webhook");
-  assert.equal(apps.hollowmere.webhook, undefined);
+  assert.equal(apps.hollowmere.webhook, "https://hollowmere.tretu.de/api/tretu/webhook");
   const secrets = Object.values(apps).map((a) => a.secret);
   assert.equal(new Set(secrets).size, secrets.length, "all different");
   for (const secret of secrets) assert.ok(secret.length >= 32);

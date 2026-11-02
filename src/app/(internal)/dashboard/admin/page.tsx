@@ -13,25 +13,28 @@ import { accountKpis, platformKpis, type PlatformKpis } from "@/lib/admin/overvi
 import { getServiceStatuses, type ServiceState } from "@/lib/admin/service-status";
 import { walletOverview } from "@/lib/admin/wallet-admin";
 import { getAuthIssuer } from "@/lib/platform/env";
+import { outboxSummary, type OutboxAppSummary } from "@/lib/platform/outbox";
 
 export const dynamic = "force-dynamic";
 
-const STATE_TONE: Record<ServiceState, "success" | "warning" | "danger" | "neutral"> = {
+const STATE_TONE: Record<ServiceState, "success" | "warning" | "danger" | "neutral" | "accent"> = {
   up: "success",
   degraded: "warning",
   down: "danger",
   unknown: "neutral",
+  maintenance: "accent",
 };
 
 export default async function AdminOverviewPage() {
   const actor = await requireAccountAdminPage();
-  const [t, f, accounts, platform, wallet, status] = await Promise.all([
+  const [t, f, accounts, platform, wallet, status, outbox] = await Promise.all([
     getTranslations("admin"),
     adminFormat(),
     accountKpis(actor.sub),
     platformKpis().catch(() => null as PlatformKpis | null),
     walletOverview().catch(() => null),
     getServiceStatuses(),
+    outboxSummary().catch(() => null as OutboxAppSummary[] | null),
   ]);
 
   // "Mein Konto" at auth.tretu.de, where two-factor sign-in is turned on.
@@ -234,6 +237,66 @@ export default async function AdminOverviewPage() {
           </ul>
         </Panel>
       </div>
+
+      {outbox?.length ? <WebhookBacklog rows={outbox} t={t} dateTime={f.dateTime} number={f.number} /> : null}
     </section>
+  );
+}
+
+/** Per app: webhook deliveries waiting, parked (no webhook configured yet) and given up (src/lib/platform/outbox.ts). */
+function WebhookBacklog({
+  rows,
+  t,
+  dateTime,
+  number,
+}: {
+  rows: OutboxAppSummary[];
+  t: Awaited<ReturnType<typeof getTranslations<"admin">>>;
+  dateTime: (iso: string | null | undefined) => string;
+  number: (n: number) => string;
+}) {
+  const parked = rows.some((r) => r.parked > 0);
+  const gaveUp = rows.some((r) => r.failed + r.expired > 0);
+  return (
+    <Panel title={t("overview.webhooksTitle")} description={t("overview.webhooksDescription")}>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[560px] text-sm" data-testid="webhook-backlog">
+          <thead className="text-left text-xs text-muted-foreground">
+            <tr>
+              <th className="py-2 font-medium">{t("overview.webhookTable.app")}</th>
+              <th className="py-2 font-medium">{t("overview.webhookTable.webhook")}</th>
+              <th className="py-2 text-right font-medium">{t("overview.webhookTable.pending")}</th>
+              <th className="py-2 text-right font-medium">{t("overview.webhookTable.parked")}</th>
+              <th className="py-2 text-right font-medium">{t("overview.webhookTable.failed")}</th>
+              <th className="py-2 pl-4 font-medium">{t("overview.webhookTable.oldest")}</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border/60">
+            {rows.map((r) => (
+              <tr key={r.app} data-testid={`webhook-backlog-${r.app}`}>
+                <td className="py-2 font-medium">{appName(r.app)}</td>
+                <td className="py-2">
+                  <Pill tone={r.webhook ? "success" : "warning"}>{t(r.webhook ? "overview.webhookConfigured" : "overview.webhookMissing")}</Pill>
+                </td>
+                <td className="py-2 text-right tabular-nums">{number(r.queued + r.retrying)}</td>
+                <td className="py-2 text-right tabular-nums">{number(r.parked)}</td>
+                <td className="py-2 text-right tabular-nums">{number(r.failed + r.expired)}</td>
+                <td className="py-2 pl-4 text-muted-foreground">{r.oldestPending ? dateTime(r.oldestPending) : "–"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {parked || gaveUp ? (
+        <div className="mt-3 space-y-2">
+          {parked ? <Hint tone="warning">{t("overview.webhooksParked")}</Hint> : null}
+          {gaveUp ? (
+            <Hint>
+              {t.rich("overview.webhooksRetry", { code: (chunks) => <code className="rounded bg-muted px-1 py-0.5 text-xs">{chunks}</code> })}
+            </Hint>
+          ) : null}
+        </div>
+      ) : null}
+    </Panel>
   );
 }

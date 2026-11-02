@@ -146,6 +146,8 @@ test("game targets from env: Minecraft default / off / custom, TeamSpeak query /
     name: "Minecraft-Server",
     host: "mc.tretu.de",
     address: { host: "mc.tretu.de", port: 25565 },
+    excludeFromOverall: false,
+    maintenance: null,
   });
   assert.equal(minecraftTarget({ TRETU_STATUS_MINECRAFT: "off" }).target, null);
   assert.deepEqual(minecraftTarget({ TRETU_STATUS_MINECRAFT: "play.example:25570" }).target?.address, { host: "play.example", port: 25570 });
@@ -157,6 +159,23 @@ test("game targets from env: Minecraft default / off / custom, TeamSpeak query /
   assert.equal(query?.host, "tretu.de");
   const tcp = teamspeakTarget({ TRETU_STATUS_TEAMSPEAK: "ts.example:30033" }).target;
   assert.deepEqual([tcp?.mode, tcp?.host, tcp?.address?.port], ["tcp", "ts.example", 30033]);
+
+  // JSON form with options (excludeFromOverall, maintenance + until).
+  const mcJson = minecraftTarget({ TRETU_STATUS_MINECRAFT: '{"address":"play.example:25570","maintenance":"Neue Map wird aufgebaut","until":"2026-11-05T18:00:00+01:00"}' });
+  assert.equal(mcJson.error, undefined);
+  assert.deepEqual(mcJson.target?.address, { host: "play.example", port: 25570 });
+  assert.deepEqual(mcJson.target?.maintenance, { note: "Neue Map wird aufgebaut", until: "2026-11-05T17:00:00.000Z" });
+  const mcDefault = minecraftTarget({ TRETU_STATUS_MINECRAFT: '{"excludeFromOverall":true}' }).target;
+  assert.deepEqual([mcDefault?.host, mcDefault?.excludeFromOverall, mcDefault?.maintenance], ["mc.tretu.de", true, null]);
+  const mcBad = minecraftTarget({ TRETU_STATUS_MINECRAFT: '{"maintenance":"x","until":"morgen"}' });
+  assert.match(mcBad.error ?? "", /TRETU_STATUS_MINECRAFT is invalid: until/);
+  assert.equal(mcBad.target?.host, "mc.tretu.de", "a typo never removes the row");
+  const tsJson = teamspeakTarget({ TRETU_STATUS_TEAMSPEAK: '{"address":"ts.example:30033","maintenance":true}' }).target;
+  assert.deepEqual([tsJson?.mode, tsJson?.maintenance], ["tcp", { note: null, until: null }]);
+  const tsQueryOnly = teamspeakTarget({ TRETU_STATUS_TEAMSPEAK: '{"excludeFromOverall":true}', TS_QUERY_HOST: "h", TS_QUERY_USER: "u", TS_QUERY_PASSWORD: "p" }).target;
+  assert.deepEqual([tsQueryOnly?.mode, tsQueryOnly?.excludeFromOverall], ["query", true]);
+  assert.equal(teamspeakTarget({ TRETU_STATUS_TEAMSPEAK: '{"maintenance":true}' }).target, null, "no address and no query: no row");
+  assert.match(teamspeakTarget({ TRETU_STATUS_TEAMSPEAK: "{oops" }).error ?? "", /not valid JSON/);
 
   const all = statusTargets({ TRETU_STATUS_TARGETS_JSON: "[]", TRETU_STATUS_TEAMSPEAK: "ts.example:30033" });
   assert.deepEqual(

@@ -40,6 +40,13 @@ test("overview: account KPIs from auth, noindex and no caching", async ({ page, 
   await expect(page.getByTestId("service-saga")).toContainText("Eingeschränkt");
   await expect(page.getByTestId("service-play")).toContainText("Ausgefallen");
   await expect(page.getByTestId("service-minecraft")).toContainText("3/20 online");
+  await expect(page.getByTestId("service-hollowmere")).toContainText("Wartung");
+  // Webhook backlog per app: saga gave up on one delivery, play's two events wait for its webhook.
+  await expect(page.getByTestId("webhook-backlog-saga")).toContainText("eingerichtet");
+  await expect(page.getByTestId("webhook-backlog-saga").locator("td").nth(4)).toHaveText("1");
+  await expect(page.getByTestId("webhook-backlog-play")).toContainText("fehlt");
+  await expect(page.getByTestId("webhook-backlog-play").locator("td").nth(3)).toHaveText("2");
+  await expect(page.getByText("npm run platform:outbox -- retry")).toBeVisible();
   await expect(page.getByTestId("app-admin-links")).toContainText("saga.tretu.de/admin");
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
   // Anonymous visitors never see it.

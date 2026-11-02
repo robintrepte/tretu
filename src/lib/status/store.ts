@@ -16,8 +16,14 @@ export const STATUS_TIME_ZONE = "Europe/Berlin";
 
 const DAY_MS = 24 * 3600_000;
 
-/** Stores one check and returns the state change to announce, if any. */
-export async function recordCheck(db: Executor, service: string, result: CheckResult, at: Date): Promise<StateChange | null> {
+/** Stores one check and returns the state change to announce, if any (never one with `silent`, i.e. in maintenance). */
+export async function recordCheck(
+  db: Executor,
+  service: string,
+  result: CheckResult,
+  at: Date,
+  options: { silent?: boolean } = {}
+): Promise<StateChange | null> {
   const iso = at.toISOString();
   const answered = result.responseMs !== null;
   const counts = {
@@ -71,7 +77,7 @@ export async function recordCheck(db: Executor, service: string, result: CheckRe
       : null;
     // Checks are recorded in order; an older one arriving late (clock change) must not rewind the state.
     if (prev && prev.lastCheckedAt > at) return null;
-    const { row, change } = nextServiceState(previous, result, at);
+    const { row, change } = nextServiceState(previous, result, at, options);
     const values = {
       ...row,
       lastCheckedAt: at,

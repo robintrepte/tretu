@@ -139,8 +139,8 @@ test("badge is awarded exactly once (also under concurrent events) with one-time
   assert.equal(await peekBalance(platformDb, sub), 500 + 20 + 25 + 25);
 
   const outbox = await platformDb.select().from(platformOutbox).where(eq(platformOutbox.type, "badge.earned"));
-  // Two badges, two subscribed apps (saga + play have webhooks).
-  assert.equal(outbox.length, 4);
+  // Two badges × four receiving apps (saga + play have webhooks, hollowmere + mc-dashboard wait for theirs).
+  assert.equal(outbox.length, 8);
 });
 
 test("XP is capped per app and Europe/Berlin day; badge XP is not", async () => {
@@ -188,7 +188,7 @@ test("level.up is emitted once per new level; Allrounder after 3 apps", async ()
   const levels = [...new Set(levelUps.map((r) => (r.payload.data as { level: number }).level))];
   assert.ok(progress.level >= 2);
   assert.equal(levels[levels.length - 1], progress.level);
-  assert.equal(levelUps.length, levels.length * 2);
+  assert.equal(levelUps.length, levels.length * 4);
 });
 
 test("user.created/updated from auth fill the directory; out-of-order updates are ignored", async () => {
@@ -222,7 +222,7 @@ test("user.created/updated from auth fill the directory; out-of-order updates ar
   assert.equal(typeof body.xpNextLevel, "number");
 
   const forwarded = await platformDb.select().from(platformOutbox).where(eq(platformOutbox.type, "user.updated"));
-  assert.equal(forwarded.length, 2); // saga + play, not auth itself
+  assert.deepEqual(forwarded.map((r) => r.targetApp).sort(), ["hollowmere", "mc-dashboard", "play", "saga"]); // not auth itself
 
   const missing = await getUser(await signedRequest("play", "GET", `/api/v1/users/${uuid()}`), ctx({ sub: uuid() }));
   assert.equal(missing.status, 404);
