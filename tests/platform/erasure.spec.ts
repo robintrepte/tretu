@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
 
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { closeDatabase, ctx, envelope, resetDatabase, seedUser, signedRequest, uuid } from "./helpers";
 import { POST as postEvents } from "../../src/app/api/v1/events/route";
@@ -105,9 +105,22 @@ test("user.deleted with mergedInto moves wallet balance and stats to the survivi
   const before = await bookTransaction(platformDb, { sub: survivor, app: "saga", idempotencyKey: "m2", kind: "spend", amount: -1, reason: "x" });
   const legacyBalance = (await bookTransaction(platformDb, { sub: legacy, app: "saga", idempotencyKey: "m1", kind: "spend", amount: -100, reason: "x" })).balance;
 
-  const deletion = envelope("auth", legacy, "user.deleted", { mergedInto: survivor });
+  const deletion = envelope("auth", legacy, "user.deleted", {
+    mergedInto: survivor,
+    intoLegacyIds: { saga: "17", play: "9f1c", bogus: 42, "Bad Key": "x" },
+  });
   assert.equal(await send("auth", deletion), 202);
   assert.equal(await send("auth", deletion), 202); // duplicate delivery is harmless
+
+  // The apps get the merge forwarded (contract §7), so they keep the account instead of deleting it.
+  const forwarded = await platformDb
+    .select()
+    .from(schema.platformOutbox)
+    .where(and(eq(schema.platformOutbox.type, "user.deleted"), eq(schema.platformOutbox.sub, legacy)));
+  assert.ok(forwarded.length > 0);
+  for (const row of forwarded) {
+    assert.deepEqual((row.payload as { data: unknown }).data, { mergedInto: survivor, intoLegacyIds: { saga: "17", play: "9f1c" } });
+  }
 
   const after = await bookTransaction(platformDb, { sub: survivor, app: "saga", idempotencyKey: "m2", kind: "spend", amount: -1, reason: "x" });
   assert.equal(after.duplicate, true);

@@ -194,7 +194,7 @@ Stat keys the apps emit (baseline; apps may add more, prefixed with their id):
 - platform itself: `tretu.friends`, `tretu.apps.used`.
 
 Webhooks the platform sends to apps (to `TRETU_APPS_JSON[app].webhook`, convention path `/api/tretu/webhook`, signed §3, retries with backoff up to 24 h, same envelope with `app:"platform"`):
-`user.updated`, `user.deleted` (apps must delete or anonymise that user's data), `badge.earned` `{badge,title,xp,credits}`, `level.up` `{level}`, `wallet.changed` `{balance,delta,kind}`, `friend.added` `{friendSub}`, `notification.created` `{id,title,url}`. Apps answer `2xx` quickly; unknown types are ignored with `204`.
+`user.updated`, `user.deleted` (apps must delete or anonymise that user's data, except after a merge in auth with `data.mergedInto`: see §7 *Merged accounts*), `badge.earned` `{badge,title,xp,credits}`, `level.up` `{level}`, `wallet.changed` `{balance,delta,kind}`, `friend.added` `{friendSub}`, `notification.created` `{id,title,url}`. Apps answer `2xx` quickly; unknown types are ignored with `204`.
 
 ## 5. Platform API (tretu.de/api/v1, all signed §3, JSON, `sub` = Tretu ID)
 
@@ -250,9 +250,38 @@ Notifications
   Idempotency keys are unique per calling app; reusing one for a different sub returns
   `409 idempotency_conflict`. History may also show the platform's own kinds `welcome`, `daily`, `reward`.
 - **Stat prefixes.** `mc-dashboard` may also send keys starting with `minecraft.`.
-- **Merged accounts.** `user.deleted` from auth may carry `{"mergedInto":"<sub>"}` when a legacy account was
-  joined into another Tretu-Konto; the platform moves that wallet balance and those stats to `mergedInto`
-  before erasing the old sub. Apps treat it like any other deletion.
+- **Merged accounts.** `user.deleted` from auth may carry `{"mergedInto":"<sub>","intoLegacyIds":{…}}` when an admin joined Tretu-Konto A
+  (the event's `sub`) into Tretu-Konto B (`mergedInto`); the platform moves A's wallet balance and stats to B before
+  erasing A, and auth moves A's links (`legacy_ids`, Discord, Minecraft, …) to B. A and B are the same person, so an
+  app MUST NOT delete the app account linked to A. Every app that keeps accounts applies this rule:
+  The platform forwards both fields unchanged to every app. `intoLegacyIds` is B's `legacy_ids` after the merge (same
+  shape as the claim): an app treats "B already has an account" as true when a local account is linked to B **or** its
+  id equals `intoLegacyIds[<this app>]` (an imported account B hasn't signed into yet).
+  1. **B has no account in this app yet:** re-link the account to B (`tretu_sub = B`, plus any per-provider row the app
+     keeps for the Tretu login), end its sessions (the person signs in again as B and lands in the same account), and
+     keep all its data unchanged (Saga: the credits migration state too, since the platform moved the wallet).
+  2. **B already has an account in this app:** unlink A's account (`tretu_sub = null`), end its sessions, keep its data
+     untouched, and record it where an admin can find it (an admin flag/note on the account or an admin/audit log
+     entry such as "merged Tretu-Konto <A> into <B>; old app account kept unlinked"). Never merge two app accounts'
+     data automatically; an admin decides.
+  3. **`user.deleted` without `mergedInto`** (or with `mergedInto` equal to `sub`, or not a string) is a real deletion
+     as before: delete or anonymise.
+
+  The handling is idempotent: afterwards no account is linked to A, so a repeated or late delivery of the same event
+  finds nothing and changes nothing. Apps that already order events by the envelope's `occurredAt` (Play's
+  `tretu_synced_at`) set the re-linked account's mark to the merge's `occurredAt`, so a late retry of an older
+  `user.updated` of B (a lock, say) can't undo what came after it; the next login as B refreshes the profile anyway.
+  Concurrent deliveries must not act twice (a per-sub lock or a conditional update). Per app:
+  - **Saga:** rule 1/2; case 2 sets `User.tretuMergedFrom/Into/At`, shown on `/admin/users` and found by both IDs.
+  - **Play:** rule 1/2; both cases write the admin log (`tretu_merge_relinked` / `tretu_merge_unlinked`, detail
+    `{from, into}`), queued platform events of A move to B; the deep link `?tretuSub=<A>` opens the kept account.
+  - **Hollowmere:** already conforms: the `tretu:<A>` farm is re-keyed to B when B has no farm, otherwise archived under
+    B (shown in B's farm choice for 90 days); A's queued events are dropped.
+  - **MC dashboard:** drops A's link, sessions and pending events, as for a deletion: the Minecraft link itself moves
+    to B in auth, so B's next login or `user.updated` brings it back. Minecraft-side data stays with the Minecraft
+    account either way.
+  - **tretu.de (platform):** moves A's wallet and stats to B (B gets the badges it now qualifies for) and moves or
+    removes Discord/TeamSpeak grants as described in PLATFORM.md; the rest of A's platform data is erased.
 - **Unknown subs.** Read-only platform routes answer `404 user_not_found` when auth cannot confirm a sub.
 - **Hollowmere** sends events only for players signed in with a Tretu-Konto; its `/api/health` is served by the
   `hollowmere-mcp` process (PM2, port 8787), proxied by nginx.
