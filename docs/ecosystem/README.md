@@ -7,13 +7,13 @@ One Tretu account, one platform, many apps. This folder documents how they fit t
 - **[../../deploy/GO-LIVE.md](../../deploy/GO-LIVE.md)** – the ordered go-live runbook (DNS, certificates, databases, secrets,
   deploy order, legacy import, switching each app on, verification, rollback per step).
 - **[../../deploy/README.md](../../deploy/README.md)** – server setup for all apps: Postgres per app, nginx/certbot, PM2,
-  Umami, Uptime Kuma.
+  backups and the status page.
 
 ## Who does what
 
 | Part | Where | Role |
 |---|---|---|
-| **tretu.de** (this repo) | `src/` | Community hub, internal game-server dashboard, **platform API** (`/api/v1`: profiles, badges, wallet, friends, presence, notifications) and the **one legal home** (`/impressum`, `/datenschutz`, `/agb`) for every service |
+| **tretu.de** (this repo) | `src/` | Community hub, internal game-server dashboard, **platform API** (`/api/v1`: profiles, badges, wallet, friends, presence, notifications), the **status page** (`/status`) and the **one legal home** (`/impressum`, `/datenschutz`, `/agb`) for every service |
 | **auth.tretu.de** | `auth/` in this repo | OpenID Connect provider: the Tretu-Konto, account page `/konto`, admin API for account links |
 | **Saga, Play, Hollowmere, Minecraft dashboard** | own repos | sign in with the Tretu-Konto, report events, use the wallet, link their footer to tretu.de's legal pages |
 

@@ -152,7 +152,9 @@ creation, then `failed`. Rows are claimed with `FOR UPDATE SKIP LOCKED`, so seve
 Worker: `scripts/platform-worker.ts` (`npm run platform:worker`, `-- --once` for a single pass). Loop: webhooks
 + jobs (every 2 s when idle), presence expiry (30 s), every 10 min badge-sync reconciliation (first removes
 grants that no longer map, then queues earned, mapped, not yet synced badges; "skipped" ones retried after a day) and housekeeping (delivered webhooks/done jobs
-after 7 days, failed after 30 days, notifications after 180 days). PM2 entry for `ecosystem.config.cjs`:
+after 7 days, failed after 30 days, notifications after 180 days, status checks after 7 days and their rollups after
+90 days). Every 60 s it also runs the health checks behind tretu.de/status (`src/lib/status/`, see
+[DEPLOY.md](../../DEPLOY.md#status-page-tretudestatus)). PM2 entry for `ecosystem.config.cjs`:
 
 ```js
 {
@@ -222,7 +224,7 @@ level) · daily_counters (sub, Berlin day, counter) · user_apps · user_badges 
 badge_sync (granted_to, granted_ref) · ts_links · outbox · jobs · wallet_accounts · wallet_transactions (unique app +
 idempotency_key) · wallet_entries (amount, balance_after) · wallet_daily (sub, day) · friend_requests ·
 friendships (sub_a < sub_b) · presence (sub, app, expires_at) · notifications · notification_settings ·
-push_subscriptions.
+push_subscriptions · status_checks / status_rollups / status_services (tretu.de/status, no personal data).
 
 ## Env vars
 
@@ -239,6 +241,7 @@ push_subscriptions.
 | `TRETU_BADGE_TS_GROUPS_JSON` (+ `TS_QUERY_*`) | for TS sync | `{"wins-10":31,…}` |
 | `WEB_PUSH_PUBLIC_KEY`, `WEB_PUSH_PRIVATE_KEY`, `WEB_PUSH_SUBJECT` | for push | VAPID |
 | `TRETU_PLATFORM_DEV_SUB`, `TRETU_PLATFORM_DEV_NAME` | dev only | impersonate a user in `next dev` (ignored in production) |
+| `TRETU_STATUS_TARGETS_JSON`, `TRETU_STATUS_DISCORD_WEBHOOK_URL`, `TRETU_STATUS_NOTICE` | no | status page checks, alerts and banner ([DEPLOY.md](../../DEPLOY.md#status-page-tretudestatus)) |
 
 ## Development and tests
 

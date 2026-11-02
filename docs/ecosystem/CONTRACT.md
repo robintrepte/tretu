@@ -18,8 +18,6 @@ env, the app must behave exactly as it does today (old logins keep working). Thi
 | Play | play.tretu.de | play | play | 3030 | play |
 | Hollowmere web + Nakama | hollowmere.tretu.de | hollowmere | hollowmere-nakama | 7350 (console 7351, localhost) | nakama |
 | Minecraft dashboard | mc.tretu.de | tretu-minecraft/dashboard | mc-dashboard | 8130 | mc_dashboard |
-| Analytics (Umami) | stats.tretu.de | (3rd party, documented in tretu/deploy) | umami | 3050 | umami |
-| Status (Uptime Kuma) | status.tretu.de | (3rd party, documented in tretu/deploy) | uptime-kuma | 3001 | – |
 
 One Postgres server on the same machine, one database per app. Every repo ships:
 - `ecosystem.config.cjs` (PM2) using the names/ports above,
@@ -27,7 +25,11 @@ One Postgres server on the same machine, one database per app. Every repo ships:
 - a `DEPLOY.md` (or section) with the same steps: `git pull` → `npm ci` → migrate → `npm run build` → `pm2 reload ecosystem.config.cjs --update-env`.
 - `GET /api/health` → `200 {"status":"ok","app":"<id>","version":"<pkg version>","time":"<ISO>","checks":{"db":"ok"}}`, `503` with `"status":"error"` if a check fails. No auth, no secrets in output.
 
-Local dev/test Postgres (already running in the build container): `postgres://postgres@localhost:5432/<db>` (trust auth), databases: tretu_auth, tretu_web, tretu_platform, saga, play, mc_dashboard, nakama, umami. Do NOT start another Postgres. Use a DB named `<db>_test` for destructive tests if you need one (create it yourself).
+Status page: `https://tretu.de/status` (and `GET https://tretu.de/api/status`), served by tretu-web. The
+`tretu-platform-worker` polls every service's `/api/health` once a minute (5 s timeout): `200` + `"status":"ok"`
+= running, any other answer = disturbed, no answer = down. There is no separate analytics or status service.
+
+Local dev/test Postgres (already running in the build container): `postgres://postgres@localhost:5432/<db>` (trust auth), databases: tretu_auth, tretu_web, tretu_platform, saga, play, mc_dashboard, nakama. Do NOT start another Postgres. Use a DB named `<db>_test` for destructive tests if you need one (create it yourself).
 
 ## 1. Common env vars
 
@@ -40,8 +42,6 @@ Local dev/test Postgres (already running in the build container): `postgres://po
 | `TRETU_APP_ID` | `saga` | apps signing requests |
 | `TRETU_APP_SECRET` | random, 32+ bytes | apps signing requests / verifying webhooks |
 | `TRETU_LEGAL_URL` | `https://tretu.de` (default) | footer links |
-| `NEXT_PUBLIC_UMAMI_SRC` | `https://stats.tretu.de/script.js` | analytics (optional) |
-| `NEXT_PUBLIC_UMAMI_WEBSITE_ID` | uuid | analytics (optional) |
 
 App IDs: `tretu-web`, `auth`, `saga`, `play`, `hollowmere`, `mc-dashboard`.
 
@@ -175,7 +175,8 @@ Notifications
 - Legal: every app's footer links to `${TRETU_LEGAL_URL}/impressum`, `/datenschutz`, `/agb`. Old per-app legal routes 308-redirect there.
 - Language: German default, English second. Locale cookie `NEXT_LOCALE` (`de`|`en`) in Next.js apps.
 - User menu in each app (own styling) shows: profile link (`https://tretu.de/u/<username>`), "Mein Konto" (`https://auth.tretu.de/konto`), notifications unread count linking to the centre, Tretu-Credits balance where relevant, logout (local + RP-initiated logout).
-- Analytics: include `<script defer src={NEXT_PUBLIC_UMAMI_SRC} data-website-id={NEXT_PUBLIC_UMAMI_WEBSITE_ID}>` only when both are set. No cookies, no consent banner needed.
+- Analytics: no analytics or tracking scripts in any app. Play's own visitor statistics (cookieless daily totals,
+  admin "Traffic" page) are the only usage statistics; any new one needs the privacy policy updated first.
 
 ## 7. Clarifications from the first implementation (binding)
 

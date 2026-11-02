@@ -9,12 +9,12 @@ rollbacks). Tools in this folder:
 
 | Path | What |
 |---|---|
-| `env/*.example` | env templates for every app and service (tretu-web, tretu-auth, saga, play, Hollowmere `server/.env` + Nakama `local.yml`, mc-dashboard, umami, Postgres roles), rendered by `generate-secrets.mjs --templates deploy/env` |
+| `env/*.example` | env templates for every app (tretu-web, tretu-auth, saga, play, Hollowmere `server/.env` + Nakama `local.yml`, mc-dashboard, Postgres roles), rendered by `generate-secrets.mjs --templates deploy/env` |
 | `scripts/generate-secrets.mjs` | one consistent set of secrets → filled env files (mode 600), `--import` keeps running apps' values |
 | `scripts/create-databases.sh` | one least-privileged role + database per app, idempotent |
-| `scripts/smoke.sh` | every `/api/health`, OIDC discovery + JWKS, Umami, Uptime Kuma, signed platform ping → pass/fail table |
+| `scripts/smoke.sh` | every `/api/health`, OIDC discovery + JWKS, the status data (`/api/status` fresh), signed platform ping → pass/fail table |
 | `scripts/check-nginx.sh` | `nginx -t` for site files without root or real certificates |
-| `scripts/pg-backup.sh`, `scripts/pg-restore-test.sh`, `systemd/tretu-pg-*` | nightly dumps, weekly restore test |
+| `scripts/pg-backup.sh`, `scripts/pg-restore-test.sh`, `scripts/alert.sh`, `systemd/tretu-pg-*` | nightly dumps, weekly restore test, Discord message when either fails |
 
 `npm run test:deploy` tests all scripts (Postgres ones against the local server with throwaway names).
 
@@ -28,14 +28,13 @@ rollbacks). Tools in this folder:
 | Play | play.tretu.de | play | play | 3030 | play |
 | Hollowmere web + Nakama | hollowmere.tretu.de | hollowmere | hollowmere-nakama | 7350 (console 7351, localhost) | nakama |
 | Minecraft dashboard | mc.tretu.de | tretu-minecraft/dashboard | mc-dashboard | 8130 | mc_dashboard |
-| Analytics (Umami) | stats.tretu.de | 3rd party, below | umami | 3050 | umami |
-| Status (Uptime Kuma) | status.tretu.de | 3rd party, below | uptime-kuma | 3001 | – |
 
-tretu.de additionally runs the workers `tretu-orchestrator` and `tretu-ts-rank` (see [DEPLOY.md](../DEPLOY.md)).
+tretu.de additionally runs the workers `tretu-orchestrator`, `tretu-ts-rank` and `tretu-platform-worker` (see
+[DEPLOY.md](../DEPLOY.md)). There is no analytics service and no separate status service.
 All apps bind to `127.0.0.1`; only nginx (80/443), the game ports (Minecraft 25565, TeamSpeak) and SSH are public.
 
 Every app answers `GET /api/health` with `200 {"status":"ok","app":…,"version":…,"time":…,"checks":{"db":"ok"}}`
-or `503` – that is what Uptime Kuma watches.
+or `503` – that is what the status page polls (see [Status page](#status-page-tretudestatus) below).
 
 ## Postgres: one database and role per app
 
@@ -46,7 +45,7 @@ install -m 600 -o postgres /root/tretu-secrets/postgres/roles.env /tmp/tretu-rol
 sudo -u postgres deploy/scripts/create-databases.sh --passwords /tmp/tretu-roles.env && shred -u /tmp/tretu-roles.env
 ```
 
-- Roles `tretu_web`, `tretu_auth`, `saga`, `play`, `mc_dashboard`, `nakama`, `umami`: LOGIN only (no superuser,
+- Roles `tretu_web`, `tretu_auth`, `saga`, `play`, `mc_dashboard`, `nakama`: LOGIN only (no superuser,
   createdb, createrole, replication), each owns its database and its `public` schema, `CONNECT` is revoked from
   PUBLIC, so no app can open another app's database. `tretu_legacy_reader` can only read saga, play, tretu_web and
   nakama (auth's one-time legacy import). Running the script again only re-applies passwords and grants; databases
@@ -65,10 +64,10 @@ sudo systemctl enable --now tretu-pg-backup.timer tretu-pg-restore-test.timer
 
 | What | When | Details |
 |---|---|---|
-| `pg_dump -Fc` of tretu_web, tretu_auth, saga, play, mc_dashboard, nakama, umami + `pg_dumpall --globals-only` | daily 03:17 (`tretu-pg-backup.timer`) | `/var/backups/tretu-postgres/<db>/<db>-<UTC time>.dump` + `.sha256`, mode 600, verified with `pg_restore --list`, kept 14 days (`RETENTION_DAYS`) |
+| `pg_dump -Fc` of tretu_web, tretu_auth, saga, play, mc_dashboard, nakama + `pg_dumpall --globals-only` | daily 03:17 (`tretu-pg-backup.timer`) | `/var/backups/tretu-postgres/<db>/<db>-<UTC time>.dump` + `.sha256`, mode 600, verified with `pg_restore --list`, kept 14 days (`RETENTION_DAYS`) |
 | copy off the machine | after each backup | `BACKUP_REMOTE` + `BACKUP_RSYNC_SSH` (rsync over SSH, e.g. Hetzner Storage Box port 23) |
 | restore test | Sundays 05:41 (`tretu-pg-restore-test.timer`) | newest dump of each database → `<db>_restore_test`, counts tables/rows, drops it; fails on missing, older than 26 h, or checksum mismatch |
-| alerting | | `BACKUP_PING_URL` / `RESTORE_PING_URL` = Uptime Kuma push monitors (heartbeat 25 h / 8 d): a run that fails or never happens turns them red |
+| alerting | on failure | `BACKUP_ALERT_WEBHOOK_URL` in `/etc/tretu/pg-backup.env` (a Discord webhook, e.g. the same channel as the status alerts): a failed backup or restore test posts "Tretu-Backup auf <host> ist fehlgeschlagen …". A backup that silently stops running fails the weekly restore test (newest dump older than 26 h), which posts the same way. `systemctl list-timers 'tretu-pg-*'` shows the last runs. |
 
 Restore one database (e.g. after a bad migration):
 
@@ -128,65 +127,16 @@ pm2 save                                 # after starting all apps
 Each repo starts its processes with `pm2 start ecosystem.config.cjs` and deploys with
 `pm2 reload ecosystem.config.cjs --update-env`.
 
-## Umami (stats.tretu.de) – self-hosted, cookie-free
+## Status page (tretu.de/status)
 
-Umami sets no cookies and stores no IP addresses, so no consent banner is needed (see the privacy policy, section 17).
+The status page is part of tretu.de: the `tretu-platform-worker` polls every app's `/api/health` once a minute and
+stores the results in `tretu_web`; https://tretu.de/status and `GET https://tretu.de/api/status` read them. No extra
+process, nginx site or certificate. Details, states and env vars (`TRETU_STATUS_TARGETS_JSON`,
+`TRETU_STATUS_DISCORD_WEBHOOK_URL`, `TRETU_STATUS_NOTICE`): [DEPLOY.md](../DEPLOY.md#status-page-tretudestatus).
 
-```bash
-sudo -u postgres psql -c "CREATE ROLE umami LOGIN PASSWORD '…'" -c "CREATE DATABASE umami OWNER umami"
-git clone https://github.com/umami-software/umami.git /srv/umami && cd /srv/umami
-git checkout <latest release tag>
-cat > .env <<'ENV'
-DATABASE_URL=postgresql://umami:…@localhost:5432/umami
-APP_SECRET=<long random string>
-DISABLE_TELEMETRY=1
-PORT=3050
-HOSTNAME=127.0.0.1
-ENV
-npm install -g pnpm && pnpm install && pnpm build
-pm2 start pnpm --name umami -- start
-pm2 save
-```
-
-Then install `deploy/nginx/stats.tretu.de.conf`, run certbot, log in (default `admin` / `umami` – **change the password
-immediately**), add one website per app (tretu.de, saga.tretu.de, play.tretu.de, hollowmere.tretu.de, mc.tretu.de) and put
-its ID into that app's env:
-
-```
-NEXT_PUBLIC_UMAMI_SRC=https://stats.tretu.de/script.js
-NEXT_PUBLIC_UMAMI_WEBSITE_ID=<website id>
-```
-
-`NEXT_PUBLIC_*` values are inlined at build time: rebuild the app after setting them. Update Umami with
-`git pull && pnpm install && pnpm build && pm2 reload umami`.
-
-## Uptime Kuma (status.tretu.de)
-
-```bash
-git clone https://github.com/louislam/uptime-kuma.git /srv/uptime-kuma && cd /srv/uptime-kuma
-git checkout <latest 2.x release tag>
-npm run setup
-pm2 start server/server.js --name uptime-kuma -- --port=3001 --host=127.0.0.1
-pm2 save
-```
-
-Install `deploy/nginx/status.tretu.de.conf`, run certbot, open https://status.tretu.de and create the admin account.
-Add one **HTTP(s) – Json Query** monitor per app (interval 60 s, retries 2), expression `status`, expected value `ok`:
-
-| Monitor | URL |
-|---|---|
-| tretu.de | https://tretu.de/api/health |
-| Tretu-Konto | https://auth.tretu.de/api/health |
-| Saga | https://saga.tretu.de/api/health |
-| Play | https://play.tretu.de/api/health |
-| Hollowmere | https://hollowmere.tretu.de/api/health |
-| Minecraft dashboard | https://mc.tretu.de/api/health |
-| Umami | https://stats.tretu.de/api/heartbeat (plain HTTP monitor) |
-| tretu.de platform worker | https://tretu.de/api/health, Json Query `checks.worker != "stale"`, expected `true` |
-| Backups | Push monitors for `BACKUP_PING_URL` (heartbeat 25 h) and `RESTORE_PING_URL` (8 days) |
-
-Optional: a TCP monitor for `tretu.de:25565` (Minecraft) and the TeamSpeak port, a notification channel (e.g. Discord
-webhook or email) and a public status page at `/status/tretu` showing all monitors. Certificate expiry alerts are built in.
+What it does not cover, checked by hand after changes: certificate expiry (certbot renews automatically; check with
+`sudo certbot renew --dry-run`), the game ports (Minecraft 25565, TeamSpeak) and the backups (they alert themselves, see
+above).
 
 ## Smoke test
 
