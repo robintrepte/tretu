@@ -117,6 +117,6 @@ describe("legacy_ids claim", () => {
       .orderBy(desc(s.eventOutbox.createdAt))
     expect(updated!.envelope).toMatchObject({ data: { sub: user.id, legacyIds: expected } })
     const [deleted] = await db.select().from(s.eventOutbox).where(and(eq(s.eventOutbox.sub, old.id), eq(s.eventOutbox.type, "user.deleted")))
-    expect(deleted!.envelope).toMatchObject({ data: { mergedInto: user.id } })
+    expect(deleted!.envelope).toMatchObject({ data: { mergedInto: user.id, intoLegacyIds: expected } })
   })
 })

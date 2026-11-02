@@ -4,7 +4,7 @@ import { db as defaultDb, type Db } from "@/lib/db"
 import { eventOutbox } from "@/lib/db/schema"
 import { env, platformEnabled } from "@/lib/env"
 import { signRequest } from "@/lib/tretu/signing"
-import { getUserShape } from "@/lib/users"
+import { getLegacyIds, getUserShape } from "@/lib/users"
 
 /**
  * User events to the platform (contract §4) through an outbox table: every change is recorded in the same
@@ -47,9 +47,14 @@ export async function emitUserEvent(type: "user.created" | "user.updated", userI
 }
 
 /** user.deleted: data is `{}`, or `{ mergedInto }` when the account was merged into another Tretu ID. */
+/**
+ * `user.deleted`; after an admin merge the data names the surviving account and its `legacy_ids` (after the merge), so
+ * every app can tell whether the survivor already has an (imported) account there (contract §7).
+ */
 export async function emitUserDeleted(sub: string, mergedInto?: string, db: Db = defaultDb): Promise<void> {
   try {
-    await enqueueEvent(buildEnvelope("user.deleted", sub, mergedInto ? { mergedInto } : {}), db)
+    const data = mergedInto ? { mergedInto, intoLegacyIds: await getLegacyIds(mergedInto, db) } : {}
+    await enqueueEvent(buildEnvelope("user.deleted", sub, data), db)
   } catch (error) {
     console.error("[events] could not record user.deleted", error instanceof Error ? error.message : error)
   }

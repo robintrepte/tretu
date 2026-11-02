@@ -43,7 +43,7 @@ export async function eraseUser(
   tx: Executor,
   sub: string,
   now: Date = new Date(),
-  options: { mergedInto?: string | null } = {}
+  options: { mergedInto?: string | null; intoLegacyIds?: Record<string, string> | null } = {}
 ): Promise<void> {
   // Must run before the directory row, TS link and sync state are deleted below.
   await releaseGrantsForErasure(tx, sub, options.mergedInto ?? null);
@@ -104,5 +104,9 @@ export async function eraseUser(
 
   await tx.delete(platformUsers).where(eq(platformUsers.sub, sub));
 
-  await emitPlatformEvent(tx, { type: "user.deleted", sub, data: {}, exceptApps: ["auth"], now });
+  // Forward the merge so the apps keep (re-link or unlink) the account instead of deleting it (contract §7).
+  const data = options.mergedInto
+    ? { mergedInto: options.mergedInto, ...(options.intoLegacyIds ? { intoLegacyIds: options.intoLegacyIds } : {}) }
+    : {};
+  await emitPlatformEvent(tx, { type: "user.deleted", sub, data, exceptApps: ["auth"], now });
 }

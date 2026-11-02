@@ -214,13 +214,22 @@ async function carryOverMergedAccount(tx: Executor, from: string, into: string, 
   await settleProgress(tx, into, { now, sourceEventId: eventId });
 }
 
+/** `intoLegacyIds` from auth's merge event: only string values per app id are forwarded. */
+function legacyIdsOf(value: unknown): Record<string, string> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const entries = Object.entries(value as Record<string, unknown>).filter(
+    (entry): entry is [string, string] => /^[a-z0-9-]{1,40}$/.test(entry[0]) && typeof entry[1] === "string" && entry[1].length <= 200
+  );
+  return Object.fromEntries(entries);
+}
+
 async function processUserEvent(tx: Executor, event: EventEnvelope, now: Date): Promise<ProcessStatus> {
   const sub = event.sub as string;
   if (event.type === "user.deleted") {
     const mergedInto = typeof event.data.mergedInto === "string" ? event.data.mergedInto : null;
     const survivor = mergedInto && mergedInto !== sub && !(await isErased(tx, mergedInto)) ? mergedInto : null;
     if (survivor) await carryOverMergedAccount(tx, sub, survivor, now, event.id);
-    await eraseUser(tx, sub, now, { mergedInto: survivor });
+    await eraseUser(tx, sub, now, { mergedInto: survivor, intoLegacyIds: survivor ? legacyIdsOf(event.data.intoLegacyIds) : null });
     return "processed";
   }
   if (await isErased(tx, sub)) return "ignored";
