@@ -254,7 +254,6 @@ function specs(domain, s) {
         ["LEGACY_PLAY_DATABASE_URL", { db: ["tretu_legacy_reader", "play"] }],
         ["LEGACY_TRETU_DATABASE_URL", { db: ["tretu_legacy_reader", "tretu_web"] }],
         ["LEGACY_NAKAMA_DATABASE_URL", { db: ["tretu_legacy_reader", "nakama"] }],
-        ["LEGACY_CLAIM_DAYS", "90"],
       ],
     },
     saga: {

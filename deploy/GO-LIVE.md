@@ -210,6 +210,14 @@ the report is clean. Then `systemctl start tretu-pg-backup && npm run import:leg
 `user.created` to the platform). Check: the import's summary matches the dry run, and imported users have profiles
 on `https://tretu.de/u/<name>`.
 
+Users cannot connect old accounts themselves. Review the report, then merge the remaining old accounts by hand:
+
+```bash
+npm run admin -- legacy                       # imported accounts no merge touched yet, with possible matches
+npm run admin -- merge <from> <into>          # dry run: both accounts, what moves, what is dropped
+npm run admin -- merge <from> <into> --yes    # merge; the platform moves wallet and stats (user.deleted mergedInto)
+```
+
 **Rollback:** restore the `tretu_auth` dump from the backup taken right before (imports only touch `tretu_auth`).
 
 ### 7.5 Switch the apps on, one at a time

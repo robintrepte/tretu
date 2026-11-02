@@ -55,7 +55,6 @@ export function appEnv(): Record<string, string> {
     TRETU_APPS_JSON: JSON.stringify(Object.fromEntries(Object.entries(APP_SECRETS).map(([id, secret]) => [id, { secret }]))),
     TRETU_PLATFORM_URL: `http://127.0.0.1:${PLATFORM_PORT}`,
     TRETU_APP_SECRET: APP_SECRETS.auth,
-    LEGACY_CLAIM_DAYS: "90",
     DISCORD_CLIENT_ID: MOCK_CLIENTS.discord.id,
     DISCORD_CLIENT_SECRET: MOCK_CLIENTS.discord.secret,
     GOOGLE_CLIENT_ID: MOCK_CLIENTS.google.id,

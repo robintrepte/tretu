@@ -30,10 +30,11 @@ Amazon SES v2 · Vitest, openid-client, Playwright.
 - **Mein Konto** (`/konto`) — profile (username shared across Tretu, display name, avatar), security
   (password, passkeys, 2FA, sessions, sign out everywhere, activity log), connected accounts (Discord, Google,
   Apple; Steam connected right there; Minecraft and TeamSpeak linked by those services), language (→ `locale` claim), privacy (JSON data export, account deletion),
-  "Alte Konten verbinden" (claim old accounts), app overview.
+  app overview.
 - **Admin API** for the other services, signed per contract §3 (`TRETU_APPS_JSON`).
 - **Events** `user.created` / `user.updated` / `user.deleted` to the platform through an outbox table.
-- **Legacy import** of Saga, Play, tretu.de and Hollowmere (Nakama) accounts.
+- **Legacy import** of Saga, Play, tretu.de and Hollowmere (Nakama) accounts. There is no self-service claim:
+  old accounts the import could not join are merged by an admin (`npm run admin -- legacy` / `merge`).
 
 ## Endpoints
 
@@ -90,7 +91,8 @@ npm run db:migrate
 npm run dev                     # http://localhost:3021 — emails are printed to the console
 ```
 
-Useful: `npm run admin -- grant <username|email> admin`, `npm run clients:sync`, `npm run worker:events`.
+Useful: `npm run admin -- grant <username|email> admin`, `npm run admin -- legacy`,
+`npm run admin -- merge <from> <into> [--yes]`, `npm run clients:sync`, `npm run worker:events`.
 
 ## Checks
 
@@ -139,7 +141,7 @@ touch `tretu_auth`.
 - **Usernames** are unique across Tretu (`[A-Za-z0-9_-]{3,24}`, case-insensitive), changeable every 30 days.
 - **Events** are written to `event_outbox` in the same database and delivered by the `tretu-auth-events`
   worker (and right away by the web process); deliveries are signed as app `auth`. `user.deleted` carries
-  `{ "mergedInto": "<sub>" }` when an imported account was merged into another one through the claim flow.
+  `{ "mergedInto": "<sub>" }` when an account was merged into another one (`npm run admin -- merge`).
 - **Legacy import** merges only on the same Discord ID, the same Google/Apple/Steam ID (Nakama's `steam_id`), or the
   same email verified on both sides; imported Steam IDs can sign in with Steam. The older account keeps a contested username; the other one gets `name_2` and a free rename
   after its first sign-in (`/weiter` and "Mein Konto").

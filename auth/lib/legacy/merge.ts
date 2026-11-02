@@ -22,7 +22,7 @@ export async function isUnusedAccount(db: Db, userId: string): Promise<boolean> 
 export async function mergeUsers(db: Db, fromId: string, intoId: string): Promise<void> {
   if (fromId === intoId) throw new Error("cannot merge an account into itself")
   await db.transaction(async (tx) => {
-    await tx.update(s.legacyLink).set({ userId: intoId, method: "claim", claimedAt: new Date() }).where(eq(s.legacyLink.userId, fromId))
+    await tx.update(s.legacyLink).set({ userId: intoId, method: "admin", claimedAt: new Date() }).where(eq(s.legacyLink.userId, fromId))
 
     const targetProviders = new Set(
       (await tx.select({ providerId: s.account.providerId }).from(s.account).where(eq(s.account.userId, intoId))).map((a) => a.providerId),

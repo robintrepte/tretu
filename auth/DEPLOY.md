@@ -111,8 +111,22 @@ npm run import:legacy                   # writes; safe to re-run (already import
 ```
 
 Check the dry-run report (merges, username and email conflicts) before the real run. Imported accounts are
-announced to the platform with `user.created` (`--no-events` to skip). Users can claim accounts that were not
-merged for `LEGACY_CLAIM_DAYS` (90) days under "Mein Konto → Alte Konten verbinden".
+announced to the platform with `user.created` (`--no-events` to skip).
+
+There is no self-service "connect old accounts" for users. After the import, review the report, then merge the
+remaining old accounts by hand:
+
+```bash
+npm run admin -- legacy                          # imported accounts no merge touched yet, with possible matches
+npm run admin -- merge <from> <into>             # dry run: both accounts, what moves, what is dropped
+npm run admin -- merge <from> <into> --yes       # merge (username or email for both)
+```
+
+A merge moves `<from>`'s sign-in methods, Minecraft/TeamSpeak links, passkeys and old-app links to `<into>` (where
+`<into>` already has one of a kind, e.g. a password, `<into>`'s stays and `<from>`'s is dropped), deletes `<from>`,
+emits `user.updated` for `<into>` and `user.deleted { mergedInto }` for `<from>` (the platform moves wallet and
+stats; the apps drop the old local user) and writes `admin.merge` to `<into>`'s activity log. It refuses merging an
+account into itself and an account with the `admin` role as `<from>`.
 
 ## Backups and keys
 

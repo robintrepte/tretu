@@ -8,7 +8,7 @@ import postgres from "postgres"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { createDb } from "@/lib/db"
 import * as s from "@/lib/db/schema"
-import { claimWithPassword } from "@/lib/legacy/claim"
+import { adminMerge, listLegacyAccounts } from "@/lib/legacy/admin"
 import { runImport } from "@/lib/legacy/run"
 import { hashPassword, isNativeHash } from "@/lib/passwords"
 import { ADMIN_DATABASE_URL, TEST_DATABASE_URL } from "./env"
@@ -187,27 +187,28 @@ describe("legacy import", () => {
     expect(res.status).toBe(200)
   })
 
-  it("lets a signed-in user claim a not-merged old account with its password", async () => {
-    const me = await registerVerifiedUser("lena")
+  it("lists the not-merged old accounts for the admin and merges one into a newer Tretu account", async () => {
     const lenaLink = (await linkFor("play", "p-lena"))!
-    const wrong = await claimWithPassword(db, { userId: me.id, app: "play", identifier: "lena@old.test", password: "nope", claimDays: 90 })
-    expect(wrong).toEqual({ ok: false, error: "notFound" })
-    const ok = await claimWithPassword(db, { userId: me.id, app: "play", identifier: "LENA@old.test", password: "lena-old-pass", claimDays: 90 })
-    expect(ok).toEqual({ ok: true, app: "play", legacyName: "lena" })
-    expect((await linkFor("play", "p-lena"))!.userId).toBe(me.id)
+    const before = await listLegacyAccounts(db)
+    const lena = before.find((c) => c.account.id === lenaLink.userId)!
+    expect(lena.account.legacy).toEqual([expect.objectContaining({ app: "play", legacyUsername: "lena", legacyEmail: "lena@old.test", method: "import" })])
+    // The two "max" accounts (Saga and Play) may be one person: each lists the other.
+    const maxPlay = before.find((c) => c.account.legacy.some((l) => l.legacyUserId === "p-max"))!
+    expect(maxPlay.possibleMatches.map((m) => m.username)).toContain("max")
+
+    const me = await registerVerifiedUser("lena")
+    const from = (await db.query.user.findFirst({ where: eq(s.user.id, lenaLink.userId) }))!
+    const into = (await db.query.user.findFirst({ where: eq(s.user.id, me.id) }))!
+    await adminMerge(db, from, into)
+    expect(await linkFor("play", "p-lena")).toMatchObject({ userId: me.id, method: "admin" })
     expect(await db.query.user.findFirst({ where: eq(s.user.id, lenaLink.userId) })).toBeUndefined()
     const deleted = await db.select().from(s.eventOutbox).where(and(eq(s.eventOutbox.type, "user.deleted"), eq(s.eventOutbox.sub, lenaLink.userId)))
     expect(deleted[0]!.envelope).toMatchObject({ app: "auth", sub: lenaLink.userId, data: { mergedInto: me.id } })
-    expect(await claimWithPassword(db, { userId: me.id, app: "play", identifier: "lena", password: "lena-old-pass", claimDays: 90 })).toEqual({ ok: false, error: "alreadyYours" })
-  })
-
-  it("refuses accounts that were already used with an app, and after the claim window", async () => {
-    const me = await registerVerifiedUser("claimer")
-    const maxSaga = (await linkFor("saga", "3"))!
-    await db.insert(s.oauthConsent).values({ id: crypto.randomUUID(), clientId: "saga", userId: maxSaga.userId, scopes: ["openid"], createdAt: new Date(), updatedAt: new Date() })
-    expect(await claimWithPassword(db, { userId: me.id, app: "saga", identifier: "max", password: "max-saga-pass", claimDays: 90 })).toEqual({ ok: false, error: "inUse" })
-    const maxPlay = (await linkFor("play", "p-max"))!
-    await db.update(s.legacyLink).set({ importedAt: new Date(Date.now() - 91 * 86_400_000) }).where(eq(s.legacyLink.id, maxPlay.id))
-    expect(await claimWithPassword(db, { userId: me.id, app: "play", identifier: "max@play.test", password: "max-play-pass", claimDays: 90 })).toEqual({ ok: false, error: "expired" })
+    expect((await listLegacyAccounts(db)).map((c) => c.account.id)).not.toContain(me.id)
+    // The target keeps its own password; the old Play password was dropped with the merged account.
+    const old = await request(new Jar(), "/api/auth/sign-in/email", { method: "POST", json: { email: me.email, password: "lena-old-pass" } })
+    expect(old.status).toBe(401)
+    const own = await request(new Jar(), "/api/auth/sign-in/email", { method: "POST", json: { email: me.email, password: me.password } })
+    expect(own.status).toBe(200)
   })
 })

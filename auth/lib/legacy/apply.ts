@@ -75,7 +75,6 @@ export async function applyGroup(db: Db, group: PlannedGroup, now = new Date()):
           userId,
           legacyUsername: record.username ?? record.name,
           legacyEmail: record.email,
-          passwordHash: record.passwordHash,
           method: group.records.length > 1 || group.anchorUserId ? "merge" : "import",
           importedAt: now,
         })

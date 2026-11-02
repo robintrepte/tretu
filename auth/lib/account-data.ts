@@ -1,16 +1,14 @@
 import "server-only"
-import { and, desc, eq, gte, inArray, min } from "drizzle-orm"
+import { and, desc, eq, gte, inArray } from "drizzle-orm"
 import { RENAME_INTERVAL_DAYS } from "@/lib/account"
 import { db } from "@/lib/db"
 import * as s from "@/lib/db/schema"
-import { env } from "@/lib/env"
-import { claimWindowOpen, legacyLinksOf } from "@/lib/legacy/claim"
 import { isAdmin } from "@/lib/users"
 
 /** Everything the account page shows, loaded in one go. */
 export async function loadAccountData(user: typeof s.user.$inferSelect, withActivity: boolean) {
   const now = Date.now()
-  const [accounts, gameLinks, passkeys, activity, legacy, [importRow]] = await Promise.all([
+  const [accounts, gameLinks, passkeys, activity] = await Promise.all([
     db
       .select({ id: s.account.id, providerId: s.account.providerId, accountId: s.account.accountId, displayName: s.account.displayName })
       .from(s.account)
@@ -36,11 +34,7 @@ export async function loadAccountData(user: typeof s.user.$inferSelect, withActi
           .orderBy(desc(s.auditLog.createdAt))
           .limit(40)
       : Promise.resolve([]),
-    legacyLinksOf(db, user.id),
-    // The claim window runs from the legacy import (its earliest link), the same for everyone.
-    db.select({ firstImport: min(s.legacyLink.importedAt) }).from(s.legacyLink),
   ])
-  const firstImport = importRow?.firstImport ?? null
   const renameAt =
     !user.usernamePending && user.usernameChangedAt ? new Date(user.usernameChangedAt.getTime() + RENAME_INTERVAL_DAYS * 86_400_000) : null
   return {
@@ -48,7 +42,6 @@ export async function loadAccountData(user: typeof s.user.$inferSelect, withActi
     gameLinks,
     passkeys,
     activity,
-    legacy,
     hasPassword: accounts.some((a) => a.providerId === "credential"),
     /** Linked sign-in providers: the account row id (for unlinking), the provider's id and name. */
     providers: Object.fromEntries(
@@ -56,8 +49,5 @@ export async function loadAccountData(user: typeof s.user.$inferSelect, withActi
     ) as Record<string, { id: string; accountId: string; displayName: string | null }>,
     admin: isAdmin(user.roles),
     renameAt: renameAt && renameAt.getTime() > now ? renameAt.toISOString() : null,
-    firstImport,
-    claimOpen: !firstImport || claimWindowOpen(firstImport, env.LEGACY_CLAIM_DAYS),
-    claimUntil: firstImport ? new Date(firstImport.getTime() + env.LEGACY_CLAIM_DAYS * 86_400_000).toISOString() : null,
   }
 }

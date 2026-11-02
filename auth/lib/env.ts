@@ -56,8 +56,6 @@ const schema = z.object({
     .transform((v) => v.replace(/\/+$/, "")),
   /** Only for automated tests that sign up many accounts from one IP. */
   AUTH_RATE_LIMIT: z.enum(["on", "off"]).default("on"),
-  /** How long after the legacy import old accounts can still be claimed in "Alte Konten verbinden". */
-  LEGACY_CLAIM_DAYS: z.coerce.number().int().positive().default(90),
   /** Set to "false" to stop `npm start` from syncing TRETU_OAUTH_CLIENTS_JSON at boot. */
   CLIENTS_SYNC_ON_START: z.enum(["true", "false"]).default("true"),
 })

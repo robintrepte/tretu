@@ -61,7 +61,6 @@
     "notices": {
       "verified": "Deine E-Mail-Adresse ist bestätigt. Willkommen bei Tretu!",
       "reset": "Dein Passwort wurde geändert. Du kannst dich jetzt anmelden.",
-      "claimed": "Dein altes Konto ist jetzt verbunden. Bitte melde dich erneut an.",
       "deleted": "Dein Konto wurde gelöscht. Schade, dass du gehst!",
       "signedOut": "Du wurdest überall abgemeldet."
     },
@@ -163,7 +162,7 @@
       "client_disabled": "Diese App ist zurzeit deaktiviert.",
       "access_denied": "Der Zugriff wurde abgelehnt.",
       "state_mismatch": "Die Anmeldung wurde in einem anderen Tab oder Browser gestartet. Bitte versuche es noch einmal.",
-      "account_already_linked_to_different_user": "Dieses Konto ist schon mit einem anderen Tretu-Konto verknüpft. Unter „Alte Konten verbinden“ kannst du alte Konten übernehmen.",
+      "account_already_linked_to_different_user": "Dieses Konto ist schon mit einem anderen Tretu-Konto verknüpft. Gehört es zu einem alten Konto von dir, melde dich bei uns im Discord – wir führen die Konten zusammen.",
       "email_doesn't_match": "Die E-Mail-Adresse passt nicht zu deinem Tretu-Konto.",
       "unable_to_link_account": "Das Konto konnte nicht verknüpft werden.",
       "email_not_found": "Der Anbieter hat uns keine E-Mail-Adresse übermittelt.",
@@ -182,8 +181,7 @@
       "sicherheit": "Sicherheit",
       "konten": "Verknüpfte Konten",
       "sprache": "Sprache",
-      "datenschutz": "Datenschutz",
-      "alte-konten": "Alte Konten verbinden"
+      "datenschutz": "Datenschutz"
     },
     "apps": {
       "title": "Deine Tretu-Apps",
@@ -303,8 +301,7 @@
     "username_changed": "Benutzername geändert",
     "locale_changed": "Sprache geändert",
     "data_exported": "Daten heruntergeladen",
-    "legacy_claimed": "Altes Konto verbunden",
-    "legacy_claim_failed": "Verbinden eines alten Kontos fehlgeschlagen",
+    "admin_merge": "Altes Konto zusammengeführt",
     "roles_changed": "Rollen geändert",
     "via": "über {method}",
     "methods": {
@@ -372,35 +369,6 @@
     "deleteMismatch": "Der Benutzername stimmt nicht.",
     "deleteReauth": "Aus Sicherheitsgründen musst du dich dafür kürzlich angemeldet haben. Bitte melde dich ab und wieder an.",
     "wrongPassword": "Das Passwort stimmt nicht."
-  },
-  "legacy": {
-    "title": "Alte Konten verbinden",
-    "description": "Du hattest schon ein Konto bei Saga, Play, Hollowmere oder tretu.de, das nicht automatisch mit diesem Tretu-Konto verbunden wurde? Weise es hier mit deinen alten Zugangsdaten nach.",
-    "until": "Möglich bis {date}.",
-    "expired": "Der Zeitraum zum Verbinden alter Konten ist abgelaufen. Bitte wende dich an uns im Discord.",
-    "connectedTitle": "Bereits verbunden",
-    "noneConnected": "Noch keine alten Konten verbunden.",
-    "app": "App",
-    "apps": {
-      "saga": "Saga",
-      "play": "Play",
-      "hollowmere": "Hollowmere",
-      "tretu-web": "tretu.de"
-    },
-    "identifier": "Alter Benutzername oder E-Mail",
-    "oldPassword": "Altes Passwort",
-    "submit": "Konto verbinden",
-    "oauthTitle": "Über Discord, Google oder Steam nachweisen",
-    "oauthText": "Hast du dich früher mit Discord, Google oder Steam angemeldet und gehört dieses Konto schon zu einem anderen Tretu-Konto? Melde dich damit an – wir verbinden es dann mit diesem Konto.",
-    "oauthButton": "Mit {provider} nachweisen",
-    "success": "Verbunden! Dein altes {app}-Konto „{name}“ gehört jetzt zu deinem Tretu-Konto.",
-    "errors": {
-      "notFound": "Benutzername/E-Mail oder Passwort stimmen nicht.",
-      "alreadyYours": "Dieses Konto ist schon mit deinem Tretu-Konto verbunden.",
-      "inUse": "Dieses alte Konto wird bereits als eigenes Tretu-Konto verwendet und kann nicht mehr automatisch verbunden werden. Bitte wende dich an uns im Discord.",
-      "expired": "Der Zeitraum zum Verbinden dieses Kontos ist abgelaufen.",
-      "oauthFailed": "Wir konnten kein passendes altes Konto finden."
-    }
   },
   "mail": {
     "greeting": "Hallo {name},",

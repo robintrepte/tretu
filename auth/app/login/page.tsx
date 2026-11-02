@@ -11,7 +11,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations("login"))("title") }
 }
 
-const NOTICES = ["verified", "reset", "claimed", "deleted", "signedOut"] as const
+const NOTICES = ["verified", "reset", "deleted", "signedOut"] as const
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams
