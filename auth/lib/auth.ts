@@ -3,19 +3,23 @@ import { passkey } from "@better-auth/passkey"
 import { getCurrentAuthEndpointContext } from "@better-auth/core/context"
 import { betterAuth, type BetterAuthPlugin } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
-import { APIError, createAuthMiddleware, isAPIError } from "better-auth/api"
-import { deleteSessionCookie } from "better-auth/cookies"
+import { APIError, createAuthMiddleware, getOAuthState, getSessionFromCtx, isAPIError } from "better-auth/api"
 import { nextCookies } from "better-auth/next-js"
 import { captcha, jwt, magicLink, twoFactor, username } from "better-auth/plugins"
-import { and, eq, or } from "drizzle-orm"
+import { and, eq, ne, or, sql } from "drizzle-orm"
+import type { AppleOptions, AppleProfile } from "@better-auth/core/social-providers"
+import { createRemoteJWKSet, jwtVerify } from "jose"
 import { localeFromHeaders, type Locale } from "@/i18n/locales"
 import { audit, requestIp, type AuditEvent } from "@/lib/audit"
 import { db } from "@/lib/db"
 import * as schema from "@/lib/db/schema"
-import { env, isHttps, issuer, passkeyRpId, socialProviders, turnstileEnabled } from "@/lib/env"
+import { env, isHttps, issuer, passkeyRpId, resolveSteamEndpoint, socialProviders, steamEnabled, turnstileEnabled } from "@/lib/env"
 import { composeMail, sendMail, type MailKind } from "@/lib/mail"
 import { buildClaims, normalizeLocale, TRETU_CLAIMS, TRETU_SCOPES } from "@/lib/oidc/claims"
 import { hashPassword, isBreachedPassword, needsRehash, verifyStoredPassword } from "@/lib/passwords"
+import { authorizeContinuation, REDIRECT_PARAMS, toSafePath } from "@/lib/redirects"
+import { steam } from "@/lib/steam/plugin"
+import { challengeUserId, consumeTrustedDevice, replaceSessionWithChallenge } from "@/lib/two-factor-challenge"
 import { emitUserEvent } from "@/lib/tretu/events"
 import { isValidUsername, normalizeUsername, pickUsername, USERNAME_MAX, USERNAME_MIN } from "@/lib/usernames"
 import { getClaimSource, getUserLinks, isAdmin } from "@/lib/users"
@@ -37,8 +41,9 @@ async function mailLocale(userId: string | undefined, request?: Request): Promis
   return localeFromHeaders(request?.headers.get("cookie"), request?.headers.get("accept-language"))
 }
 
+/** Always to the account's current address: a change of address is confirmed by the old one (it names the new one). */
 async function mail(kind: MailKind, user: { id?: string; email: string; name: string }, url: string | undefined, request?: Request, newEmail?: string) {
-  await sendMail(composeMail(kind, await mailLocale(user.id, request), newEmail ?? user.email, { name: user.name, url, newEmail }))
+  await sendMail(composeMail(kind, await mailLocale(user.id, request), user.email, { name: user.name, url, newEmail }))
 }
 
 /** Finds the user a sign-in or reset request is about (by email or username in the body). */
@@ -54,11 +59,22 @@ async function userFromBody(body: unknown): Promise<string | null> {
   return row?.id ?? null
 }
 
-/** Sign-ins that Better Auth's two-factor plugin does not challenge. */
-const isSecondFactorBypass = (path: string) => path.startsWith("/callback/") || path.startsWith("/oauth2/callback/") || path === "/magic-link/verify"
+/**
+ * Sign-ins that Better Auth's two-factor plugin does not challenge itself: provider callbacks, Steam, magic links
+ * and email confirmation links (which sign in). For two-factor accounts the tretu plugin asks for the code.
+ * Passkeys are not on the list: a passkey with user verification already is two factors.
+ */
+const isSecondFactorBypass = (path: string) =>
+  path.startsWith("/callback/") || path.startsWith("/oauth2/callback/") || path === "/magic-link/verify" || path === "/verify-email" || path === "/steam/callback"
 
-const signInMethod = (path: string) =>
-  path.startsWith("/callback/") || path.startsWith("/oauth2/callback/") ? (path.split("/").pop() ?? "oauth") : (SIGN_IN_METHODS[path] ?? "other")
+/** The method of a sign-in, for the activity log. Hooks see route templates (`/callback/:id`): the provider is a param. */
+const signInMethod = (path: string, params?: Record<string, unknown> | null) => {
+  if (path.startsWith("/callback/") || path.startsWith("/oauth2/callback/")) {
+    const id = typeof params?.id === "string" ? params.id : path.split("/").pop()
+    return id && !id.startsWith(":") ? id : "oauth"
+  }
+  return SIGN_IN_METHODS[path] ?? "other"
+}
 
 const SIGN_IN_METHODS: Record<string, string> = {
   "/sign-in/email": "password",
@@ -67,6 +83,7 @@ const SIGN_IN_METHODS: Record<string, string> = {
   "/passkey/verify-authentication": "passkey",
   "/magic-link/verify": "magic-link",
   "/verify-email": "email-link",
+  "/steam/callback": "steam",
   "/two-factor/verify-totp": "2fa",
   "/two-factor/verify-backup-code": "2fa-backup-code",
 }
@@ -88,14 +105,55 @@ const SUCCESS_EVENTS: Record<string, AuditEvent> = {
   "/sign-out": "logout",
 }
 
+/** Where the browser goes once the second factor is entered: the app sign-in, or the page the sign-in was for. */
+async function afterSecondFactor(returned: unknown): Promise<string> {
+  // Provider callbacks inside an app sign-in carry the app's request in the (server-side) OAuth state.
+  const serverContext = (await getOAuthState())?.serverContext as { query?: unknown } | undefined
+  if (typeof serverContext?.query === "string" && serverContext.query) return authorizeContinuation(serverContext.query)
+  const location = isAPIError(returned) && returned.headers instanceof Headers ? returned.headers.get("location") : null
+  const path = toSafePath(location, issuer)
+  if (!path) return "/konto"
+  // Email links inside an app sign-in return to /login?<signed request>; go straight to the app instead.
+  const url = new URL(path, issuer)
+  if (url.pathname === "/login" && url.searchParams.has("client_id")) return authorizeContinuation(url.search)
+  return path
+}
+
+/** A sign-in method other than the one being removed must remain: another linked account or a passkey. */
+async function keepsASignInMethod(userId: string, accountRowId: string): Promise<boolean> {
+  const [others] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(schema.account)
+    .where(and(eq(schema.account.userId, userId), ne(schema.account.id, accountRowId)))
+  if ((others?.n ?? 0) > 0) return true
+  const passkey = await db.query.passkey.findFirst({ where: eq(schema.passkey.userId, userId), columns: { id: true } })
+  return Boolean(passkey)
+}
+
 /**
- * Tretu's own rules on top of Better Auth: username rules, audit log, transparent re-hashing of imported
- * passwords and the user events for the platform.
+ * Tretu's own rules on top of Better Auth: username rules, redirect targets, unlink rules, the second factor for
+ * provider and email-link sign-ins, audit log, transparent re-hashing of imported passwords and the user events
+ * for the platform.
  */
 const tretu = (): BetterAuthPlugin => ({
   id: "tretu",
   hooks: {
     before: [
+      {
+        // Open-redirect protection: every redirect parameter must stay on this site (lib/redirects.ts).
+        matcher: () => true,
+        handler: createAuthMiddleware(async (ctx) => {
+          for (const source of [ctx.body, ctx.query] as unknown[]) {
+            if (!source || typeof source !== "object") continue
+            for (const key of REDIRECT_PARAMS) {
+              const value = (source as Record<string, unknown>)[key]
+              if (value !== undefined && value !== "" && !toSafePath(value, issuer)) {
+                throw new APIError("FORBIDDEN", { message: "Invalid redirect target.", code: "INVALID_REDIRECT" })
+              }
+            }
+          }
+        }),
+      },
       {
         matcher: (ctx) => ctx.path === "/sign-up/email" || ctx.path === "/update-user",
         handler: createAuthMiddleware(async (ctx) => {
@@ -114,13 +172,29 @@ const tretu = (): BetterAuthPlugin => ({
           }
         }),
       },
+      {
+        // Disconnecting Discord, Google, Apple or Steam: only while another way to sign in remains.
+        matcher: (ctx) => ctx.path === "/unlink-account",
+        handler: createAuthMiddleware(async (ctx) => {
+          const accountId = (ctx.body as { accountId?: unknown } | undefined)?.accountId
+          const session = ctx.context.session ?? (await getSessionFromCtx(ctx))
+          if (!session || typeof accountId !== "string") return
+          const row = await db.query.account.findFirst({ where: and(eq(schema.account.id, accountId), eq(schema.account.userId, session.user.id)), columns: { id: true, providerId: true } })
+          if (!row) return
+          if (row.providerId === "credential") throw new APIError("BAD_REQUEST", { message: "The password is removed elsewhere.", code: "CANNOT_UNLINK_PASSWORD" })
+          if (!(await keepsASignInMethod(session.user.id, row.id))) {
+            throw new APIError("BAD_REQUEST", { message: "This is the only way to sign in.", code: "FAILED_TO_UNLINK_LAST_ACCOUNT" })
+          }
+        }),
+      },
     ],
     after: [
       {
         matcher: () => true,
         handler: createAuthMiddleware(async (ctx) => {
           const returned = ctx.context.returned
-          const failed = isAPIError(returned)
+          // Redirects (provider callbacks, email links) are APIErrors too, but successful ones.
+          const failed = isAPIError(returned) && returned.statusCode >= 400
           const headers = ctx.request?.headers ?? ctx.headers
           const base = { ipAddress: requestIp(headers), userAgent: headers?.get("user-agent") ?? null }
           const path = ctx.path
@@ -148,22 +222,36 @@ const tretu = (): BetterAuthPlugin => ({
             return
           }
           if (failed && (path === "/two-factor/verify-totp" || path === "/two-factor/verify-backup-code")) {
-            await audit("2fa.failed", { ...base, userId: sessionUserId, success: false })
+            await audit("2fa.failed", { ...base, userId: sessionUserId ?? (await challengeUserId(ctx)), success: false, meta: { method: path.endsWith("backup-code") ? "backup-code" : "totp" } })
             return
           }
           if (failed) return
-          // Two-factor accounts (all admins) only sign in with password + code or a passkey: Better Auth's
-          // two-factor check does not cover provider sign-ins and email links, so those are turned away here.
+
+          // Two-factor accounts (all admins): a provider or email-link sign-in only proves the first factor. Its
+          // session is replaced by the two-factor challenge before anything (an app's OIDC code, /konto) can use it.
+          // A session the browser already had (e.g. confirming a new email address while signed in) passed its
+          // second factor long ago and is only refreshed.
           const newSession = ctx.context.newSession
-          if (newSession?.user.twoFactorEnabled && isSecondFactorBypass(path)) {
-            await ctx.context.internalAdapter.deleteSession(newSession.session.token)
-            deleteSessionCookie(ctx)
-            ctx.context.setNewSession(null)
-            await audit("login.failed", { ...base, userId: newSession.user.id, success: false, meta: { method: signInMethod(path), code: "TWO_FACTOR_REQUIRED" } })
-            throw ctx.redirect(`${issuer}/login?error=two_factor_required`)
+          const incomingToken = newSession ? await ctx.getSignedCookie(ctx.context.authCookies.sessionToken.name, ctx.context.secret) : null
+          if (newSession?.user.twoFactorEnabled && isSecondFactorBypass(path) && incomingToken !== newSession.session.token) {
+            const method = signInMethod(path, ctx.params)
+            if (await consumeTrustedDevice(ctx, newSession.user.id)) {
+              await db.update(schema.user).set({ lastLoginAt: new Date() }).where(eq(schema.user.id, newSession.user.id))
+              await audit("login", { ...base, userId: newSession.user.id, meta: { method, trustedDevice: true } })
+              return
+            }
+            const next = await afterSecondFactor(returned)
+            await replaceSessionWithChallenge(ctx, { token: newSession.session.token, userId: newSession.user.id })
+            await audit("2fa.challenge", { ...base, userId: newSession.user.id, meta: { method } })
+            throw ctx.redirect(`${issuer}/2fa?next=${encodeURIComponent(next)}`)
           }
           if (path === "/two-factor/verify-totp" && ctx.context.session && !ctx.context.session.user.twoFactorEnabled) {
             await audit("2fa.enabled", { ...base, userId: sessionUserId })
+            return
+          }
+          if (path === "/two-factor/verify-backup-code") {
+            const userId = newSession?.user.id ?? sessionUserId
+            if (userId) await audit("2fa.backup_code_used", { ...base, userId })
             return
           }
           const event = SUCCESS_EVENTS[path]
@@ -177,6 +265,30 @@ const tretu = (): BetterAuthPlugin => ({
     ],
   },
 })
+
+/** Apple's ID token is verified against Apple's published keys (issuer, audience, expiry), not only decoded. */
+const appleKeys = createRemoteJWKSet(new URL("https://appleid.apple.com/auth/keys"), { timeoutDuration: 5000, cooldownDuration: 30_000 })
+
+async function appleUserInfo(token: { idToken?: string; user?: { name?: { firstName?: string; lastName?: string } } }) {
+  if (!token.idToken) return null
+  const audience = [env.APPLE_CLIENT_ID!, ...(env.APPLE_APP_BUNDLE_IDENTIFIER ? [env.APPLE_APP_BUNDLE_IDENTIFIER] : [])]
+  let payload: Record<string, unknown>
+  try {
+    ;({ payload } = await jwtVerify(token.idToken, appleKeys, { issuer: "https://appleid.apple.com", audience, algorithms: ["RS256"], maxTokenAge: "1h" }))
+  } catch (error) {
+    console.warn("[apple] ID token rejected:", error instanceof Error ? error.name : "error")
+    return null
+  }
+  if (typeof payload.sub !== "string" || !payload.sub) return null
+  const typedName = token.user?.name ? `${token.user.name.firstName ?? ""} ${token.user.name.lastName ?? ""}`.trim() : ""
+  const name = typedName || (typeof payload.name === "string" ? payload.name : "")
+  const email = typeof payload.email === "string" ? payload.email : undefined
+  const emailVerified = payload.email_verified === true || payload.email_verified === "true"
+  return {
+    user: { name, email, emailVerified, ...(name && { displayUsername: name }) },
+    data: { ...payload, name } as unknown as AppleProfile,
+  }
+}
 
 const enabledSocialProviders = {
   ...(socialProviders.discord && {
@@ -206,6 +318,7 @@ const enabledSocialProviders = {
       clientId: env.APPLE_CLIENT_ID!,
       clientSecret: env.APPLE_CLIENT_SECRET!,
       ...(env.APPLE_APP_BUNDLE_IDENTIFIER && { appBundleIdentifier: env.APPLE_APP_BUNDLE_IDENTIFIER }),
+      getUserInfo: appleUserInfo as NonNullable<AppleOptions["getUserInfo"]>,
     },
   }),
 }
@@ -261,7 +374,9 @@ export const auth = betterAuth({
   socialProviders: enabledSocialProviders,
   account: {
     // Discord, Google and Apple can be connected in "Verknüpfte Konten", even with another email address there.
-    accountLinking: { enabled: true, trustedProviders: ["google", "apple"], allowDifferentEmails: true },
+    // Unlinking the last provider is allowed by Better Auth here because the tretu plugin enforces the real rule:
+    // another account or a passkey must remain (see keepsASignInMethod).
+    accountLinking: { enabled: true, trustedProviders: ["google", "apple"], allowDifferentEmails: true, allowUnlinkingAll: true },
     encryptOAuthTokens: true,
   },
   user: {
@@ -298,6 +413,13 @@ export const auth = betterAuth({
       "/two-factor/verify-backup-code": { window: 60, max: 6 },
       "/passkey/verify-authentication": { window: 60, max: 10 },
       "/is-username-available": { window: 60, max: 20 },
+      "/sign-in/social": { window: 60, max: 10 },
+      "/link-social": { window: 60, max: 10 },
+      "/unlink-account": { window: 60, max: 10 },
+      "/magic-link/verify": { window: 60, max: 10 },
+      "/sign-in/steam": { window: 60, max: 10 },
+      "/steam/link": { window: 60, max: 10 },
+      "/steam/callback": { window: 60, max: 20 },
     },
   },
   advanced: {
@@ -343,10 +465,10 @@ export const auth = betterAuth({
           const path = context?.path ?? ""
           if (isSecondFactorBypass(path)) {
             const owner = await db.query.user.findFirst({ where: eq(schema.user.id, session.userId), columns: { twoFactorEnabled: true } })
-            if (owner?.twoFactorEnabled) return // turned away in the tretu plugin's after hook
+            if (owner?.twoFactorEnabled) return // only the first factor: the tretu plugin's after hook takes over
           }
           await db.update(schema.user).set({ lastLoginAt: new Date() }).where(eq(schema.user.id, session.userId))
-          await audit("login", { userId: session.userId, ipAddress: session.ipAddress, userAgent: session.userAgent, meta: { method: signInMethod(path) } })
+          await audit("login", { userId: session.userId, ipAddress: session.ipAddress, userAgent: session.userAgent, meta: { method: signInMethod(path, context?.params) } })
         },
       },
     },
@@ -354,14 +476,17 @@ export const auth = betterAuth({
       create: {
         after: async (account, context) => {
           if (account.providerId === "credential") return
-          // A provider connected to an existing account (not the account's first sign-up).
-          if (context?.path?.startsWith("/callback/") || context?.path === "/link-social") {
-            const owner = await db.query.user.findFirst({ where: eq(schema.user.id, account.userId), columns: { createdAt: true } })
-            if (owner && Date.now() - owner.createdAt.getTime() > 30_000) {
-              await audit("link.added", { userId: account.userId, meta: { provider: account.providerId } })
+          // A provider connected to an existing account: explicitly ("Verbinden" in Mein Konto, the OAuth state
+          // carries `link`) or by a verified email on sign-in (not the account's own sign-up). Steam audits itself.
+          if (context?.path?.startsWith("/callback/")) {
+            const explicit = Boolean((await getOAuthState())?.link)
+            const owner = explicit ? null : await db.query.user.findFirst({ where: eq(schema.user.id, account.userId), columns: { createdAt: true } })
+            if (explicit || (owner && Date.now() - owner.createdAt.getTime() > 30_000)) {
+              const headers = context.request?.headers ?? context.headers
+              await audit("link.added", { userId: account.userId, ipAddress: requestIp(headers), userAgent: headers?.get("user-agent"), meta: { provider: account.providerId } })
             }
           }
-          if (account.providerId === "discord") await emitUserEvent("user.updated", account.userId)
+          if (account.providerId === "discord" || account.providerId === "steam") await emitUserEvent("user.updated", account.userId)
         },
       },
       delete: {
@@ -370,7 +495,7 @@ export const auth = betterAuth({
             const headers = context?.request?.headers ?? context?.headers
             await audit("link.removed", { userId: account.userId, ipAddress: requestIp(headers), userAgent: headers?.get("user-agent"), meta: { provider: account.providerId } })
           }
-          if (account.providerId === "discord") await emitUserEvent("user.updated", account.userId)
+          if (account.providerId === "discord" || account.providerId === "steam") await emitUserEvent("user.updated", account.userId)
         },
       },
     },
@@ -431,6 +556,7 @@ export const auth = betterAuth({
         if (row) await mail("magicLink", { id: row.id, email, name: row.name }, url, ctx?.request)
       },
     }),
+    steam({ enabled: steamEnabled, issuer, endpoint: resolveSteamEndpoint(env.STEAM_OPENID_ENDPOINT), webApiKey: env.STEAM_WEB_API_KEY }),
     ...(turnstileEnabled ? [captcha({ provider: "cloudflare-turnstile", secretKey: env.TURNSTILE_SECRET_KEY!, endpoints: ["/sign-up/email"] })] : []),
     nextCookies(),
   ],

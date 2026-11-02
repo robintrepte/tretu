@@ -45,8 +45,4 @@ export async function readOAuthRequest(searchParams: SearchParams): Promise<OAut
   }
 }
 
-/** Only relative, same-site paths are accepted as "next" targets. */
-export function safeNext(value: string | string[] | undefined, fallback = "/konto"): string {
-  const next = Array.isArray(value) ? value[0] : value
-  return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : fallback
-}
+export { safeNext } from "@/lib/redirects"

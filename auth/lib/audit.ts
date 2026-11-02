@@ -17,6 +17,8 @@ export type AuditEvent =
   | "2fa.disabled"
   | "2fa.failed"
   | "2fa.backup_codes"
+  | "2fa.challenge"
+  | "2fa.backup_code_used"
   | "passkey.added"
   | "passkey.removed"
   | "link.added"
