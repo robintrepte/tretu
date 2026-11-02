@@ -186,6 +186,10 @@ mods/worlds, edit configs) and a per-server job log.
 - `manager` — start, turn off, restart, backups
 - `user` — no dashboard access
 
+The **central Tretu admin** (`/dashboard/admin`: Tretu-Konten, wallet, badges, cross-app stats, audit log) needs the
+Tretu `admin` role of the Tretu-Konto, not just the local admin role; operator and manager never get it. See
+[DEPLOY.md](DEPLOY.md#central-tretu-admin).
+
 ### Orchestrator worker
 
 The job worker and the status monitor run inside the Next.js server process by default (`src/instrumentation.ts`).

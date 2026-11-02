@@ -33,3 +33,12 @@ export const STATUS_SEED: Record<string, { now: "up" | "degraded" | "down"; badD
   minecraft: { now: "up", users: [3, 20] },
   teamspeak: { now: "up", users: [4, null] },
 };
+
+/** A signed-in team member without the Tretu admin role (no access to the central admin). */
+export const MEMBER_SESSION_TOKEN = "e2e-member-session-token-0123456789";
+export const MEMBER_SUB = "00000000-0000-4000-8000-0000000000a4";
+
+/** The mocked auth.tretu.de admin API (tests/helpers/mock-auth-admin.ts) and the secret tretu.de signs with. */
+export const AUTH_MOCK_PORT = Number(process.env.E2E_AUTH_PORT ?? 3133);
+export const AUTH_MOCK_URL = `http://127.0.0.1:${AUTH_MOCK_PORT}`;
+export const WEB_SECRET = "e2e-web-secret-0123456789";

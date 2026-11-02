@@ -225,7 +225,14 @@ level) · daily_counters (sub, Berlin day, counter) · user_apps · user_badges 
 badge_sync (granted_to, granted_ref) · ts_links · outbox · jobs · wallet_accounts · wallet_transactions (unique app +
 idempotency_key) · wallet_entries (amount, balance_after) · wallet_daily (sub, day) · friend_requests ·
 friendships (sub_a < sub_b) · presence (sub, app, expires_at) · notifications · notification_settings ·
-push_subscriptions · status_checks / status_rollups / status_services / status_certs (tretu.de/status, no personal data).
+push_subscriptions · status_checks / status_rollups / status_services / status_certs (tretu.de/status, no personal data) ·
+admin_audit (central admin actions: actor sub, action, target sub, details) · badge_revocations (badges an admin took
+back; the rules do not award them again, erased with the user).
+
+The central admin (`/dashboard/admin`, see DEPLOY.md "Central Tretu admin") reads these tables directly and books wallet
+corrections / badge grants through the same functions as the API (`src/lib/admin/**`). Its service overview reads the
+status tables (`src/lib/status/read.ts`). `user.created` / `user.updated` from auth also update the local tretu.de user
+with that sub (Tretu `admin` role → local admin, `locked` → sessions end; `src/lib/auth/tretu-account.ts`).
 
 ## Env vars
 
@@ -235,7 +242,7 @@ push_subscriptions · status_checks / status_rollups / status_services / status_
 | `PLATFORM_DB_POOL_MAX` | no (10) | pool size of the platform client |
 | `TRETU_APPS_JSON` | yes (API on) | app secrets + webhook URLs (contract §3) |
 | `TRETU_PLATFORM_URL` | no (`https://tretu.de`) | base for `profileUrl` and push links |
-| `TRETU_AUTH_ISSUER`, `TRETU_APP_SECRET` | for user fetches | auth admin API (signed as `tretu-web`); also "Mein Konto" link |
+| `TRETU_AUTH_ISSUER`, `TRETU_APP_SECRET` | for user fetches + central admin | auth admin API (signed as `tretu-web`); also "Mein Konto" link |
 | `TRETU_PLATFORM_RATE_LIMIT_PER_MIN`, `…_BURST` | no | per-app rate limit |
 | `TRETU_ECONOMY_*`, `TRETU_XP_*`, `TRETU_EARLY_SUPPORTER_UNTIL` | no | economy table above |
 | `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `TRETU_BADGE_DISCORD_ROLES_JSON` | for Discord sync | `{"wins-10":"<role id>",…}` |
