@@ -1,3 +1,6 @@
+import { spawn } from "node:child_process";
+import path from "node:path";
+
 import { expect, test, type BrowserContext } from "@playwright/test";
 import { serializeSignedCookie } from "better-call";
 
@@ -91,4 +94,43 @@ test("signed platform API rejects unsigned calls with a JSON error", async ({ re
   const res = await request.get("/api/v1/badges");
   expect(res.status()).toBe(401);
   expect(await res.json()).toEqual({ error: "unauthorized" });
+});
+
+test("login offers only \"Mit Tretu-Konto anmelden\"", async ({ page }) => {
+  await page.goto("/login");
+  const main = page.locator("#main-content");
+  await expect(main.getByRole("heading", { level: 1, name: "Anmelden" })).toBeVisible();
+  await expect(main.getByText("Melde dich mit deinem Tretu-Konto an")).toBeVisible();
+  await expect(main.getByRole("button")).toHaveText(["Mit Tretu-Konto anmelden"]);
+  await expect(main.getByText(/Discord/)).toHaveCount(0);
+  await expect(main.getByTestId("login-not-configured")).toHaveCount(0);
+});
+
+test("login errors from the provider are shown in plain words", async ({ page }) => {
+  await page.goto("/login?error=unable_to_create_session");
+  await expect(page.locator("#main-content").getByRole("alert")).toContainText("Ist dein Tretu-Konto gesperrt");
+});
+
+test("production refuses to start without the Tretu-Konto configuration", async () => {
+  test.setTimeout(90_000);
+  const root = path.resolve(__dirname, "../..");
+  const env: NodeJS.ProcessEnv = { ...process.env, NODE_ENV: "production", AUTH_SECRET: "x".repeat(40), ORCHESTRATOR_EMBEDDED: "false" };
+  for (const key of ["TRETU_AUTH_ISSUER", "TRETU_AUTH_CLIENT_ID", "TRETU_AUTH_CLIENT_SECRET"]) delete env[key];
+  env.TRETU_AUTH_ISSUER = "https://auth.tretu.de";
+  const child = spawn(process.execPath, [path.join(root, "node_modules/next/dist/bin/next"), "start", "-p", "3139"], { cwd: root, env });
+  let output = "";
+  child.stdout.on("data", (chunk: Buffer) => (output += chunk.toString()));
+  child.stderr.on("data", (chunk: Buffer) => (output += chunk.toString()));
+  const code = await new Promise<number | null>((resolve) => {
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      resolve(null);
+    }, 60_000);
+    child.on("exit", (exitCode) => {
+      clearTimeout(timer);
+      resolve(exitCode);
+    });
+  });
+  expect(output).toContain("TRETU_AUTH_CLIENT_ID, TRETU_AUTH_CLIENT_SECRET must be set");
+  expect(code).not.toBe(0);
 });

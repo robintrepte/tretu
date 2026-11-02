@@ -140,7 +140,11 @@ export async function signInToHub(page: Page, account?: Pick<Account, "username"
     await expect(page).toHaveURL(new RegExp(`^${AUTH_URL}/login`));
     await signInAtAuth(page, account, authenticator);
   }
-  await page.waitForURL((url) => url.origin === HUB_URL && !url.pathname.startsWith("/api/") && !url.pathname.startsWith("/login"), { timeout: 30_000 });
+  // "commit": the landing page (e.g. the home page with its embeds) need not finish loading, only the hub must be reached.
+  await page.waitForURL((url) => url.origin === HUB_URL && !url.pathname.startsWith("/api/") && !url.pathname.startsWith("/login"), {
+    timeout: 30_000,
+    waitUntil: "commit",
+  });
 }
 
 /** The hub's session for this context (Better Auth), or null. */

@@ -230,7 +230,8 @@ export function DatenschutzEn() {
             When you choose “Sign in with your Tretu account” in a Tretu service, the Tretu account transmits to that service (e.g.
             Saga or Play) via OpenID Connect your Tretu ID, username, display name, profile picture, email address with its
             verification status, language, roles and the IDs of linked accounts. The service uses them to match you with an
-            existing account (via the Tretu ID, the Discord ID or a verified email address) or creates a new one. We pass changes to
+            existing account (via the Tretu ID, the ID of your old account with that service from the takeover of the previous
+            accounts, the Discord ID or an email address verified on both sides) or creates a new one. We pass changes to
             your Tretu account (e.g. name, language or deletion) on to the services so that they stay up to date or also delete or
             anonymise your data.
           </P>
@@ -263,9 +264,11 @@ export function DatenschutzEn() {
         </Sub>
         <Sub title="Signing in on tretu.de">
           <P>
-            On tretu.de you sign in with your Tretu account or directly with Discord. For this we store a local user profile
-            (display name, profile picture, Discord ID, Tretu ID, email address, language), your roles, the link to the sign-in
-            provider including the tokens it issues, and your sessions (with IP address and browser identifier). Each time you sign
+            On tretu.de you sign in only with your Tretu account. For this we store a local user profile (display name, profile
+            picture, Discord ID, Tretu ID, email address, language), your roles, the link to the Tretu account including the
+            tokens it issues, and your sessions (with IP address and browser identifier). Links from the former direct sign-in
+            with Discord are kept for now but no longer used; we delete them once we no longer need them for a possible return
+            to the previous version. Each time you sign
             in, we update your name, profile picture and the time of your last sign-in. The legal basis is Art. 6(1)(b) GDPR.
           </P>
         </Sub>

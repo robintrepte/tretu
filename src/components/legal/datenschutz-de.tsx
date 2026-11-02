@@ -234,7 +234,8 @@ export function DatenschutzDe() {
             Wenn du dich bei einem Tretu-Dienst „Mit Tretu-Konto anmelden“ entscheidest, übermittelt das Tretu-Konto dem
             jeweiligen Dienst (z. B. Saga oder Play) per OpenID Connect deine Tretu-ID, Benutzername, Anzeigename, Profilbild,
             E-Mail-Adresse samt Bestätigungsstatus, Sprache, Rollen und die IDs verknüpfter Konten. Der Dienst gleicht dich darüber
-            mit einem vorhandenen Konto ab (über die Tretu-ID, die Discord-ID oder eine bestätigte E-Mail-Adresse) oder legt ein
+            mit einem vorhandenen Konto ab (über die Tretu-ID, die Kennung deines alten Kontos bei diesem Dienst aus der
+            Übernahme der bisherigen Konten, die Discord-ID oder eine auf beiden Seiten bestätigte E-Mail-Adresse) oder legt ein
             neues an. Änderungen an deinem Tretu-Konto (z. B. Name, Sprache oder Löschung) geben wir an die Dienste weiter, damit
             sie aktuell bleiben bzw. deine Daten dort ebenfalls löschen oder anonymisieren.
           </P>
@@ -268,10 +269,11 @@ export function DatenschutzDe() {
         </Sub>
         <Sub title="Anmeldung auf tretu.de">
           <P>
-            Auf tretu.de meldest du dich mit deinem Tretu-Konto oder direkt mit Discord an. Wir speichern dazu ein lokales
+            Auf tretu.de meldest du dich ausschließlich mit deinem Tretu-Konto an. Wir speichern dazu ein lokales
             Nutzerprofil (Anzeigename, Profilbild, Discord-ID, Tretu-ID, E-Mail-Adresse, Sprache), deine Rollen, die
-            Verknüpfung zum Anmeldeanbieter samt der von ihm ausgestellten Tokens sowie deine Sitzungen (mit IP-Adresse und
-            Browser-Kennung). Bei jeder Anmeldung aktualisieren wir Name und Profilbild und den Zeitpunkt der letzten Anmeldung.
+            Verknüpfung zum Tretu-Konto samt der von ihm ausgestellten Tokens sowie deine Sitzungen (mit IP-Adresse und
+            Browser-Kennung). Verknüpfungen aus der früheren direkten Anmeldung mit Discord bewahren wir vorerst auf, nutzen sie
+            aber nicht mehr; wir löschen sie, sobald wir sie für eine mögliche Rückkehr zur Vorversion nicht mehr brauchen. Bei jeder Anmeldung aktualisieren wir Name und Profilbild und den Zeitpunkt der letzten Anmeldung.
             Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO.
           </P>
         </Sub>
