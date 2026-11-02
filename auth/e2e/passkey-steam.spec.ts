@@ -111,3 +111,40 @@ test("Steam button on the login page in English", async ({ page, context }) => {
   await page.goto("/login")
   await expect(page.getByRole("button", { name: "Sign in with Steam" })).toBeVisible()
 })
+
+test("a Steam-only account sets a password together with an email to confirm, then signs in with it", async ({ page }) => {
+  const steamId = String(76561198600000000n + BigInt(Date.now() % 1_000_000))
+  await steamAs(steamId)
+  await page.goto("/login")
+  await page.getByRole("button", { name: "Mit Steam anmelden" }).click()
+  await expect(page).toHaveURL(/\/konto/)
+  const username = await page.getByLabel("Benutzername").inputValue()
+
+  await page.goto("/konto?tab=sicherheit")
+  await expect(page.getByText("Für die Anmeldung mit Passwort brauchst du eine bestätigte E-Mail-Adresse")).toBeVisible()
+  const email = `steam.${Date.now().toString(36)}@example.test`
+  const password = "ein langes geheimes Passwort 8"
+  await page.getByLabel("E-Mail-Adresse").fill(email)
+  await page.getByLabel("Neues Passwort").fill(password)
+  await page.getByRole("button", { name: "Passwort festlegen" }).click()
+  await expect(page.getByText(`Bitte bestätige jetzt ${email}`)).toBeVisible()
+
+  // Not confirmed yet: the password does not sign in.
+  await page.getByRole("button", { name: "Abmelden", exact: true }).click()
+  await page.getByLabel("E-Mail oder Benutzername").fill(username)
+  await page.getByLabel("Passwort", { exact: true }).fill(password)
+  await page.getByRole("button", { name: "Anmelden", exact: true }).click()
+  await expect(page.getByRole("alert").filter({ hasText: "bestätige zuerst deine E-Mail-Adresse" })).toBeVisible()
+
+  // The link confirms the address (and signs in); afterwards username + password work.
+  await page.goto(await mailLinkFor(email))
+  await expect(page).toHaveURL(/\/konto/)
+  await page.goto("/konto?tab=profil")
+  await expect(page.getByText(email)).toBeVisible()
+  await page.getByRole("button", { name: "Abmelden", exact: true }).click()
+  await page.getByLabel("E-Mail oder Benutzername").fill(username)
+  await page.getByLabel("Passwort", { exact: true }).fill(password)
+  await page.getByRole("button", { name: "Anmelden", exact: true }).click()
+  await expect(page).toHaveURL(/\/konto/)
+  await expect(page.getByRole("heading", { name: "Hallo, Steam-Spieler!" })).toBeVisible()
+})

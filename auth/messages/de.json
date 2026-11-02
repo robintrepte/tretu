@@ -124,7 +124,8 @@
     "useTotp": "Code aus der App verwenden",
     "invalid": "Der Code stimmt nicht. Bitte versuche es noch einmal.",
     "expired": "Die Anmeldung ist abgelaufen. Bitte melde dich erneut an.",
-    "subtitleProvider": "Fast geschafft: Dein Konto ist mit der Bestätigung in zwei Schritten geschützt."
+    "subtitleProvider": "Fast geschafft: Dein Konto ist mit der Bestätigung in zwei Schritten geschützt.",
+    "reused": "Dieser Code wurde schon verwendet. Bitte warte auf den nächsten Code in deiner App."
   },
   "consent": {
     "title": "Zugriff erlauben?",
@@ -230,7 +231,7 @@
   "security": {
     "passwordTitle": "Passwort",
     "passwordDescription": "Mit Benutzername oder E-Mail und Passwort anmelden.",
-    "passwordNone": "Du hast noch kein Passwort. Lege eines fest, um dich auch ohne Discord, Google oder Passkey anmelden zu können.",
+    "passwordNone": "Du hast noch kein Passwort. Lege eines fest, um dich auch ohne Discord, Google, Apple, Steam oder Passkey anmelden zu können.",
     "currentPassword": "Aktuelles Passwort",
     "newPassword": "Neues Passwort",
     "changePassword": "Passwort ändern",
@@ -274,7 +275,9 @@
     "activityTitle": "Letzte Aktivitäten",
     "activityDescription": "Anmeldungen und Änderungen an deinem Konto der letzten 90 Tage.",
     "noActivity": "Noch keine Aktivitäten.",
-    "failed": "fehlgeschlagen"
+    "failed": "fehlgeschlagen",
+    "passwordNeedsEmail": "Für die Anmeldung mit Passwort brauchst du eine bestätigte E-Mail-Adresse. Wir schicken dir einen Bestätigungslink – danach meldest du dich mit Benutzername oder E-Mail und Passwort an.",
+    "passwordSetConfirmEmail": "Passwort gespeichert. Bitte bestätige jetzt {email} über den Link, den wir dir geschickt haben – erst dann funktioniert die Anmeldung mit Passwort."
   },
   "audit": {
     "login": "Anmeldung",

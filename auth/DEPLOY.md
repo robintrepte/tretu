@@ -54,7 +54,7 @@ pm2 reload ecosystem.config.cjs --update-env
 
 Migrations are additive. `0001_steam_login` adds `account.display_name` and the `openid_nonce` table, and moves
 Steam IDs linked earlier through the admin API from `external_link` into `account` (provider `steam`), so they can
-sign in with Steam.
+sign in with Steam. `0002_totp_replay` adds `two_factor.last_totp_counter` (TOTP codes are accepted only once).
 
 `npm start` (PM2 `tretu-auth`) syncs `TRETU_OAUTH_CLIENTS_JSON` into the database at boot; run
 `npm run clients:sync` by hand after changing it without a restart. Clients removed from the variable are

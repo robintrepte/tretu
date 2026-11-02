@@ -126,6 +126,12 @@ touch `tretu_auth`.
   `openid_nonce`). A signed `steam_state` cookie binds the one-time state to the browser. The Steam ID is an
   `account` row (provider `steam`), like other providers; Steam sign-ups get a placeholder email and a unique
   username from the persona name. The admin API's `steam` links use the same rows.
+- **TOTP replay protection** (`lib/totp-replay.ts`): a code's 30 s time step is accepted once per user
+  (`two_factor.last_totp_counter`, claimed with one conditional UPDATE in a before hook on
+  `/two-factor/verify-totp`, the only TOTP check: sign-in, turning 2FA on, signed-in checks). The same code twice,
+  an older code after a newer one and concurrent submissions are refused (`TOTP_CODE_REUSED`).
+- **Accounts without a real email** (Steam sign-ups, imported accounts with a placeholder address) give and confirm an
+  email address when they set a first password; password sign-in keeps requiring a confirmed email for everyone.
 - **Redirect parameters** (`next`, `callbackURL`, `errorCallbackURL`, `newUserCallbackURL`, `redirectTo`) must stay
   on this site (`lib/redirects.ts`): relative paths or the issuer origin, never whitespace, backslashes or `//`.
 - **Unlinking** a provider (incl. Steam) is allowed while another way to sign in remains: password, another provider

@@ -11,7 +11,7 @@ import { env, isHttps, issuer, socialProviders, steamEnabled } from "@/lib/env"
 import { CLAIM_COOKIE, RENAME_INTERVAL_DAYS, signClaim } from "@/lib/account"
 import { claimWithPassword, CLAIMABLE_APPS } from "@/lib/legacy/claim"
 import { composeMail, sendMail } from "@/lib/mail"
-import { normalizeLocale } from "@/lib/oidc/claims"
+import { isPlaceholderEmail, normalizeLocale } from "@/lib/oidc/claims"
 import { verifyStoredPassword } from "@/lib/passwords"
 import { rateLimit } from "@/lib/rate-limit"
 import { getSession } from "@/lib/session"
@@ -130,17 +130,35 @@ export async function removeAvatar() {
   return { ok: true as const }
 }
 
-/** Sets a first password for accounts that only used Discord, Google, Apple or passkeys. */
-export async function setFirstPassword(newPassword: string): Promise<{ ok: boolean; error?: "short" | "compromised" | "exists" }> {
-  await currentUser()
+const firstPasswordEmail = z.email().max(254)
+
+/**
+ * Sets a first password for accounts that only used Discord, Google, Apple, Steam or passkeys. Password sign-in
+ * needs a confirmed email address (requireEmailVerification), so accounts without a real one (Steam sign-ups,
+ * imported accounts: placeholder addresses) give one here and confirm it through the link we send; until then the
+ * password exists but cannot be used, exactly like after a normal registration.
+ */
+export async function setFirstPassword(newPassword: string, email?: string): Promise<{ ok: boolean; emailSent?: boolean; error?: "short" | "compromised" | "exists" | "email" }> {
+  const { user } = await currentUser()
   if (newPassword.length < 10 || newPassword.length > 128) return { ok: false, error: "short" }
+  const needsEmail = isPlaceholderEmail(user.email)
+  const parsedEmail = needsEmail ? firstPasswordEmail.safeParse(email?.trim().toLowerCase()) : null
+  if (parsedEmail && !parsedEmail.success) return { ok: false, error: "email" }
+  const requestHeaders = await headers()
   try {
-    await auth.api.setPassword({ body: { newPassword }, headers: await headers() })
+    await auth.api.setPassword({ body: { newPassword }, headers: requestHeaders })
   } catch (error) {
     const code = (error as { body?: { code?: string } }).body?.code
     return { ok: false, error: code === "PASSWORD_COMPROMISED" ? "compromised" : "exists" }
   }
-  return { ok: true }
+  if (!parsedEmail?.success) return { ok: true }
+  try {
+    // An unconfirmed (placeholder) address changes only once the link sent to the new address is opened.
+    await auth.api.changeEmail({ body: { newEmail: parsedEmail.data, callbackURL: "/konto?tab=sicherheit" }, headers: requestHeaders })
+  } catch {
+    return { ok: false, error: "email" }
+  }
+  return { ok: true, emailSent: true }
 }
 
 /** Signs out every session and revokes every app token (apps' refresh tokens stop working). */

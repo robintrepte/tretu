@@ -107,6 +107,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
             {tab === "sicherheit" && (
               <SecuritySection
                 hasPassword={hasPassword}
+                needsEmail={isPlaceholderEmail(user.email)}
                 twoFactorEnabled={Boolean(user.twoFactorEnabled)}
                 isAdmin={admin}
                 passkeys={passkeys.map((p) => ({ id: p.id, name: p.name, createdAt: p.createdAt?.toISOString() ?? null }))}

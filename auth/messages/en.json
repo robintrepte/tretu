@@ -124,7 +124,8 @@
     "useTotp": "Use a code from the app",
     "invalid": "The code is incorrect. Please try again.",
     "expired": "Signing in has expired. Please sign in again.",
-    "subtitleProvider": "Almost there: your account is protected with two-step verification."
+    "subtitleProvider": "Almost there: your account is protected with two-step verification.",
+    "reused": "This code was already used. Please wait for the next code in your app."
   },
   "consent": {
     "title": "Allow access?",
@@ -230,7 +231,7 @@
   "security": {
     "passwordTitle": "Password",
     "passwordDescription": "Sign in with username or email and password.",
-    "passwordNone": "You don't have a password yet. Set one to also sign in without Discord, Google or a passkey.",
+    "passwordNone": "You don't have a password yet. Set one to also sign in without Discord, Google, Apple, Steam or a passkey.",
     "currentPassword": "Current password",
     "newPassword": "New password",
     "changePassword": "Change password",
@@ -274,7 +275,9 @@
     "activityTitle": "Recent activity",
     "activityDescription": "Sign-ins and changes to your account in the last 90 days.",
     "noActivity": "No activity yet.",
-    "failed": "failed"
+    "failed": "failed",
+    "passwordNeedsEmail": "Signing in with a password needs a confirmed email address. We'll send you a confirmation link – afterwards you sign in with your username or email and password.",
+    "passwordSetConfirmEmail": "Password saved. Please confirm {email} with the link we sent you – signing in with the password works after that."
   },
   "audit": {
     "login": "Sign-in",

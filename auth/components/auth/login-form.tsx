@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Divider } from "@/components/ui/card"
 import { Field, Input } from "@/components/ui/field"
 import { PasswordInput } from "@/components/ui/password-input"
-import { authClient } from "@/lib/client/auth-client"
+import { authClient, passkeyOptionsSettled } from "@/lib/client/auth-client"
 import { errorCode, isRateLimited } from "@/lib/client/errors"
 
 interface Props {
@@ -125,6 +125,7 @@ export function LoginForm({ providers, steam, oauth, signedIn, error: initialErr
   async function onPasskey() {
     setError(null)
     setBusy("passkey")
+    await passkeyOptionsSettled()
     const result = await authClient.signIn.passkey()
     if (result?.error) {
       setBusy(null)
