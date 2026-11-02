@@ -7,7 +7,7 @@ import { audit, requestIp } from "@/lib/audit"
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import * as s from "@/lib/db/schema"
-import { env, isHttps, issuer, socialProviders } from "@/lib/env"
+import { env, isHttps, issuer, socialProviders, steamEnabled } from "@/lib/env"
 import { CLAIM_COOKIE, RENAME_INTERVAL_DAYS, signClaim } from "@/lib/account"
 import { claimWithPassword, CLAIMABLE_APPS } from "@/lib/legacy/claim"
 import { composeMail, sendMail } from "@/lib/mail"
@@ -155,9 +155,10 @@ export async function signOutEverywhere() {
   return { ok: true as const }
 }
 
-export async function unlinkGameAccount(provider: "minecraft" | "steam") {
+/** Minecraft and TeamSpeak links (made by the Minecraft server and tretu.de); Steam is unlinked like a provider. */
+export async function unlinkGameAccount(provider: "minecraft" | "teamspeak") {
   const { user } = await currentUser()
-  if (provider !== "minecraft" && provider !== "steam") return { ok: false as const }
+  if (provider !== "minecraft" && provider !== "teamspeak") return { ok: false as const }
   const removed = await db
     .delete(s.externalLink)
     .where(and(eq(s.externalLink.userId, user.id), eq(s.externalLink.provider, provider)))
@@ -215,7 +216,8 @@ export async function claimLegacyAccount(input: { app: string; identifier: strin
 /** Starts the "prove with Discord/Google" claim: remembers who wants the account, for 10 minutes. */
 export async function startOAuthClaim(provider: string) {
   const { user } = await currentUser()
-  if (!(provider in socialProviders) || !socialProviders[provider as keyof typeof socialProviders]) return { ok: false as const }
+  const enabled = provider === "steam" ? steamEnabled : provider in socialProviders && socialProviders[provider as keyof typeof socialProviders]
+  if (!enabled) return { ok: false as const }
   const payload = `${user.id}.${Date.now() + 10 * 60_000}`
   ;(await cookies()).set(CLAIM_COOKIE, `${payload}.${signClaim(payload)}`, { httpOnly: true, secure: isHttps, sameSite: "lax", path: "/", maxAge: 600 })
   return { ok: true as const }

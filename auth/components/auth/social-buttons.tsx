@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl"
 import { useState } from "react"
+import { SteamButton } from "@/components/auth/steam-button"
 import { providerIcons, providerNames } from "@/components/provider-icons"
 import { Button } from "@/components/ui/button"
 import { authClient } from "@/lib/client/auth-client"
@@ -9,10 +10,10 @@ import { authClient } from "@/lib/client/auth-client"
 export type ProviderId = "discord" | "google" | "apple"
 
 /** "Continue with …" buttons. Inside an app sign-in the signed OAuth request travels along (client plugin). */
-export function SocialButtons({ providers, callbackURL }: { providers: ProviderId[]; callbackURL: string }) {
+export function SocialButtons({ providers, steam = false, callbackURL }: { providers: ProviderId[]; steam?: boolean; callbackURL: string }) {
   const t = useTranslations("login")
-  const [busy, setBusy] = useState<ProviderId | null>(null)
-  if (!providers.length) return null
+  const [busy, setBusy] = useState<ProviderId | "steam" | null>(null)
+  if (!providers.length && !steam) return null
   return (
     <div className="grid gap-2.5">
       {providers.map((provider) => {
@@ -40,6 +41,7 @@ export function SocialButtons({ providers, callbackURL }: { providers: ProviderI
           </Button>
         )
       })}
+      {steam && <SteamButton callbackURL={callbackURL} disabled={busy !== null && busy !== "steam"} onStart={(on) => setBusy(on ? "steam" : null)} />}
     </div>
   )
 }

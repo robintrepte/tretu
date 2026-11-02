@@ -8,6 +8,13 @@
       "when": 1793549838930,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793589899253,
+      "tag": "0001_steam_login",
+      "breakpoints": true
     }
   ]
 }

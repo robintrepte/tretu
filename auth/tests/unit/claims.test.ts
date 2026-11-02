@@ -12,7 +12,7 @@ const user: ClaimSource = {
   locale: "en",
   roles: ["admin"],
 }
-const links = { discord: "123456789012345678", minecraft: "069a79f4-44e9-4726-a5be-fca90e38aaf5", minecraftName: "Notch", steam: "76561197960287930" }
+const links = { discord: "123456789012345678", minecraft: "069a79f4-44e9-4726-a5be-fca90e38aaf5", minecraftName: "Notch", steam: "76561197960287930", teamspeak: "aB3+/xYz09kLmNoPqRsTuVwXyZ0=", teamspeakName: "Robin" }
 
 describe("claim mapping", () => {
   it("maps profile claims", () => {
@@ -42,6 +42,7 @@ describe("claim mapping", () => {
       minecraft_uuid: "069a79f4-44e9-4726-a5be-fca90e38aaf5",
       minecraft_name: "Notch",
       steam_id: "76561197960287930",
+      teamspeak_uid: "aB3+/xYz09kLmNoPqRsTuVwXyZ0=",
     })
     expect(buildClaims({ ...user, roles: null }, {}, ["tretu"])).toEqual({ roles: [] })
   })

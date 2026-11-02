@@ -25,6 +25,15 @@ const schema = z.object({
   APPLE_CLIENT_ID: optional,
   APPLE_CLIENT_SECRET: optional,
   APPLE_APP_BUNDLE_IDENTIFIER: optional,
+  /** "Mit Steam anmelden" (Steam OpenID 2.0). Off unless "true". */
+  STEAM_LOGIN: z.enum(["true", "false"]).default("false"),
+  /** Optional Steam Web API key: persona name and avatar for new accounts and in "Verknüpfte Konten". */
+  STEAM_WEB_API_KEY: optional,
+  /** Where "Verknüpfen" sends people for Minecraft and TeamSpeak (those links are made by the other services). */
+  TRETU_MC_LINK_URL: z.url().default("https://mc.tretu.de/verknuepfen"),
+  TRETU_TS_LINK_URL: z.url().default("https://tretu.de/einstellungen#teamspeak"),
+  /** Tests only: a local stub Steam OpenID endpoint. Refused unless the issuer is plain http on loopback. */
+  STEAM_OPENID_ENDPOINT: optional,
   /** Amazon SES v2 region (e.g. eu-central-1); turns on real email. Credentials come from the usual AWS variables. */
   SES_REGION: optional,
   SES_CONFIGURATION_SET: optional,
@@ -68,15 +77,36 @@ export const socialProviders = {
 export type SocialProvider = keyof typeof socialProviders
 export const enabledSocialProviders = (Object.keys(socialProviders) as SocialProvider[]).filter((p) => socialProviders[p])
 
+/** Steam's OpenID 2.0 provider endpoint (Steam has no OAuth 2). */
+export const STEAM_OPENID_ENDPOINT = "https://steamcommunity.com/openid/login"
+export const steamEnabled = env.STEAM_LOGIN === "true"
+
+/** Test-only overrides (stub providers) are honoured only for a plain-http loopback issuer, never in production. */
+export function allowsTestOverrides(issuerUrl: string = issuer): boolean {
+  const url = new URL(issuerUrl)
+  return url.protocol === "http:" && (url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]")
+}
+
+/** The OpenID endpoint for Steam: Steam's own, or the stub of the tests (refused for any real deployment). */
+export function resolveSteamEndpoint(override: string | undefined, issuerUrl: string = issuer): string {
+  if (!override) return STEAM_OPENID_ENDPOINT
+  if (!allowsTestOverrides(issuerUrl)) throw new Error("STEAM_OPENID_ENDPOINT is for tests only and refused with this issuer")
+  return override
+}
+
 export const mailEnabled = Boolean(env.SES_REGION || env.MAIL_OUTBOX_DIR)
 export const turnstileEnabled = Boolean(env.TURNSTILE_SITE_KEY && env.TURNSTILE_SECRET_KEY)
 export const platformEnabled = Boolean(env.TRETU_PLATFORM_URL && env.TRETU_APP_SECRET)
 
 /** `tretu.de` for the production issuer and its subdomains, else the issuer's own host (e.g. localhost in dev). */
-export function passkeyRpId(): string {
-  if (env.AUTH_PASSKEY_RP_ID) return env.AUTH_PASSKEY_RP_ID
-  const host = new URL(issuer).hostname
+export function rpIdFor(issuerUrl: string, override?: string): string {
+  if (override) return override
+  const host = new URL(issuerUrl).hostname
   return host === "tretu.de" || host.endsWith(".tretu.de") ? "tretu.de" : host
+}
+
+export function passkeyRpId(): string {
+  return rpIdFor(issuer, env.AUTH_PASSKEY_RP_ID)
 }
 
 /** Fail fast on an insecure production configuration. */
@@ -86,5 +116,7 @@ export function assertProductionEnv() {
   if (!process.env.DATABASE_URL) problems.push("DATABASE_URL is required")
   if (!process.env.TRETU_AUTH_ISSUER) problems.push("TRETU_AUTH_ISSUER is required")
   if (!process.env.BETTER_AUTH_SECRET || env.BETTER_AUTH_SECRET.length < 32) problems.push("BETTER_AUTH_SECRET must be at least 32 characters")
+  if (!isHttps && !allowsTestOverrides()) problems.push("TRETU_AUTH_ISSUER must use https (plain http only on localhost)")
+  if (env.STEAM_OPENID_ENDPOINT && !allowsTestOverrides()) problems.push("STEAM_OPENID_ENDPOINT is for tests only: remove it")
   if (problems.length) throw new Error(`Invalid environment:\n- ${problems.join("\n- ")}`)
 }

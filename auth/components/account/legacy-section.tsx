@@ -12,6 +12,7 @@ import { Card, CardHeader } from "@/components/ui/card"
 import { Field, Input } from "@/components/ui/field"
 import { PasswordInput } from "@/components/ui/password-input"
 import { authClient } from "@/lib/client/auth-client"
+import { startSteam } from "@/lib/client/steam"
 
 const APPS = ["saga", "play", "hollowmere", "tretu-web"] as const
 
@@ -25,7 +26,7 @@ export function LegacySection({
   connected: { app: string; name: string }[]
   until: string | null
   open: boolean
-  providers: ("discord" | "google")[]
+  providers: ("discord" | "google" | "steam")[]
   notice: string | null
 }) {
   const t = useTranslations("legacy")
@@ -54,11 +55,17 @@ export function LegacySection({
     }
   }
 
-  async function onOAuth(provider: "discord" | "google") {
+  async function onOAuth(provider: "discord" | "google" | "steam") {
     setBusy(provider)
     const started = await startOAuthClaim(provider)
     if (!started.ok) return setBusy(null)
-    await authClient.signIn.social({ provider, callbackURL: "/konto/alte-konten/abschluss", errorCallbackURL: "/konto?tab=alte-konten&claim=oauthFailed" })
+    const target = { callbackURL: "/konto/alte-konten/abschluss", errorCallbackURL: "/konto?tab=alte-konten&claim=oauthFailed" }
+    // Steam (Hollowmere accounts signed in with Steam) proves the identity the same way, through Steam's own flow.
+    if (provider === "steam") {
+      if ((await startSteam(target)).error) setBusy(null)
+      return
+    }
+    await authClient.signIn.social({ provider, ...target })
   }
 
   return (

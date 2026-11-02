@@ -1,5 +1,5 @@
 import "server-only"
-import { and, desc, eq, gte, min } from "drizzle-orm"
+import { and, desc, eq, gte, inArray, min } from "drizzle-orm"
 import { RENAME_INTERVAL_DAYS } from "@/lib/account"
 import { db } from "@/lib/db"
 import * as s from "@/lib/db/schema"
@@ -11,11 +11,14 @@ import { isAdmin } from "@/lib/users"
 export async function loadAccountData(user: typeof s.user.$inferSelect, withActivity: boolean) {
   const now = Date.now()
   const [accounts, gameLinks, passkeys, activity, legacy, [importRow]] = await Promise.all([
-    db.select({ providerId: s.account.providerId, accountId: s.account.accountId }).from(s.account).where(eq(s.account.userId, user.id)),
+    db
+      .select({ id: s.account.id, providerId: s.account.providerId, accountId: s.account.accountId, displayName: s.account.displayName })
+      .from(s.account)
+      .where(eq(s.account.userId, user.id)),
     db
       .select({ provider: s.externalLink.provider, id: s.externalLink.providerAccountId, displayName: s.externalLink.displayName })
       .from(s.externalLink)
-      .where(eq(s.externalLink.userId, user.id)),
+      .where(and(eq(s.externalLink.userId, user.id), inArray(s.externalLink.provider, ["minecraft", "teamspeak"]))),
     db.select({ id: s.passkey.id, name: s.passkey.name, createdAt: s.passkey.createdAt }).from(s.passkey).where(eq(s.passkey.userId, user.id)),
     withActivity
       ? db
@@ -47,7 +50,10 @@ export async function loadAccountData(user: typeof s.user.$inferSelect, withActi
     activity,
     legacy,
     hasPassword: accounts.some((a) => a.providerId === "credential"),
-    providers: Object.fromEntries(accounts.filter((a) => a.providerId !== "credential").map((a) => [a.providerId, a.accountId])) as Record<string, string>,
+    /** Linked sign-in providers: the account row id (for unlinking), the provider's id and name. */
+    providers: Object.fromEntries(
+      accounts.filter((a) => a.providerId !== "credential").map((a) => [a.providerId, { id: a.id, accountId: a.accountId, displayName: a.displayName }]),
+    ) as Record<string, { id: string; accountId: string; displayName: string | null }>,
     admin: isAdmin(user.roles),
     renameAt: renameAt && renameAt.getTime() > now ? renameAt.toISOString() : null,
     firstImport,

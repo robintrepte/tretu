@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 import { getTranslations } from "next-intl/server"
 import { AuthShell } from "@/components/auth-shell"
 import { LoginForm } from "@/components/auth/login-form"
-import { enabledSocialProviders } from "@/lib/env"
+import { enabledSocialProviders, steamEnabled } from "@/lib/env"
 import { readOAuthRequest, safeNext, toQueryString, type SearchParams } from "@/lib/oidc/flow"
 import { getSession } from "@/lib/session"
 
@@ -29,6 +29,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     <AuthShell title={t("title")} subtitle={oauth ? t("subtitleClient", { client: oauth.clientName }) : t("subtitle")}>
       <LoginForm
         providers={enabledSocialProviders}
+        steam={steamEnabled}
         oauth={oauth ? { clientName: oauth.clientName, valid: oauth.valid } : null}
         signedIn={session && oauth && oauth.valid && !oauth.forceLogin ? { name: session.user.name } : null}
         error={error}

@@ -52,7 +52,11 @@
       "expired": "Signing in took too long. Please go back to the app and start again.",
       "locked": "Too many failed attempts. The account is locked for a short while.",
       "provider": "Signing in with {provider} didn't work.",
-      "account_not_linked": "This account isn't linked to your Tretu account yet. Sign in and connect it under \"Connected accounts\"."
+      "account_not_linked": "This account isn't linked to your Tretu account yet. Sign in and connect it under \"Connected accounts\".",
+      "steam_failed": "Signing in with Steam didn't work. Please try again.",
+      "state_mismatch": "The sign-in was started in another tab or browser, or took too long. Please try again.",
+      "signup_disabled": "There is no Tretu account for this login yet.",
+      "cancelled": "The sign-in was cancelled."
     },
     "notices": {
       "verified": "Your email address is confirmed. Welcome to Tretu!",
@@ -60,7 +64,8 @@
       "claimed": "Your old account is now connected. Please sign in again.",
       "deleted": "Your account has been deleted. Sorry to see you go!",
       "signedOut": "You have been signed out everywhere."
-    }
+    },
+    "steam": "Sign in with Steam"
   },
   "register": {
     "title": "Create account",
@@ -118,7 +123,8 @@
     "useBackup": "Use a backup code",
     "useTotp": "Use a code from the app",
     "invalid": "The code is incorrect. Please try again.",
-    "expired": "Signing in has expired. Please sign in again."
+    "expired": "Signing in has expired. Please sign in again.",
+    "subtitleProvider": "Almost there: your account is protected with two-step verification."
   },
   "consent": {
     "title": "Allow access?",
@@ -129,7 +135,7 @@
       "profile": "username, display name, profile picture and language",
       "email": "your email address",
       "offline_access": "access while you are not signed in",
-      "tretu": "your roles and connected accounts (Discord, Minecraft, Steam)"
+      "tretu": "your roles and connected accounts (Discord, Minecraft, Steam, TeamSpeak)"
     },
     "allow": "Allow",
     "deny": "Deny",
@@ -161,7 +167,9 @@
       "unable_to_link_account": "The account could not be linked.",
       "email_not_found": "The provider didn't send us an email address.",
       "signup_disabled": "There is no Tretu account for this sign-in yet.",
-      "default": "Please try again. If it happens again, let us know on Discord."
+      "default": "Please try again. If it happens again, let us know on Discord.",
+      "steam_failed": "Steam could not confirm the sign-in. Please try again.",
+      "steam_already_linked": "Your Tretu account is already connected to another Steam account. Disconnect it first under “Connected accounts”."
     }
   },
   "account": {
@@ -238,7 +246,7 @@
     "noPasskeys": "No passkeys yet.",
     "addedOn": "Added on {date}",
     "twoFactorTitle": "Two-step verification",
-    "twoFactorDescription": "When you sign in with a password, we also ask for a code from your authenticator app.",
+    "twoFactorDescription": "Every sign-in without a passkey – with a password, Discord, Google, Apple, Steam or a sign-in link – also asks for a code from your authenticator app.",
     "twoFactorOn": "On",
     "twoFactorOff": "Off",
     "twoFactorEnable": "Turn on",
@@ -247,7 +255,7 @@
     "twoFactorScan": "Scan the QR code with your authenticator app (e.g. 1Password, Google Authenticator, Aegis) and enter the code it shows.",
     "twoFactorSecret": "Or enter this key:",
     "twoFactorVerify": "Verify code",
-    "twoFactorEnabled": "Two-step verification is now on. Signing in with Discord, Google, Apple or email links is now blocked for your account – use your password and code, or a passkey.",
+    "twoFactorEnabled": "Two-step verification is now on. From now on every sign-in without a passkey asks for a code.",
     "twoFactorDisabled": "Two-step verification is off.",
     "backupCodesTitle": "Your backup codes",
     "backupCodesText": "Keep these codes safe. Each one works once if you can't access your app.",
@@ -307,8 +315,13 @@
       "google": "Google",
       "apple": "Apple",
       "oauth": "Discord/Google",
-      "other": "other"
-    }
+      "other": "other",
+      "steam": "Steam",
+      "backup-code": "Backup code",
+      "totp": "Authenticator app"
+    },
+    "2fa_challenge": "Code requested at sign-in",
+    "2fa_backup_code_used": "Backup code used"
   },
   "connections": {
     "title": "Connected accounts",
@@ -319,11 +332,26 @@
     "notConnected": "Not connected",
     "lastMethod": "This is your only way to sign in. Set a password or add a passkey first.",
     "gamesTitle": "Game accounts",
-    "gamesDescription": "You link these directly in the game or on the Minecraft server.",
+    "gamesDescription": "Connect Minecraft and TeamSpeak on the server or on tretu.de, Steam right here.",
     "minecraft": "Minecraft",
     "steam": "Steam",
     "unlinkConfirm": "Really remove this connection?",
-    "unlinked": "Connection removed."
+    "unlinked": "Connection removed.",
+    "link": "Connect",
+    "teamspeak": "TeamSpeak",
+    "reauth": "For your security, please sign in again and then try once more.",
+    "hints": {
+      "minecraft": "Type /dashboard in the game on our Minecraft server and sign in with your Tretu account.",
+      "teamspeak": "Put the code from tretu.de into your TeamSpeak nickname and your TeamSpeak account gets connected.",
+      "steam": "Afterwards you can also sign in with Steam."
+    },
+    "errors": {
+      "account_already_linked_to_different_user": "This Steam account is already connected to another Tretu account.",
+      "steam_already_linked": "Your Tretu account is already connected to another Steam account. Disconnect it first.",
+      "steam_failed": "Steam could not confirm the connection. Please try again.",
+      "state_mismatch": "Connecting took too long or was started in another tab. Please try again.",
+      "access_denied": "Connecting was cancelled."
+    }
   },
   "language": {
     "title": "Language",
@@ -359,8 +387,8 @@
     "identifier": "Old username or email",
     "oldPassword": "Old password",
     "submit": "Connect account",
-    "oauthTitle": "Prove it with Discord or Google",
-    "oauthText": "Did you use to sign in with Discord or Google and that account already belongs to another Tretu account? Sign in with it – we'll then connect it to this account.",
+    "oauthTitle": "Prove it with Discord, Google or Steam",
+    "oauthText": "Did you use to sign in with Discord, Google or Steam and that account already belongs to another Tretu account? Sign in with it – we'll then connect it to this account.",
     "oauthButton": "Prove with {provider}",
     "success": "Connected! Your old {app} account \"{name}\" now belongs to your Tretu account.",
     "errors": {

@@ -6,7 +6,7 @@ import { isValidUsername, normalizeUsername, RESERVED_USERNAMES, slugifyUsername
 /**
  * The legacy import's matching rules (pure, unit-tested in tests/unit/legacy-plan.test.ts):
  * - same Discord ID → same person;
- * - same Google or Apple account ID → same person;
+ * - same Google, Apple or Steam account ID → same person (Steam IDs come from Nakama, which verified them);
  * - same email, verified on both sides → same person;
  * - anything weaker (same unverified email, same username, same display name) is NOT merged.
  * Merging is transitive. Existing Tretu accounts (and accounts created by an earlier import run) take part
@@ -14,7 +14,7 @@ import { isValidUsername, normalizeUsername, RESERVED_USERNAMES, slugifyUsername
  */
 
 export type LegacyApp = "saga" | "play" | "tretu-web" | "hollowmere"
-export type IdentityProvider = "discord" | "google" | "apple"
+export type IdentityProvider = "discord" | "google" | "apple" | "steam"
 
 export interface LegacyRecord {
   app: LegacyApp
@@ -29,7 +29,6 @@ export interface LegacyRecord {
   /** In the stored format of lib/passwords.ts (`bcrypt:` or native), or null. */
   passwordHash: string | null
   identities: { provider: IdentityProvider; id: string }[]
-  steamId: string | null
   /** Roles in the old app, only reported (global roles are granted by hand). */
   roles: string[]
 }
@@ -43,10 +42,9 @@ export interface Anchor {
   /** Legacy accounts already linked to this user (earlier import runs, claims). */
   legacy: { app: LegacyApp; legacyUserId: string }[]
   hasPassword: boolean
-  steamLinked: boolean
 }
 
-export type MergeReason = "discord" | "google" | "apple" | "verified-email" | "already-linked"
+export type MergeReason = "discord" | "google" | "apple" | "steam" | "verified-email" | "already-linked"
 
 export interface PlannedGroup {
   /** Existing Tretu user the records join, or null for a new account. */
@@ -66,11 +64,10 @@ export interface PlannedGroup {
   createdAt: Date
   passwordHash: string | null
   identities: { provider: IdentityProvider; id: string }[]
-  steamId: string | null
 }
 
 export interface Conflict {
-  kind: "username" | "email" | "multiple-existing-accounts" | "multiple-identities" | "same-app-merged" | "steam-taken"
+  kind: "username" | "email" | "multiple-existing-accounts" | "multiple-identities" | "same-app-merged"
   detail: string
   records: string[]
 }
@@ -136,7 +133,7 @@ function suggest(base: string, taken: (lower: string) => boolean): string {
   throw new Error(`no free username for ${base}`)
 }
 
-export function planImport(records: LegacyRecord[], anchors: Anchor[], options: { takenUsernames?: Iterable<string>; takenEmails?: Iterable<string>; takenSteamIds?: Iterable<string> } = {}): ImportPlan {
+export function planImport(records: LegacyRecord[], anchors: Anchor[], options: { takenUsernames?: Iterable<string>; takenEmails?: Iterable<string> } = {}): ImportPlan {
   const uf = new UnionFind()
   const reasonsByKey = new Map<string, MergeReason>()
   const conflicts: Conflict[] = []
@@ -171,7 +168,6 @@ export function planImport(records: LegacyRecord[], anchors: Anchor[], options: 
   for (const a of anchors) if (a.username) usernames.add(a.username.toLowerCase())
   const emails = new Set([...(options.takenEmails ?? [])].map((e) => e.toLowerCase()))
   for (const a of anchors) emails.add(a.email.toLowerCase())
-  const steamIds = new Set(options.takenSteamIds ?? [])
 
   const skipped: ImportPlan["skipped"] = []
   const planned: PlannedGroup[] = []
@@ -203,20 +199,11 @@ export function planImport(records: LegacyRecord[], anchors: Anchor[], options: 
     if (new Set(apps).size < apps.length) conflicts.push({ kind: "same-app-merged", detail: "several accounts of one app belong to one person", records: ids })
 
     const identities = uniqueIdentities([...records.flatMap((r) => r.identities), ...(anchor?.identities ?? [])])
-    for (const provider of ["discord", "google", "apple"] as const) {
+    for (const provider of ["discord", "google", "apple", "steam"] as const) {
       if (identities.filter((i) => i.provider === provider).length > 1) conflicts.push({ kind: "multiple-identities", detail: `${provider}: ${identities.filter((i) => i.provider === provider).map((i) => i.id).join(", ")}`, records: ids })
     }
 
     const primary = records[0]!
-    const steam = records.find((r) => r.steamId)?.steamId ?? null
-    let steamId: string | null = null
-    if (steam && !(anchor?.steamLinked ?? false)) {
-      if (steamIds.has(steam)) conflicts.push({ kind: "steam-taken", detail: steam, records: ids })
-      else {
-        steamIds.add(steam)
-        steamId = steam
-      }
-    }
     // Native (Play) hashes first, then the newest old password.
     const passwords = [...records]
       .filter((r) => r.passwordHash)
@@ -239,7 +226,6 @@ export function planImport(records: LegacyRecord[], anchors: Anchor[], options: 
         createdAt: oldest(records),
         passwordHash: anchor.hasPassword ? null : combineStored(passwords),
         identities,
-        steamId,
       })
       continue
     }
@@ -285,7 +271,6 @@ export function planImport(records: LegacyRecord[], anchors: Anchor[], options: 
       createdAt: oldest(records),
       passwordHash: combineStored(passwords),
       identities,
-      steamId,
     })
   }
   return { groups: planned, conflicts, skipped }

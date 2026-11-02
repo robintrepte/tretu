@@ -18,7 +18,7 @@ export async function GET() {
   if (!row) return Response.json({ error: "unauthorized" }, { status: 401 })
 
   const [accounts, links, passkeys, sessions, consents, legacy, activity] = await Promise.all([
-    db.select({ provider: s.account.providerId, accountId: s.account.accountId, createdAt: s.account.createdAt }).from(s.account).where(eq(s.account.userId, userId)),
+    db.select({ provider: s.account.providerId, accountId: s.account.accountId, displayName: s.account.displayName, createdAt: s.account.createdAt }).from(s.account).where(eq(s.account.userId, userId)),
     db.select({ provider: s.externalLink.provider, accountId: s.externalLink.providerAccountId, displayName: s.externalLink.displayName, createdAt: s.externalLink.createdAt }).from(s.externalLink).where(eq(s.externalLink.userId, userId)),
     db.select({ name: s.passkey.name, deviceType: s.passkey.deviceType, backedUp: s.passkey.backedUp, createdAt: s.passkey.createdAt }).from(s.passkey).where(eq(s.passkey.userId, userId)),
     db.select({ createdAt: s.session.createdAt, expiresAt: s.session.expiresAt, ipAddress: s.session.ipAddress, userAgent: s.session.userAgent }).from(s.session).where(eq(s.session.userId, userId)),

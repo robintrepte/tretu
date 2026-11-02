@@ -8,7 +8,7 @@ import { Field, Input } from "@/components/ui/field"
 import { authClient } from "@/lib/client/auth-client"
 import { errorCode, isRateLimited } from "@/lib/client/errors"
 
-export function TwoFactorForm() {
+export function TwoFactorForm({ next }: { next: string }) {
   const t = useTranslations("twoFactor")
   const tc = useTranslations("common")
   const [mode, setMode] = useState<"totp" | "backup">("totp")
@@ -32,8 +32,8 @@ export function TwoFactorForm() {
       setError(isRateLimited(result.error) ? tc("rateLimited") : c === "INVALID_TWO_FACTOR_COOKIE" || c === "TWO_FACTOR_NOT_ENABLED" ? t("expired") : t("invalid"))
       return
     }
-    // Inside an app sign-in the response redirects to the app (client plugin); otherwise to the account page.
-    if (!(result.data as { redirect?: boolean } | null)?.redirect) window.location.assign("/konto")
+    // Inside an app sign-in the response redirects to the app (client plugin); otherwise on to `next`.
+    if (!(result.data as { redirect?: boolean } | null)?.redirect) window.location.assign(next)
   }
 
   return (

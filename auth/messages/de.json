@@ -52,7 +52,11 @@
       "expired": "Die Anmeldung hat zu lange gedauert. Bitte kehre zur App zurück und starte sie neu.",
       "locked": "Zu viele Fehlversuche. Das Konto ist für kurze Zeit gesperrt.",
       "provider": "Die Anmeldung über {provider} hat nicht geklappt.",
-      "account_not_linked": "Dieses Konto ist noch nicht mit deinem Tretu-Konto verknüpft. Melde dich an und verbinde es unter „Verknüpfte Konten“."
+      "account_not_linked": "Dieses Konto ist noch nicht mit deinem Tretu-Konto verknüpft. Melde dich an und verbinde es unter „Verknüpfte Konten“.",
+      "steam_failed": "Die Anmeldung über Steam hat nicht geklappt. Bitte versuche es noch einmal.",
+      "state_mismatch": "Die Anmeldung wurde in einem anderen Tab oder Browser gestartet oder hat zu lange gedauert. Bitte versuche es noch einmal.",
+      "signup_disabled": "Zu diesem Konto gibt es noch kein Tretu-Konto.",
+      "cancelled": "Die Anmeldung wurde abgebrochen."
     },
     "notices": {
       "verified": "Deine E-Mail-Adresse ist bestätigt. Willkommen bei Tretu!",
@@ -60,7 +64,8 @@
       "claimed": "Dein altes Konto ist jetzt verbunden. Bitte melde dich erneut an.",
       "deleted": "Dein Konto wurde gelöscht. Schade, dass du gehst!",
       "signedOut": "Du wurdest überall abgemeldet."
-    }
+    },
+    "steam": "Mit Steam anmelden"
   },
   "register": {
     "title": "Konto erstellen",
@@ -118,7 +123,8 @@
     "useBackup": "Backup-Code verwenden",
     "useTotp": "Code aus der App verwenden",
     "invalid": "Der Code stimmt nicht. Bitte versuche es noch einmal.",
-    "expired": "Die Anmeldung ist abgelaufen. Bitte melde dich erneut an."
+    "expired": "Die Anmeldung ist abgelaufen. Bitte melde dich erneut an.",
+    "subtitleProvider": "Fast geschafft: Dein Konto ist mit der Bestätigung in zwei Schritten geschützt."
   },
   "consent": {
     "title": "Zugriff erlauben?",
@@ -129,7 +135,7 @@
       "profile": "Benutzername, Anzeigename, Profilbild und Sprache",
       "email": "deine E-Mail-Adresse",
       "offline_access": "Zugriff, auch wenn du gerade nicht angemeldet bist",
-      "tretu": "deine Rollen und verknüpften Konten (Discord, Minecraft, Steam)"
+      "tretu": "deine Rollen und verknüpften Konten (Discord, Minecraft, Steam, TeamSpeak)"
     },
     "allow": "Erlauben",
     "deny": "Ablehnen",
@@ -161,7 +167,9 @@
       "unable_to_link_account": "Das Konto konnte nicht verknüpft werden.",
       "email_not_found": "Der Anbieter hat uns keine E-Mail-Adresse übermittelt.",
       "signup_disabled": "Für diese Anmeldung gibt es noch kein Tretu-Konto.",
-      "default": "Bitte versuche es noch einmal. Wenn es wieder passiert, melde dich bei uns im Discord."
+      "default": "Bitte versuche es noch einmal. Wenn es wieder passiert, melde dich bei uns im Discord.",
+      "steam_failed": "Steam konnte die Anmeldung nicht bestätigen. Bitte versuche es noch einmal.",
+      "steam_already_linked": "Dein Tretu-Konto ist schon mit einem anderen Steam-Konto verbunden. Trenne es zuerst unter „Verknüpfte Konten“."
     }
   },
   "account": {
@@ -238,7 +246,7 @@
     "noPasskeys": "Noch keine Passkeys.",
     "addedOn": "Hinzugefügt am {date}",
     "twoFactorTitle": "Bestätigung in zwei Schritten",
-    "twoFactorDescription": "Bei der Anmeldung mit Passwort fragen wir zusätzlich nach einem Code aus deiner Authenticator-App.",
+    "twoFactorDescription": "Bei jeder Anmeldung ohne Passkey – mit Passwort, Discord, Google, Apple, Steam oder Anmeldelink – fragen wir zusätzlich nach einem Code aus deiner Authenticator-App.",
     "twoFactorOn": "Aktiv",
     "twoFactorOff": "Aus",
     "twoFactorEnable": "Einschalten",
@@ -247,7 +255,7 @@
     "twoFactorScan": "Scanne den QR-Code mit deiner Authenticator-App (z. B. 1Password, Google Authenticator, Aegis) und gib den angezeigten Code ein.",
     "twoFactorSecret": "Oder gib diesen Schlüssel ein:",
     "twoFactorVerify": "Code bestätigen",
-    "twoFactorEnabled": "Die Bestätigung in zwei Schritten ist jetzt aktiv. Anmeldungen über Discord, Google, Apple und Anmeldelinks sind für dein Konto damit gesperrt – nutze Passwort und Code oder einen Passkey.",
+    "twoFactorEnabled": "Die Bestätigung in zwei Schritten ist jetzt aktiv. Ab sofort fragen wir bei jeder Anmeldung ohne Passkey nach einem Code.",
     "twoFactorDisabled": "Die Bestätigung in zwei Schritten ist ausgeschaltet.",
     "backupCodesTitle": "Deine Backup-Codes",
     "backupCodesText": "Bewahre diese Codes sicher auf. Jeder funktioniert einmal, falls du keinen Zugriff auf deine App hast.",
@@ -307,23 +315,43 @@
       "google": "Google",
       "apple": "Apple",
       "oauth": "Discord/Google",
-      "other": "Sonstiges"
-    }
+      "other": "Sonstiges",
+      "steam": "Steam",
+      "backup-code": "Backup-Code",
+      "totp": "Authenticator-App"
+    },
+    "2fa_challenge": "Code bei der Anmeldung abgefragt",
+    "2fa_backup_code_used": "Backup-Code verwendet"
   },
   "connections": {
     "title": "Verknüpfte Konten",
-    "description": "Melde dich mit diesen Konten an. Verknüpfte Konten können Tretu-Apps für Funktionen wie Rollen oder Statistiken nutzen.",
+    "description": "Melde dich mit diesen Konten an. Tretu-Apps können verknüpfte Konten für Funktionen wie Rollen oder Statistiken nutzen.",
     "connect": "Verbinden",
     "disconnect": "Trennen",
     "connected": "Verbunden",
     "notConnected": "Nicht verbunden",
     "lastMethod": "Das ist deine einzige Anmeldemethode. Lege zuerst ein Passwort oder einen Passkey fest.",
     "gamesTitle": "Spielkonten",
-    "gamesDescription": "Diese Konten verknüpfst du direkt im Spiel bzw. auf dem Minecraft-Server.",
+    "gamesDescription": "Minecraft und TeamSpeak verknüpfst du auf dem Server bzw. auf tretu.de, Steam direkt hier.",
     "minecraft": "Minecraft",
     "steam": "Steam",
     "unlinkConfirm": "Verknüpfung wirklich entfernen?",
-    "unlinked": "Verknüpfung entfernt."
+    "unlinked": "Verknüpfung entfernt.",
+    "link": "Verknüpfen",
+    "teamspeak": "TeamSpeak",
+    "reauth": "Bitte melde dich aus Sicherheitsgründen erneut an und versuche es dann noch einmal.",
+    "hints": {
+      "minecraft": "Tippe /dashboard im Spiel auf unserem Minecraft-Server und melde dich mit deinem Tretu-Konto an.",
+      "teamspeak": "Setze den Code von tretu.de in deinen TeamSpeak-Namen, dann wird dein TeamSpeak-Konto verknüpft.",
+      "steam": "Danach kannst du dich auch mit Steam anmelden."
+    },
+    "errors": {
+      "account_already_linked_to_different_user": "Dieses Steam-Konto ist schon mit einem anderen Tretu-Konto verknüpft.",
+      "steam_already_linked": "Dein Tretu-Konto ist schon mit einem anderen Steam-Konto verbunden. Trenne es zuerst.",
+      "steam_failed": "Steam konnte die Verknüpfung nicht bestätigen. Bitte versuche es noch einmal.",
+      "state_mismatch": "Das Verknüpfen hat zu lange gedauert oder wurde in einem anderen Tab gestartet. Bitte versuche es noch einmal.",
+      "access_denied": "Das Verknüpfen wurde abgebrochen."
+    }
   },
   "language": {
     "title": "Sprache",
@@ -359,8 +387,8 @@
     "identifier": "Alter Benutzername oder E-Mail",
     "oldPassword": "Altes Passwort",
     "submit": "Konto verbinden",
-    "oauthTitle": "Über Discord oder Google nachweisen",
-    "oauthText": "Hast du dich früher mit Discord oder Google angemeldet und gehört dieses Konto schon zu einem anderen Tretu-Konto? Melde dich damit an – wir verbinden es dann mit diesem Konto.",
+    "oauthTitle": "Über Discord, Google oder Steam nachweisen",
+    "oauthText": "Hast du dich früher mit Discord, Google oder Steam angemeldet und gehört dieses Konto schon zu einem anderen Tretu-Konto? Melde dich damit an – wir verbinden es dann mit diesem Konto.",
     "oauthButton": "Mit {provider} nachweisen",
     "success": "Verbunden! Dein altes {app}-Konto „{name}“ gehört jetzt zu deinem Tretu-Konto.",
     "errors": {

@@ -21,6 +21,8 @@ const KNOWN = new Set([
   "unable_to_link_account",
   "email_not_found",
   "signup_disabled",
+  "steam_failed",
+  "steam_already_linked",
 ])
 
 export default async function ErrorPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
