@@ -4,6 +4,7 @@ import path from "node:path"
 import { expect, test, type Page } from "@playwright/test"
 import postgres from "postgres"
 import { signRequest } from "../lib/tretu/signing"
+import { withoutPasskeyAutofill } from "./login-page"
 
 /**
  * The account lock as people see it: the friendly message for every way of signing in in the browser (passkey,
@@ -61,6 +62,7 @@ async function signedInUser(page: Page, prefix: string) {
 }
 
 test("a locked account sees why at every sign-in, and the lock in its activity log", async ({ page, context }) => {
+  await withoutPasskeyAutofill(page)
   const cdp = await page.context().newCDPSession(page)
   await cdp.send("WebAuthn.enable")
   await cdp.send("WebAuthn.addVirtualAuthenticator", {

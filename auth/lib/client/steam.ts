@@ -12,6 +12,8 @@ export async function startSteam(options: { callbackURL: string; errorCallbackUR
     body: { callbackURL: options.callbackURL, errorCallbackURL: options.errorCallbackURL },
   })
   if (error || !data?.url) return { error: error ?? new Error("no url") }
-  window.location.assign(data.url)
+  // The answer is `{ url, redirect: true }`, which Better Auth's client redirect plugin already follows. A second
+  // navigation here would run the Steam round trip twice with the same one-time state: whichever callback came
+  // second was refused ("state_mismatch") and could win the race in the browser.
   return { error: null }
 }
