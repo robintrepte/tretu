@@ -6,6 +6,7 @@ import { cache } from "react";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { auth } from "@/lib/auth/auth";
+import { isLockActive } from "@/lib/auth/tretu-account";
 import { getUserRoles } from "@/lib/permissions/checks";
 
 /**
@@ -20,6 +21,8 @@ export type CurrentUser = {
   image: string | null;
   discordId: string | null;
   roles: string[];
+  /** Global roles of the Tretu-Konto as last seen (`roles` claim / auth `user.updated`). */
+  tretuRoles: string[];
 };
 
 /** Resolves the current session from the request cookies (deduplicated per request). Never throws for anonymous visitors. */
@@ -31,6 +34,8 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
 
   const [row] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!row) return null;
+  // A locked Tretu-Konto has no session here (its sessions are deleted on lock; this covers the rest).
+  if (isLockActive(row.tretuLockedAt, row.tretuLockedUntil)) return null;
   return {
     id: String(row.id),
     tretuSub: row.tretuSub,
@@ -38,6 +43,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     image: row.avatarUrl,
     discordId: row.discordId,
     roles: await getUserRoles(row.id),
+    tretuRoles: Array.isArray(row.tretuRoles) ? row.tretuRoles : [],
   };
 });
 

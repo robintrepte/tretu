@@ -6,6 +6,7 @@
 import { and, eq, sql } from "drizzle-orm";
 
 import {
+  platformBadgeRevocations,
   platformDailyCounters,
   platformUserBadges,
   platformUserProgress,
@@ -214,6 +215,15 @@ export async function getEarnedBadgeKeys(db: Executor, sub: string): Promise<Set
   return new Set(rows.map((r) => r.key));
 }
 
+/** Badges an admin took back from `sub`: the rules do not award them again (a manual grant lifts this). */
+export async function getRevokedBadgeKeys(db: Executor, sub: string): Promise<Set<string>> {
+  const rows = await db
+    .select({ key: platformBadgeRevocations.badgeKey })
+    .from(platformBadgeRevocations)
+    .where(eq(platformBadgeRevocations.sub, sub));
+  return new Set(rows.map((r) => r.key));
+}
+
 /**
  * Re-evaluates badge rules and the level for `sub` (call after stats changed, with the progress
  * row locked). Emits `level.up` + a notification when the level increased.
@@ -226,6 +236,7 @@ export async function settleProgress(
   const stats = await getStats(db, sub);
   const user = await getDirectoryUser(db, sub);
   const earned = await getEarnedBadgeKeys(db, sub);
+  for (const key of await getRevokedBadgeKeys(db, sub)) earned.add(key);
   const newBadges: string[] = [];
   for (const badge of newlyEarnedBadges({ stats, accountCreatedAt: user?.authCreatedAt ?? null }, earned)) {
     if (await awardBadge(db, sub, badge, options)) newBadges.push(badge.key);

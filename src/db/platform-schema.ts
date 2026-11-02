@@ -545,6 +545,49 @@ export const platformStatusCerts = pgTable("platform_status_certs", {
   checkedAt: tz("checked_at").notNull(),
 });
 
+/* -------------------------------------------------------------------------- */
+/* Central admin (tretu.de/dashboard/admin)                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Every action done through the central admin, including the ones forwarded to auth.tretu.de.
+ * Only subs (pseudonymous ids) and the admin's reason are stored; names are resolved when shown.
+ */
+export const platformAdminAudit = pgTable(
+  "platform_admin_audit",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    actorSub: text("actor_sub").notNull(),
+    /** e.g. `account.lock`, `wallet.adjust`, `badge.grant` (see src/lib/admin/audit.ts). */
+    action: text("action").notNull(),
+    targetSub: text("target_sub"),
+    /** `{ reason, outcome: "ok" | "failed", error?, …action parameters }` */
+    details: jsonb("details").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("platform_admin_audit_created_idx").on(t.createdAt),
+    index("platform_admin_audit_target_idx").on(t.targetSub, t.createdAt),
+    index("platform_admin_audit_actor_idx").on(t.actorSub, t.createdAt),
+    index("platform_admin_audit_action_idx").on(t.action, t.createdAt),
+  ]
+);
+
+/**
+ * Badges an admin took back. The rules never award them again automatically (a manual grant lifts it).
+ * Erased with the user.
+ */
+export const platformBadgeRevocations = pgTable(
+  "platform_badge_revocations",
+  {
+    sub: text("sub").notNull(),
+    badgeKey: text("badge_key").notNull(),
+    actorSub: text("actor_sub").notNull(),
+    revokedAt: tz("revoked_at").notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.sub, t.badgeKey] })]
+);
+
 /** Every table in this file (tests use it to reset the database). */
 export const PLATFORM_TABLE_NAMES = [
   "platform_users",
@@ -575,4 +618,6 @@ export const PLATFORM_TABLE_NAMES = [
   "platform_status_rollups",
   "platform_status_services",
   "platform_status_certs",
+  "platform_admin_audit",
+  "platform_badge_revocations",
 ] as const;

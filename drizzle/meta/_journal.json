@@ -29,6 +29,13 @@
       "when": 1793607675314,
       "tag": "0003_status_page",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793608615026,
+      "tag": "0004_central_admin",
+      "breakpoints": true
     }
   ]
 }
