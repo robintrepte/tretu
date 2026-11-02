@@ -9,8 +9,55 @@ import type { IdentityProvider, LegacyRecord } from "./plan"
 
 type Sql = ReturnType<typeof postgres>
 
+/**
+ * Query parameters only Prisma understands. postgres.js would send them to the server as session settings, which
+ * fails with `FATAL: unrecognized configuration parameter "schema"` (Saga's DATABASE_URL is a Prisma URL).
+ */
+const PRISMA_ONLY_PARAMS = [
+  "schema",
+  "connection_limit",
+  "pool_timeout",
+  "pgbouncer",
+  "statement_cache_size",
+  "socket_timeout",
+  "connect_timeout",
+  "sslaccept",
+  "sslidentity",
+  "sslpassword",
+  "sslcert",
+  "application_name",
+  "options",
+]
+
+/**
+ * Turns an app's DATABASE_URL (possibly a Prisma URL) into what postgres.js accepts: Prisma-only parameters are
+ * removed, and a Prisma `schema` other than `public` becomes the connection's `search_path`.
+ */
+export function legacyConnection(url: string): { url: string; searchPath: string | null } {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return { url, searchPath: null }
+  }
+  const schema = parsed.searchParams.get("schema")?.trim() || null
+  for (const name of PRISMA_ONLY_PARAMS) parsed.searchParams.delete(name)
+  const searchPath = schema && schema !== "public" && /^[A-Za-z_][A-Za-z0-9_$]*$/.test(schema) ? schema : null
+  return { url: parsed.toString(), searchPath }
+}
+
 function connect(url: string): Sql {
-  return postgres(url, { max: 2, onnotice: () => {}, connect_timeout: 15, connection: { default_transaction_read_only: true, application_name: "tretu-auth-legacy-import" } })
+  const { url: clean, searchPath } = legacyConnection(url)
+  return postgres(clean, {
+    max: 2,
+    onnotice: () => {},
+    connect_timeout: 15,
+    connection: {
+      default_transaction_read_only: true,
+      application_name: "tretu-auth-legacy-import",
+      ...(searchPath ? { search_path: searchPath } : {}),
+    },
+  })
 }
 
 async function withSql<T>(url: string, fn: (sql: Sql) => Promise<T>): Promise<T> {

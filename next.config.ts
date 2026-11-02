@@ -73,6 +73,10 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Pin the project root to this folder: on the server a package-lock.json one level up (/var/www) would otherwise be
+  // picked as the workspace root for file tracing and Turbopack.
+  turbopack: { root: __dirname },
+  outputFileTracingRoot: __dirname,
   poweredByHeader: false,
   /** Native addon + legacy assets; do not bundle (Turbopack cannot place them in ESM chunks). */
   serverExternalPackages: ["ssh2"],
