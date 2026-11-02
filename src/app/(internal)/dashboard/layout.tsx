@@ -1,17 +1,22 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 
 import { DashboardNav } from "@/components/dashboard/dashboard-nav";
 import { Hint } from "@/components/dashboard/panel";
-import { getUserId } from "@/lib/auth/session";
+import { isAccountAdmin } from "@/lib/admin/access";
+import { getCurrentUser } from "@/lib/auth/session";
 import { getPermissions } from "@/lib/permissions/checks";
 import { getSetupStatus } from "@/lib/settings/store";
 
+/** Internal pages: never indexed (X-Robots-Tag is also sent for /dashboard, see next.config.ts). */
+export const metadata: Metadata = { robots: { index: false, follow: false } };
+
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const userId = await getUserId();
-  if (!userId) redirect("/login?callbackUrl=/dashboard");
-  const permissions = await getPermissions(userId);
+  const user = await getCurrentUser();
+  if (!user) redirect("/login?callbackUrl=/dashboard");
+  const permissions = await getPermissions(user.id);
   if (!permissions.includes("dashboard:view")) redirect("/");
 
   const t = await getTranslations("dashboard.layout");
@@ -26,6 +31,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             canCreate={permissions.includes("instances:create")}
             canManageSettings={canManageSettings}
             canManageRoles={permissions.includes("roles:manage")}
+            accountAdmin={isAccountAdmin(user)}
           />
           {!setup.ready ? (
             <Hint tone="warning">

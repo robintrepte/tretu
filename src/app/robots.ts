@@ -8,7 +8,7 @@ import { SITE_URL } from "@/lib/seo";
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
-      { userAgent: "*", allow: "/" },
+      { userAgent: "*", allow: "/", disallow: ["/dashboard"] },
       { userAgent: "GPTBot", allow: "/" },
       { userAgent: "ChatGPT-User", allow: "/" },
       { userAgent: "Claude-Web", allow: "/" },

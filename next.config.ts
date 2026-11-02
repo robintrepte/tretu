@@ -108,6 +108,11 @@ const nextConfig: NextConfig = {
         source: "/:path*",
         headers: securityHeaders,
       },
+      {
+        // Internal dashboard and central admin: never indexed (pages are dynamic, so never cached either).
+        source: "/dashboard/:path*",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      },
     ];
   },
 };
