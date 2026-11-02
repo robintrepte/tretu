@@ -112,6 +112,7 @@ npm run test:platform
 npm run build
 npm run test:e2e    # browser tests (Playwright) against the build
 npm run test:deploy # deploy/scripts (secrets generator, databases, smoke test, backups)
+npm run test:e2e:admin-real  # central admin against the real auth.tretu.de (needs both builds, see DEPLOY.md)
 ```
 
 CI (`.github/workflows/ci.yml`) runs all of it, plus `auth/`'s suite, on pull requests and pushes to `main`; GitHub

@@ -1,6 +1,7 @@
 # The full check suite of both apps in this repository, the same commands as locally:
 #   tretu.de (root):        npm run lint · typecheck · test · test:platform · build · test:e2e · test:deploy
 #   auth.tretu.de (auth/):  npm run lint · typecheck · test · build · test:integration · test:e2e
+#   both together:          npm run build · npm --prefix auth run build · npm run test:e2e:admin-real
 # GitHub Actions must be enabled for the repository (Settings → Actions → General) for this to run.
 name: CI
 
@@ -123,4 +124,51 @@ jobs:
           path: |
             auth/playwright-report
             auth/test-results
+          retention-days: 7
+
+  admin-real:
+    name: tretu.de + auth.tretu.de · central admin e2e (no mocks)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      # tests/e2e-real/serve.ts creates and resets tretu_auth_test_admin_real and tretu_web_test_admin_real.
+      TEST_ADMIN_DATABASE_URL: postgres://postgres@localhost:5432/postgres
+      NODE_OPTIONS: --max-old-space-size=3072
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            auth/package-lock.json
+      - run: npm ci
+      - run: npm ci
+        working-directory: auth
+      - run: npm run build
+      - run: npm run build
+        working-directory: auth
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e:admin-real
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: admin-real-playwright-report
+          path: |
+            playwright-report-admin-real
+            test-results
           retention-days: 7

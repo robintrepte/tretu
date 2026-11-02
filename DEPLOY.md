@@ -201,10 +201,16 @@ Admin rows that existed before migration `0004_central_admin` count as local.
 sessions and refuses new ones (also via the Discord fallback) until unlocked or `lockedUntil` has passed.
 
 **How it talks to auth.** Every account read and mutation goes to auth.tretu.de's admin API, signed as `tretu-web`
-(`TRETU_AUTH_ISSUER` + `TRETU_APP_SECRET`, which auth must know as `TRETU_APPS_JSON["tretu-web"].secret`), 5 s timeout;
-when auth is down or not configured the pages show a friendly notice and the platform data still works. Every mutation
-needs a reason (3–500 characters), is confirmed in a dialog, sent with `actorSub`, rate-limited per admin
-(`TRETU_ADMIN_RATE_LIMIT_*`) and recorded in `platform_admin_audit` (failed attempts too). Mutations are Next.js server
+(`TRETU_AUTH_ISSUER` + `TRETU_APP_SECRET`, which auth must know as `TRETU_APPS_JSON["tretu-web"].secret`; auth answers
+any other app with `403 forbidden_app`), 5 s timeout; when auth is down or not configured the pages show a friendly
+notice and the platform data still works. Reads carry `?actorSub=` and changes `actorSub` in the body: auth only serves
+an admin who holds `admin`, is not locked and has **2FA turned on** (`actor_two_factor_required`; the overview checks
+this first and links to "Mein Konto"). Every mutation needs a reason (3–500 characters), is confirmed in a dialog,
+rate-limited per admin (`TRETU_ADMIN_RATE_LIMIT_*`) and recorded in `platform_admin_audit` (failed attempts too, and
+changes auth answered with `changed: false` as `outcome: "noop"`; auth itself records only real changes, as `admin.*`
+in the account's activity log). auth's refusals (`self_action`, `last_admin`, `last_sign_in_method`, `no_email`,
+`merge_refused`, …) each have their own message. The service panel of the overview reads the same status tables as
+[/status](#status-page-tretudestatus). Mutations are Next.js server
 actions (same-origin only). Admin pages are rendered per request (`Cache-Control: no-store`) and sent with
 `X-Robots-Tag: noindex` (`robots.txt` disallows `/dashboard`).
 
@@ -247,9 +253,27 @@ npm run test:platform         # tretu_platform_test (created automatically)
 NODE_OPTIONS=--max-old-space-size=3072 npm run build
 npm run test:e2e              # Playwright against next start (needs the build; database tretu_web_test_e2e)
 npm run test:deploy           # deploy/scripts (local Postgres with throwaway names, nginx for check-nginx.sh)
+npm --prefix auth ci && npm --prefix auth run build
+npm run test:e2e:admin-real   # central admin against the REAL auth (see below)
 ```
 
-`.github/workflows/ci.yml` runs exactly these (and `auth/`'s suite) with a Postgres 16 service on every pull request
+**Central admin against the real auth (`npm run test:e2e:admin-real`).** `npm run test:e2e` uses a stand-in for auth's
+admin API (`tests/helpers/mock-auth-admin.ts`, kept identical to `auth/app/api/v1/admin/**`); this suite runs the real
+thing. `tests/e2e-real/serve.ts` resets the databases `tretu_auth_test_admin_real` and `tretu_web_test_admin_real`
+(override with `E2E_REAL_AUTH_DATABASE_URL` / `E2E_REAL_HUB_DATABASE_URL`), migrates both, runs `npm run clients:sync`
+in `auth/` with a confidential `tretu-web` client, then starts auth on `http://localhost:3141` (with `TRETU_APPS_JSON`
+holding the tretu-web secret, event delivery to the hub, and `npm run worker:events`) and the hub on
+`http://127.0.0.1:3142` (Tretu-Konto provider on that auth, `TRETU_ADMIN_FROM_ROLES=true`, `npm run platform:worker`
+checking both apps for the status panel). Plain http works because auth accepts an http issuer on loopback hosts; the
+two hosts keep the cookies apart. Ports: `E2E_REAL_AUTH_PORT`, `E2E_REAL_HUB_PORT`. The scenario
+(`tests/e2e-real/admin-real.spec.ts`): an admin made with `npm run admin -- grant` and TOTP (codes generated in the
+test) signs in through auth, searches and opens a normal account, locks it (its auth and hub sessions end, auth's login
+shows the lock), unlocks it, ends its sessions, corrects its wallet, grants a badge, previews and merges an imported old
+account into it, and finds all of it in the hub's audit log and in auth's activity log; a second admin without 2FA (role
+from the CLI, delivered as `user.updated`) gets "Aktiviere 2FA in Mein Konto, um die Verwaltung zu nutzen". Takes about
+a minute (TOTP codes are single-use, so the sign-in may wait for the next 30 s step).
+
+`.github/workflows/ci.yml` runs exactly these (`auth/`'s suite and the real hub + auth admin e2e as separate jobs) with a Postgres 16 service on every pull request
 and push to `main`. **GitHub Actions must be enabled** for the repository (Settings → Actions → General).
 
 TeamSpeak (`TS_*`), Hetzner/Cloudflare/CurseForge fallbacks and the remaining variables are documented in `.env.example`.
