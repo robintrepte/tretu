@@ -78,6 +78,7 @@ record() { # check url result detail
 # fetch <url> [curl args…] → sets $code and writes the body to $tmp/body
 fetch() {
   local url="$1"; shift
+  : >"$tmp/body"   # an empty body when curl can't connect, so json() never reads a missing file
   code="$(curl -sS -o "$tmp/body" -w '%{http_code}' --max-time "$timeout" -H 'accept: application/json' "$@" "$url" 2>"$tmp/err")" || code="000"
 }
 
