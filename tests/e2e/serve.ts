@@ -75,6 +75,12 @@ async function seed() {
   await db.insert(authSessions).values({ token: NO2FA_SESSION_TOKEN, userId: no2fa!.id, expiresAt: new Date(Date.now() + 24 * 3600_000) });
   await grantRoleWithSource(db, no2fa!.id, "admin", "tretu");
   await seedStatus();
+  // Webhook backlog for the admin overview: saga gave up on one delivery, play has no webhook yet (parked).
+  const { platformOutbox } = await import("../../src/db/platform-schema");
+  const { randomUUID } = await import("node:crypto");
+  const queuedAt = new Date(Date.now() - 3600_000);
+  const outboxRow = (targetApp: string, status: string) => ({ eventId: randomUUID(), targetApp, type: "level.up", payload: {}, status, nextAttemptAt: queuedAt, createdAt: queuedAt });
+  await platformDb.insert(platformOutbox).values([outboxRow("saga", "failed"), outboxRow("play", "pending"), outboxRow("play", "pending")]);
   await closePlatformDb();
   await closeDb();
 }
@@ -161,7 +167,11 @@ async function main() {
       ORCHESTRATOR_EMBEDDED: "false",
       AUTH_RATE_LIMIT: "off",
       // Platform on (signed API) with a Tretu-Konto issuer for the "Mein Konto" / "Steam verbinden" links.
-      TRETU_APPS_JSON: JSON.stringify({ "tretu-web": { secret: WEB_SECRET } }),
+      TRETU_APPS_JSON: JSON.stringify({
+        "tretu-web": { secret: WEB_SECRET },
+        saga: { secret: "e2e-saga-secret-0123456789", webhook: "http://127.0.0.1:9/api/tretu/webhook" },
+        play: { secret: "e2e-play-secret-0123456789" },
+      }),
       TRETU_AUTH_ISSUER: AUTH_MOCK_URL,
       // Required: tretu.de signs in only with the Tretu-Konto (the button is never clicked here).
       TRETU_AUTH_CLIENT_ID: "tretu-web",

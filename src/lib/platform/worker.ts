@@ -14,7 +14,7 @@ import { AuthUnavailableError, refreshStub } from "@/lib/platform/directory";
 import { runDueJobs, type JobOutcome, type JobRow } from "@/lib/platform/jobs";
 import { pruneNotifications } from "@/lib/platform/notifications";
 import { tsAuthLinkJob, tsAuthUnlinkJob } from "@/lib/platform/ts-auth-link";
-import { deliverDueWebhooks } from "@/lib/platform/outbox";
+import { deliverDueWebhooks, expireParkedWebhooks } from "@/lib/platform/outbox";
 import { expirePresence } from "@/lib/platform/presence";
 import { sendPushJob } from "@/lib/platform/push";
 import { pruneStatus } from "@/lib/status/store";
@@ -74,7 +74,8 @@ export async function runMaintenanceTick(now: Date = new Date()): Promise<void> 
   await platformDb
     .delete(platformOutbox)
     .where(and(inArray(platformOutbox.status, ["delivered"]), lt(platformOutbox.createdAt, weekAgo)));
-  await platformDb.delete(platformOutbox).where(and(inArray(platformOutbox.status, ["failed"]), lt(platformOutbox.createdAt, monthAgo)));
+  await expireParkedWebhooks(platformDb, now);
+  await platformDb.delete(platformOutbox).where(and(inArray(platformOutbox.status, ["failed", "expired"]), lt(platformOutbox.createdAt, monthAgo)));
   await platformDb.delete(platformJobs).where(and(inArray(platformJobs.status, ["done"]), lt(platformJobs.createdAt, weekAgo)));
   await platformDb.delete(platformJobs).where(and(inArray(platformJobs.status, ["failed"]), lt(platformJobs.createdAt, monthAgo)));
   await pruneNotifications(platformDb, 180);

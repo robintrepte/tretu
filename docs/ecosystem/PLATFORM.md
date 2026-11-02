@@ -140,10 +140,34 @@ Sign rules: `spend` must be negative, `adjust` may be negative, all other kinds 
 
 Platform events (`user.updated`, `user.deleted`, `badge.earned`, `level.up`, `wallet.changed`,
 `friend.added`, `notification.created`) are written to `platform_outbox` in the same transaction as the
-change, one row per app with a `webhook` in `TRETU_APPS_JSON` (same event id for all apps). The worker
+change, one row per **receiving app** (same event id for all apps): every app in `TRETU_APPS_JSON` except `auth` and
+`tretu-web` (those two only when they have a `webhook`), whether or not it has a `webhook` yet. The worker
 POSTs the envelope (`app:"platform"`) signed with `x-tretu-app: platform` and the **receiving** app's
-secret, 5 s timeout. Non-2xx/timeouts retry after 30 s, 1, 2, 4 … min (capped at 2 h) until 24 h after
-creation, then `failed`. Rows are claimed with `FOR UPDATE SKIP LOCKED`, so several workers are safe.
+secret, 5 s timeout. Non-2xx/timeouts retry after 30 s, 1, 2, 4 … min (capped at 2 h) until 24 h after the
+**first attempt** (`first_attempt_at`, migration `0005_outbox_first_attempt`), then `failed`. Rows are claimed with
+`FOR UPDATE SKIP LOCKED`, so several workers are safe.
+
+**Apps without a webhook (parked rows):** their rows stay `pending` and are neither attempted nor do they use up
+backoff (the worker only claims rows of apps with a `webhook` in its own `TRETU_APPS_JSON`). Add the webhook to
+`TRETU_APPS_JSON` and `pm2 reload ecosystem.config.cjs --update-env` (web + worker): everything queued meanwhile is
+delivered, in order, with the original event ids, and gets the normal 24 h retry window from then on. Retention: a
+parked row expires (`status = expired`) **7 days after it was created** if its app still has no webhook (housekeeping,
+every 10 min); `failed` and `expired` rows are deleted after 30 days, `delivered` ones after 7. Parked rows never count
+as an overdue worker in `/api/health`. The central admin's overview (`/dashboard/admin`, "Webhook-Zustellung") shows
+per app: webhook configured or missing, waiting, parked, failed/expired and the oldest waiting event.
+
+**Admin command** (reads `.env.local` like the worker):
+
+```
+npm run platform:outbox -- status [--app saga] [--type user.deleted] [--since 2026-11-01]
+npm run platform:outbox -- retry  [--app saga] [--type …] [--since 2026-11-01T12:00:00Z] [--dry-run]
+```
+
+`status` prints one row per app: webhook yes/no, `QUEUED` (pending, not attempted yet), `RETRYING`, `PARKED`,
+`DELIVERED`, `FAILED`, `EXPIRED` and the age of the oldest pending row. `retry` sets matching `failed` and `expired` rows
+back to `pending` (attempts 0, fresh 24 h window, same row and event id, so apps can dedupe by `id`). It never touches
+`pending` or `delivered` rows, so running it twice is harmless; rows of apps that still have no webhook are skipped and
+reported. `--since` filters on the row's creation time. Exit code 2 on bad arguments.
 
 `platform_jobs` (same backoff; push gives up after 1 h, role removals after 7 days): `push.send`,
 `badge.sync.discord`, `badge.sync.teamspeak`, `badge.revoke.discord`, `badge.revoke.teamspeak`,

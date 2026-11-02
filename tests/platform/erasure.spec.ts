@@ -79,7 +79,7 @@ test("user.deleted erases all platform data for the sub, keeps the ledger balanc
   assert.equal(Number(total.sum), 0);
 
   const forwarded = await platformDb.select().from(schema.platformOutbox).where(eq(schema.platformOutbox.type, "user.deleted"));
-  assert.deepEqual(forwarded.map((r) => r.targetApp).sort(), ["play", "saga"]);
+  assert.deepEqual(forwarded.map((r) => r.targetApp).sort(), ["hollowmere", "mc-dashboard", "play", "saga"]);
   assert.deepEqual(forwarded[0].payload.data, {});
   // Only the user.deleted webhooks remain queued for that sub.
   const queued = await platformDb.select().from(schema.platformOutbox).where(eq(schema.platformOutbox.sub, gone));

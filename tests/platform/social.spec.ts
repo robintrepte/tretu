@@ -80,7 +80,7 @@ test("friend requests: by username, auto-accept on reverse, rules and friend.add
   assert.equal(firstFriendBadge.length, 1);
 
   const added = await platformDb.select().from(platformOutbox).where(eq(platformOutbox.type, "friend.added"));
-  assert.equal(added.length, 2 * 2 * 2); // 2 friendships × both users × 2 subscribed apps
+  assert.equal(added.length, 2 * 2 * 4); // 2 friendships × both users × 4 receiving apps (2 of them parked, no webhook)
 
   // Decline / withdraw.
   const d = uuid();
@@ -153,7 +153,7 @@ test("notifications: create, count, mark read, muted categories, notification.cr
   assert.equal(await unreadCount(platformDb, a), 0);
 
   const created = await platformDb.select().from(platformOutbox).where(eq(platformOutbox.type, "notification.created"));
-  assert.equal(created.length, 3 * 2);
+  assert.equal(created.length, 3 * 4);
   const data = created[0].payload.data as Record<string, unknown>;
   assert.deepEqual(Object.keys(data).sort(), ["id", "title", "url"]);
 });

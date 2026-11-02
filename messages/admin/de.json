@@ -128,7 +128,21 @@
     "statusStale": "Die Prüfungen laufen gerade nicht (letzte Prüfung {date}). Läuft der Plattform-Worker?",
     "statusNoChecks": "Noch keine Prüfung. Läuft der Plattform-Worker?",
     "statusNoTargets": "Es sind keine Dienste zur Prüfung eingerichtet (TRETU_STATUS_TARGETS_JSON).",
-    "statusUnavailable": "Der Dienststatus ist gerade nicht verfügbar (Datenbank)."
+    "statusUnavailable": "Der Dienststatus ist gerade nicht verfügbar (Datenbank).",
+    "webhooksTitle": "Webhook-Zustellung",
+    "webhooksDescription": "Ereignisse, die tretu.de an die Apps sendet (Warteschlange des Plattform-Workers).",
+    "webhookTable": {
+      "app": "App",
+      "webhook": "Webhook",
+      "pending": "Wartend",
+      "parked": "Ohne Webhook",
+      "failed": "Fehlgeschlagen",
+      "oldest": "Älteste wartende"
+    },
+    "webhookConfigured": "eingerichtet",
+    "webhookMissing": "fehlt",
+    "webhooksParked": "Ereignisse für Apps ohne Webhook warten bis zu 7 Tage: Webhook in TRETU_APPS_JSON eintragen und den Plattform-Worker neu starten, dann werden sie zugestellt.",
+    "webhooksRetry": "Fehlgeschlagene Zustellungen erneut senden: <code>npm run platform:outbox -- retry</code>"
   },
   "accounts": {
     "title": "Konten",

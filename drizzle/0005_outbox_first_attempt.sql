@@ -1,0 +1,1 @@
+ALTER TABLE "platform_outbox" ADD COLUMN "first_attempt_at" timestamp with time zone;
