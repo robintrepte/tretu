@@ -23,6 +23,10 @@ tretu checkout (`/srv/tretu`). **Every app signs people in only with the Tretu-K
 
 Conventions: `$IP` / `$IP6` = the server's addresses; commands as root unless `sudo -u postgres` is shown; each
 app runs as its own Unix user or the deploy user that owns `/srv/<repo>`.
+Paths: this runbook writes checkouts as `/srv/<repo>`; on the Tretu server (tfmg) they live under
+`/var/www/<domain>` (e.g. `/var/www/saga.tretu.de`), so substitute accordingly. Every Next.js app pins its project
+root in `next.config.ts`, so a `package-lock.json` in `/var/www` does not matter. The shared ACME webroot of every
+nginx file is `/var/www/letsencrypt` (`certbot certonly --webroot -w /var/www/letsencrypt -d <host>`).
 
 ---
 
