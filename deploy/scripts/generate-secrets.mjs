@@ -43,7 +43,7 @@ export const DB_ROLES = ["tretu_web", "tretu_auth", "saga", "play", "mc_dashboar
 
 /** Apps that sign platform calls (contract §1) and the ones that receive webhooks (convention path). */
 export const SIGNING_APPS = ["tretu-web", "auth", "saga", "play", "hollowmere", "mc-dashboard"];
-const WEBHOOK_APPS = ["saga", "play", "mc-dashboard"];
+const WEBHOOK_APPS = ["saga", "play", "hollowmere", "mc-dashboard"];
 const CONFIDENTIAL_CLIENTS = ["tretu-web", "saga", "play", "mc-dashboard"];
 
 const hex = (bytes) => randomBytes(bytes).toString("hex");
@@ -101,7 +101,12 @@ export function urls(domain) {
 
 export function appsJson(domain, s) {
   const u = urls(domain);
-  const webhook = { saga: `${u.saga}/api/tretu/webhook`, play: `${u.play}/api/tretu/webhook`, "mc-dashboard": `${u.mc}/api/tretu/webhook` };
+  const webhook = {
+    saga: `${u.saga}/api/tretu/webhook`,
+    play: `${u.play}/api/tretu/webhook`,
+    hollowmere: `${u.hollowmere}/api/tretu/webhook`, // served by hollowmere-mcp (127.0.0.1:8787) via nginx
+    "mc-dashboard": `${u.mc}/api/tretu/webhook`,
+  };
   return Object.fromEntries(
     SIGNING_APPS.map((app) => [app, WEBHOOK_APPS.includes(app) ? { secret: s[`app.${app}`], webhook: webhook[app] } : { secret: s[`app.${app}`] }])
   );
