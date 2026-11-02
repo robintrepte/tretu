@@ -8,7 +8,8 @@ module.exports = {
       name: "tretu-web",
       cwd: __dirname,
       script: "node_modules/next/dist/bin/next",
-      args: "start",
+      // Bind to localhost only: nginx is the only way in. (next start ignores HOSTNAME, so pass -H.)
+      args: "start -H 127.0.0.1 -p 3020",
       instances: 1,
       exec_mode: "fork",
       env: {

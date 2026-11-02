@@ -5,7 +5,7 @@ Production runs on the shared Hetzner server: PM2 behind nginx, one Postgres ser
 
 | PM2 process | What | Port |
 |---|---|---|
-| `tretu-web` | Next.js (`next start`), hub + platform API | 3020 (127.0.0.1) |
+| `tretu-web` | Next.js (`next start -H 127.0.0.1 -p 3020`: `next start` ignores `HOSTNAME`, so the bind is explicit), hub + platform API | 3020 (127.0.0.1) |
 | `tretu-orchestrator` | game-server jobs and monitoring (`npm run worker:orchestrator`) | – |
 | `tretu-ts-rank` | TeamSpeak ranking worker (`npm run worker:ts-rank`) | – |
 | `tretu-platform-worker` | platform webhooks, jobs, presence expiry, badge sync (`npm run platform:worker`, see [docs/ecosystem/PLATFORM.md](docs/ecosystem/PLATFORM.md)) and the checks behind [/status](#status-page-tretudestatus) | – |
@@ -309,3 +309,9 @@ a minute (TOTP codes are single-use, so the sign-in may wait for the next 30 s s
 and push to `main`. **GitHub Actions must be enabled** for the repository (Settings → Actions → General).
 
 TeamSpeak (`TS_*`), Hetzner/Cloudflare/CurseForge fallbacks and the remaining variables are documented in `.env.example`.
+
+## Smoke test
+
+`npm run smoke` runs `deploy/scripts/smoke.sh` with this checkout's `.env.local`, so the signed platform ping uses
+`TRETU_APP_ID` / `TRETU_APP_SECRET` from there (`SMOKE_ENV_FILE` points it at another file). Options pass through:
+`npm run smoke -- --only web,auth`.

@@ -203,7 +203,7 @@ tretu.de account. Only the operator signs in before that, with a fresh test acco
 cd /srv/tretu && npm ci && systemctl start tretu-pg-backup && npm run db:migrate && npm run build
 pm2 start ecosystem.config.cjs     # tretu-web, tretu-orchestrator, tretu-ts-rank, tretu-platform-worker
 pm2 save
-deploy/scripts/smoke.sh --only web --env-file /srv/tretu/.env.local
+deploy/scripts/smoke.sh --only web --env-file /srv/tretu/.env.local   # or, in /srv/tretu: npm run smoke -- --only web
 ```
 
 Check: `health web PASS … migrations=ok worker=ok`, `platform signed ping PASS`, `status page PASS` (the worker's
