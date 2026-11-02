@@ -21,7 +21,8 @@ Source code for the official **Tretu** gaming community website. Teamspeak, Disc
 - **Ranking & Stats** — Native TeamSpeak time ranking (monthly + all-time leaderboard)
 - **Legal home** — Impressum, Datenschutz and AGB for every Tretu service (German, English translation)
 - **Languages** — German and English (next-intl, `NEXT_LOCALE` cookie, switcher in the footer)
-- **Accounts** — Better Auth: Discord login, optional Tretu-Konto (auth.tretu.de) as primary login
+- **Accounts** — Better Auth: "Mit Tretu-Konto anmelden" (auth.tretu.de, OIDC) is the only sign-in; existing members are
+  matched through the `legacy_ids` claim, their Discord ID or a verified email
 - **Theme** — Light / dark / system with next-themes
 - **SEO & PWA** — Metadata, Open Graph, Twitter cards, JSON-LD, manifest, sitemap, robots.txt
 - **Security** — CSP, HSTS, X-Frame-Options, COOP and other security headers, rate limits, redacted logs
@@ -39,7 +40,7 @@ Source code for the official **Tretu** gaming community website. Teamspeak, Disc
 | Fonts      | [Jost](https://fonts.google.com/specimen/Jost) (next/font) |
 | Icons      | [lucide-react](https://lucide.dev) |
 | Data       | Drizzle ORM, PostgreSQL (postgres.js) |
-| Auth       | Better Auth (Discord, Tretu-Konto via OIDC) + role-based access |
+| Auth       | Better Auth (Tretu-Konto via OIDC only) + role-based access |
 | i18n       | next-intl (no URL prefixes) |
 | Validation | Zod |
 | Infra      | Hetzner Cloud API + SSH orchestration worker |
@@ -81,9 +82,12 @@ Site identity and default SEO are in `src/lib/seo.ts` (canonical URL: **https://
 2. Fill required values:
    - `DATABASE_URL` (Postgres, database `tretu_web`)
    - `AUTH_SECRET`, `BETTER_AUTH_URL`
-   - `AUTH_DISCORD_CLIENT_ID`, `AUTH_DISCORD_CLIENT_SECRET` (redirect URL `<BETTER_AUTH_URL>/api/auth/callback/discord`)
-   - `DASHBOARD_ADMIN_DISCORD_IDS` (your Discord user id → admin role on login)
-   - optional `TRETU_AUTH_*` for the Tretu-Konto login (see [DEPLOY.md](DEPLOY.md))
+   - `TRETU_AUTH_ISSUER`, `TRETU_AUTH_CLIENT_ID`, `TRETU_AUTH_CLIENT_SECRET`: "Mit Tretu-Konto anmelden" is the only
+     sign-in (see [DEPLOY.md](DEPLOY.md#tretu-konto-login)). Without them, `/login` shows "Anmeldung nicht konfiguriert"
+     in development and production refuses to start. Locally, run auth.tretu.de from [`auth/`](auth/) (port 3021) with
+     a `tretu-web` client for `http://localhost:3020`.
+   - `DASHBOARD_ADMIN_DISCORD_IDS` (your Discord user id → admin role on login, via the Discord account linked to your
+     Tretu-Konto)
 3. Keep `.env.local` private and never commit it.
 
 Hetzner, Cloudflare and CurseForge are connected in the dashboard itself (`/dashboard/setup`), not via env.
@@ -160,7 +164,7 @@ mods/plugins). Valheim, Satisfactory, Palworld, Terraria (TShock) and Counter-St
 
 ### First-time setup
 
-1. Set `DASHBOARD_ADMIN_DISCORD_IDS` and log in once via Discord.
+1. Set `DASHBOARD_ADMIN_DISCORD_IDS` (or give your Tretu-Konto the `admin` role) and sign in once with the Tretu-Konto.
 2. Open **Einrichtung** (`/dashboard/setup`) and paste a Hetzner Cloud API token (read & write). The dashboard
    generates its own SSH key and registers it in the Hetzner project.
 3. Optional: Cloudflare API token ("Edit zone DNS" template) + domain → every server gets `<name>.<domain>`, updated

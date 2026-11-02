@@ -20,6 +20,3 @@ console:
   # Nakama console (127.0.0.1:7351 only, reach it through an SSH tunnel).
   username: "admin"
   password: "<generated>"
-social:
-  apple:
-    bundle_id: "com.hollowmere.unset"

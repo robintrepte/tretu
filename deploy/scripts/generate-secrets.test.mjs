@@ -7,7 +7,7 @@ import path from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { buildEcosystem, DB_ROLES, main, parseEnv, SIGNING_APPS, STATE_FILE } from "./generate-secrets.mjs";
+import { buildEcosystem, DB_ROLES, main, parseEnv, REMOVED_KEYS, SIGNING_APPS, STATE_FILE } from "./generate-secrets.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const tmp = mkdtempSync(path.join(tmpdir(), "tretu-secrets-"));
@@ -178,6 +178,9 @@ test("--import keeps a running app's secrets and settings and feeds them into th
       "STORAGE_DIR=/data/saga",
       "SOMETHING_CUSTOM='kept as is'",
       "DISCORD_CLIENT_ID=",
+      "DISCORD_BOT_TOKEN=bot-token-kept",
+      "GOOGLE_CLIENT_SECRET=old-google-secret",
+      "TRETU_LOCAL_LOGIN=false",
     ].join("\n")
   );
   const dir = path.join(tmp, "imported");
@@ -190,6 +193,29 @@ test("--import keeps a running app's secrets and settings and feeds them into th
   assert.equal(env.saga.TRETU_APP_SECRET, "existing-saga-app-secret-0123456789abcdef");
   assert.equal(JSON.parse(env.web.TRETU_APPS_JSON).saga.secret, "existing-saga-app-secret-0123456789abcdef");
   assert.equal(JSON.parse(env.auth.TRETU_APPS_JSON).saga.secret, "existing-saga-app-secret-0123456789abcdef");
+  // Settings of removed sign-in methods are dropped (named, never their values); the Discord bot stays.
+  assert.equal(env.saga.DISCORD_BOT_TOKEN, "bot-token-kept");
+  for (const key of ["DISCORD_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "TRETU_LOCAL_LOGIN"]) assert.equal(env.saga[key], undefined, key);
+  const raw = readFileSync(path.join(dir, "saga/.env"), "utf8");
+  assert.match(raw, /# Dropped from the imported env file \(sign-in methods removed, Tretu-Konto only\): DISCORD_CLIENT_ID, GOOGLE_CLIENT_SECRET, TRETU_LOCAL_LOGIN/);
+  assert.ok(!raw.includes("old-google-secret"));
+});
+
+test("Tretu-Konto only: TRETU_AUTH_* filled for every app, no setting of a removed sign-in method left", () => {
+  for (const [app, env] of Object.entries({ "tretu-web": files.web, saga: files.saga, play: files.play, "mc-dashboard": files.mc })) {
+    assert.equal(env.TRETU_AUTH_ISSUER, "https://auth.tretu.de", app);
+    assert.equal(env.TRETU_AUTH_CLIENT_ID, app);
+    assert.ok(env.TRETU_AUTH_CLIENT_SECRET.length >= 32, app);
+    for (const key of [...REMOVED_KEYS[app], "TRETU_DISCORD_FALLBACK", "TRETU_LOCAL_LOGIN", "TRETU_CODE_LOGIN", "TRETU_SKIP_INVITE_FOR_TRETU"]) {
+      assert.equal(env[key], undefined, `${app}: ${key}`);
+    }
+  }
+  assert.doesNotMatch(files.nakamaYaml, /social:|apple|bundle_id/);
+  // Kept: the hub's Discord admins (via the discord_id claim), the badge bot and Saga's campaign bot; auth's own providers.
+  assert.equal(files.web.DASHBOARD_ADMIN_DISCORD_IDS, "");
+  assert.equal(files.web.DISCORD_BOT_TOKEN, "");
+  assert.equal(files.saga.DISCORD_BOT_TOKEN, "");
+  for (const key of ["DISCORD_CLIENT_ID", "GOOGLE_CLIENT_ID", "APPLE_CLIENT_ID", "STEAM_LOGIN"]) assert.ok(key in files.auth, key);
 });
 
 test("other domains (staging) produce matching hosts", () => {
