@@ -38,6 +38,12 @@ export const APPS = {
   "mc-dashboard": { host: "mc.", dir: "/srv/tretu-minecraft", db: "mc_dashboard", port: 8130 },
 };
 
+/**
+ * Saga's storage directory on the Tretu server: the checkout's public/images (runtime folders are gitignored, so they
+ * survive git pull and builds). Saga's nginx file serves the same path ($saga_storage); change both together.
+ */
+export const SAGA_STORAGE_DIR = "/var/www/saga.tretu.de/public/images";
+
 /** Postgres roles (one per database) plus the read-only role auth uses for the legacy import. */
 export const DB_ROLES = ["tretu_web", "tretu_auth", "saga", "play", "mc_dashboard", "nakama", "tretu_legacy_reader"];
 
@@ -308,7 +314,7 @@ function specs(domain, s) {
         ["STRIPE_SECRET_KEY", X()],
         ["STRIPE_WEBHOOK_SECRET", X()],
         "# Storage and logs",
-        ["STORAGE_DIR", "/var/lib/saga/storage"],
+        ["STORAGE_DIR", SAGA_STORAGE_DIR, "generated images and speech; must equal $saga_storage in Saga's deploy/nginx/saga.tretu.de.conf (an existing value is kept on --import)"],
         ["LOG_LEVEL", "info"],
       ],
     },
