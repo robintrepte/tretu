@@ -79,7 +79,8 @@ pm2 start saga
 
 On a new server: restore `globals/globals-<time>.sql` with `psql -f` first (roles), then each dump with
 `createdb -O <role> <db> && pg_restore -d <db> <dump>`. Besides Postgres, keep the env files / `tretu-secrets.json`
-(password manager) and the app data outside Postgres (Saga `STORAGE_DIR`, Minecraft worlds, see each app's doc).
+(password manager) and the app data outside Postgres (Saga `STORAGE_DIR`, on the Tretu server
+`/var/www/saga.tretu.de/public/images`; Minecraft worlds; see each app's doc).
 
 ## nginx and certbot
 

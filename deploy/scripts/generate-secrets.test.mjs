@@ -57,6 +57,8 @@ test("one TRETU_APP_SECRET per app, identical in TRETU_APPS_JSON on tretu.de and
   for (const secret of secrets) assert.ok(secret.length >= 32);
   for (const env of [files.saga, files.play, files.mc]) assert.equal(env.TRETU_PLATFORM_URL, "https://tretu.de");
   assert.equal(files.saga.TRETU_APP_ID, "saga");
+  // The Tretu server's Saga storage, the default of Saga's nginx file ($saga_storage).
+  assert.equal(files.saga.STORAGE_DIR, "/var/www/saga.tretu.de/public/images");
   assert.equal(files.play.TRETU_APP_ID, "play");
   assert.equal(files.mc.TRETU_APP_ID, "mc-dashboard");
 });
