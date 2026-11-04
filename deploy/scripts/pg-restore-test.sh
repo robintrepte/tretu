@@ -20,6 +20,11 @@ failed=0
 printf '%-16s %-8s %8s %10s  %s\n' DATABASE RESULT TABLES ROWS DUMP
 for db in "${dbs[@]}"; do
   dump="$(ls -1t "$BACKUP_DIR/$db"/"$db"-*.dump 2>/dev/null | head -n 1 || true)"
+  if [ -z "$dump" ] && [[ " ${BACKUP_OPTIONAL_DATABASES-city} " == *" $db "* ]] \
+    && [ "$(psql -X -At -d postgres -c "select count(*) from pg_database where datname = '$db'")" != "1" ]; then
+    printf '%-16s %-8s %8s %10s  %s\n' "$db" SKIPPED - - "(optional, not created yet)"
+    continue
+  fi
   if [ -z "$dump" ]; then
     printf '%-16s %-8s %8s %10s  %s\n' "$db" FAILED - - "no dump in $BACKUP_DIR/$db"
     failed=$((failed + 1)); continue
