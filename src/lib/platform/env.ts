@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import { log } from "@/lib/observability/logger";
 
-export const APP_IDS = ["tretu-web", "auth", "saga", "play", "hollowmere", "mc-dashboard"] as const;
+export const APP_IDS = ["tretu-web", "auth", "saga", "play", "hollowmere", "mc-dashboard", "city"] as const;
 export type KnownAppId = (typeof APP_IDS)[number];
 
 /** Sender id the platform uses for webhooks (contract §3/§4). */

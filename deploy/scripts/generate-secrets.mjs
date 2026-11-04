@@ -49,8 +49,8 @@ export const SAGA_STORAGE_DIR = "/var/www/saga.tretu.de/public/images";
 export const DB_ROLES = ["tretu_web", "tretu_auth", "saga", "play", "mc_dashboard", "city", "nakama", "tretu_legacy_reader"];
 
 /** Apps that sign platform calls (contract §1) and the ones that receive webhooks (convention path). */
-export const SIGNING_APPS = ["tretu-web", "auth", "saga", "play", "hollowmere", "mc-dashboard"];
-const WEBHOOK_APPS = ["saga", "play", "hollowmere", "mc-dashboard"];
+export const SIGNING_APPS = ["tretu-web", "auth", "saga", "play", "hollowmere", "mc-dashboard", "city"];
+const WEBHOOK_APPS = ["saga", "play", "hollowmere", "mc-dashboard", "city"];
 const CONFIDENTIAL_CLIENTS = ["tretu-web", "saga", "play", "mc-dashboard", "city"];
 
 const hex = (bytes) => randomBytes(bytes).toString("hex");
@@ -114,6 +114,7 @@ export function appsJson(domain, s) {
     play: `${u.play}/api/tretu/webhook`,
     hollowmere: `${u.hollowmere}/api/tretu/webhook`, // served by hollowmere-mcp (127.0.0.1:8787) via nginx
     "mc-dashboard": `${u.mc}/api/tretu/webhook`,
+    city: `${u.city}/api/tretu/webhook`,
   };
   return Object.fromEntries(
     SIGNING_APPS.map((app) => [app, WEBHOOK_APPS.includes(app) ? { secret: s[`app.${app}`], webhook: webhook[app] } : { secret: s[`app.${app}`] }])
@@ -402,6 +403,11 @@ function specs(domain, s) {
         ["TRETU_AUTH_ISSUER", u.auth],
         ["TRETU_AUTH_CLIENT_ID", "city"],
         ["TRETU_AUTH_CLIENT_SECRET", G("oauth.city")],
+        "# Tretu platform (contract §3–§4): signed requests, stats, presence, invites; webhooks at /api/tretu/webhook",
+        ["TRETU_PLATFORM_URL", u.web],
+        ["TRETU_APP_ID", "city"],
+        ["TRETU_APP_SECRET", G("app.city")],
+        ["TRETU_LEGAL_URL", u.web],
         "# Optional limits (defaults shown)\n# CITY_CHECKPOINT_MINUTES=10\n# CITY_UNLOAD_MINUTES=10\n# CITY_MAX_RUNNING=10\n# CITY_MAX_UNATTENDED_SPEED=1",
       ],
     },
@@ -542,7 +548,7 @@ const IMPORT_SECRET_KEYS = {
   play: { BETTER_AUTH_SECRET: "play.betterAuthSecret", TRETU_APP_SECRET: "app.play", TRETU_AUTH_CLIENT_SECRET: "oauth.play", VAPID_PUBLIC_KEY: "play.vapidPublic", VAPID_PRIVATE_KEY: "play.vapidPrivate" },
   hollowmere: { NAKAMA_HTTP_KEY: "nakama.httpKey" },
   "mc-dashboard": { TRETU_APP_SECRET: "app.mc-dashboard", TRETU_AUTH_CLIENT_SECRET: "oauth.mc-dashboard" },
-  city: { TRETU_AUTH_CLIENT_SECRET: "oauth.city" },
+  city: { TRETU_APP_SECRET: "app.city", TRETU_AUTH_CLIENT_SECRET: "oauth.city" },
 };
 const MIN_IMPORTED_SECRET = 16;
 

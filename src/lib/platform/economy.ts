@@ -55,6 +55,7 @@ export const STAT_XP_RULES: Record<string, { xp: number; per: number }> = {
   "hollowmere.creatures.befriended": { xp: 15, per: 1 },
   "hollowmere.days.played": { xp: 10, per: 1 },
   "minecraft.playtime.minutes": { xp: 1, per: 5 },
+  "city.playtime.minutes": { xp: 1, per: 5 },
 };
 
 export function xpForStatIncrement(key: string, before: number, after: number): number {

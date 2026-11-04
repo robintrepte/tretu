@@ -37,6 +37,7 @@
     "hollowmere": "Hollowmere",
     "mc-dashboard": "Minecraft",
     "minecraft": "Minecraft",
+    "city": "Tretu City",
     "tretu-web": "tretu.de",
     "auth": "Tretu-Konto",
     "platform": "Tretu"
@@ -89,6 +90,11 @@
       "minecraft": {
         "playtime": "Spielzeit",
         "hours": "{hours, plural, one {# Stunde} other {# Stunden}}"
+      },
+      "city": {
+        "playtime": "Spielzeit",
+        "hours": "{hours, plural, one {# Stunde} other {# Stunden}}",
+        "coop": "Gemeinsam gebaut"
       }
     },
     "linkedTitle": "Verknüpfte Konten",
@@ -210,6 +216,7 @@
       "saga": "Saga",
       "hollowmere": "Hollowmere",
       "minecraft": "Minecraft",
+      "city": "Tretu City",
       "community": "Community"
     }
   },

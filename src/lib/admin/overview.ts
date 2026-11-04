@@ -60,7 +60,7 @@ export async function platformKpis(db: Executor = platformDb, now: Date = new Da
     db.execute(sql`select count(*)::int as n from platform_user_badges`) as unknown as Promise<Row[]>,
   ]);
 
-  const apps = new Set<string>(["saga", "play", "hollowmere", "mc-dashboard"]);
+  const apps = new Set<string>(["saga", "play", "hollowmere", "mc-dashboard", "city"]);
   for (const r of [...dailyRows, ...weeklyRows, ...totalRows, ...onlineRows]) if (typeof r.app === "string" && !NON_USAGE_APPS.has(r.app)) apps.add(r.app);
   const pick = (rows: Row[], app: string) => Number(rows.find((r) => r.app === app)?.users ?? 0);
 

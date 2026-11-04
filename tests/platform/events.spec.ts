@@ -227,3 +227,41 @@ test("user.created/updated from auth fill the directory; out-of-order updates ar
   const missing = await getUser(await signedRequest("play", "GET", `/api/v1/users/${uuid()}`), ctx({ sub: uuid() }));
   assert.equal(missing.status, 404);
 });
+
+test("Tretu City: signed city.* stats count, give XP and City badges", async () => {
+  const secret = "city-secret-0123456789abcdef";
+  const before = process.env.TRETU_APPS_JSON;
+  process.env.TRETU_APPS_JSON = JSON.stringify({ ...JSON.parse(before ?? "{}"), city: { secret, webhook: "https://city.test/api/tretu/webhook" } });
+  try {
+    const sub = uuid();
+    await seedUser(sub, "gina");
+    const sendCity = async (body: unknown) => {
+      const res = await postEvents(await signedRequest("city", "POST", "/api/v1/events", body, { secret }), ctx());
+      return { status: res.status, body: (await res.json()) as Record<string, unknown> };
+    };
+    const res = await sendCity({
+      events: [
+        envelope("city", sub, "stat.increment", { key: "city.playtime.minutes", by: 600 }),
+        envelope("city", sub, "stat.increment", { key: "city.coop.sessions", by: 1 }),
+        envelope("city", sub, "stat.increment", { key: "city.milestone.1", by: 1 }),
+        envelope("city", sub, "stat.increment", { key: "city.milestone.2", by: 1 }),
+      ],
+    });
+    assert.equal(res.status, 202);
+    assert.equal(res.body.accepted, 4);
+    assert.equal((await sendCity(envelope("city", sub, "stat.increment", { key: "saga.turns", by: 1 }))).body.error, "invalid_key");
+
+    const stats = await getStats(platformDb, sub);
+    assert.equal(stats["city.playtime.minutes"], 600);
+    assert.equal(stats["tretu.apps.used"], 1);
+    const keys = (await badgeRows(sub)).map((b) => b.badgeKey).sort();
+    assert.deepEqual(keys, ["city.planner-10h", "city.together", "city.town", "city.village"]);
+    const [progress] = await platformDb.select().from(platformUserProgress).where(eq(platformUserProgress.sub, sub));
+    // 600 minutes = 120 XP (1 per 5 min) plus the badges' XP (100 + 50 + 50 + 25).
+    assert.equal(progress.xp, 120 + 100 + 50 + 50 + 25);
+    const outbox = await platformDb.select().from(platformOutbox).where(eq(platformOutbox.type, "badge.earned"));
+    assert.ok(outbox.some((r) => r.targetApp === "city"), "City receives platform webhooks");
+  } finally {
+    process.env.TRETU_APPS_JSON = before;
+  }
+});

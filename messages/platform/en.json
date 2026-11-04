@@ -37,6 +37,7 @@
     "hollowmere": "Hollowmere",
     "mc-dashboard": "Minecraft",
     "minecraft": "Minecraft",
+    "city": "Tretu City",
     "tretu-web": "tretu.de",
     "auth": "Tretu account",
     "platform": "Tretu"
@@ -89,6 +90,11 @@
       "minecraft": {
         "playtime": "Playtime",
         "hours": "{hours, plural, one {# hour} other {# hours}}"
+      },
+      "city": {
+        "playtime": "Playtime",
+        "hours": "{hours, plural, one {# hour} other {# hours}}",
+        "coop": "Co-op sessions"
       }
     },
     "linkedTitle": "Linked accounts",
@@ -210,6 +216,7 @@
       "saga": "Saga",
       "hollowmere": "Hollowmere",
       "minecraft": "Minecraft",
+      "city": "Tretu City",
       "community": "Community"
     }
   },
