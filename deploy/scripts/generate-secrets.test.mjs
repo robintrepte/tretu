@@ -56,15 +56,16 @@ test("one TRETU_APP_SECRET per app, identical in TRETU_APPS_JSON on tretu.de and
   const secrets = Object.values(apps).map((a) => a.secret);
   assert.equal(new Set(secrets).size, secrets.length, "all different");
   for (const secret of secrets) assert.ok(secret.length >= 32);
-  for (const env of [files.saga, files.play, files.mc]) assert.equal(env.TRETU_PLATFORM_URL, "https://tretu.de");
+  for (const env of [files.saga, files.play, files.mc, files.city]) assert.equal(env.TRETU_PLATFORM_URL, "https://tretu.de");
   assert.equal(files.saga.TRETU_APP_ID, "saga");
   // The Tretu server's Saga storage, the default of Saga's nginx file ($saga_storage).
   assert.equal(files.saga.STORAGE_DIR, "/var/www/saga.tretu.de/public/images");
   assert.equal(files.play.TRETU_APP_ID, "play");
   assert.equal(files.mc.TRETU_APP_ID, "mc-dashboard");
-  // City signs nothing yet: no app secret, no webhook.
-  assert.equal(apps.city, undefined);
-  for (const key of ["TRETU_APP_ID", "TRETU_APP_SECRET", "TRETU_PLATFORM_URL"]) assert.equal(files.city[key], undefined, key);
+  assert.equal(apps.city.secret, files.city.TRETU_APP_SECRET);
+  assert.equal(apps.city.webhook, "https://city.tretu.de/api/tretu/webhook");
+  assert.equal(files.city.TRETU_APP_ID, "city");
+  assert.equal(files.city.TRETU_LEGAL_URL, "https://tretu.de");
 });
 
 test("TRETU_OAUTH_CLIENTS_JSON matches every client's id, secret, redirect and post-logout URI", () => {

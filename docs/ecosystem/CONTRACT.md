@@ -46,7 +46,7 @@ Local dev/test Postgres (already running in the build container): `postgres://po
 | `TRETU_APP_SECRET` | random, 32+ bytes | apps signing requests / verifying webhooks |
 | `TRETU_LEGAL_URL` | `https://tretu.de` (default) | footer links |
 
-App IDs: `tretu-web`, `auth`, `saga`, `play`, `hollowmere`, `mc-dashboard`.
+App IDs: `tretu-web`, `auth`, `saga`, `play`, `hollowmere`, `mc-dashboard`, `city`.
 
 ## 2. Identity: auth.tretu.de (OIDC provider)
 
@@ -167,7 +167,7 @@ GET /api/v1/wallet/user-sub-1 (empty body, sha256 = e3b0c44298fc1c149afbf4c8996f
 signature = v1=2b0726b5f46af3137ecc0e51e27183533e357d620e2ab128fd7165610bc9ca6f
 ```
 
-Platform config (on tretu.de and auth.tretu.de): `TRETU_APPS_JSON` = `{"saga":{"secret":"…","webhook":"https://saga.tretu.de/api/tretu/webhook"},"play":{…},"hollowmere":{"secret":"…"},"mc-dashboard":{…},"auth":{"secret":"…"},"tretu-web":{"secret":"…"}}`. `webhook` optional.
+Platform config (on tretu.de and auth.tretu.de): `TRETU_APPS_JSON` = `{"saga":{"secret":"…","webhook":"https://saga.tretu.de/api/tretu/webhook"},"play":{…},"hollowmere":{"secret":"…"},"mc-dashboard":{…},"city":{"secret":"…","webhook":"https://city.tretu.de/api/tretu/webhook"},"auth":{"secret":"…"},"tretu-web":{"secret":"…"}}`. `webhook` optional.
 
 Clients: timeout 5 s, never block a user-facing request on the platform for longer; failures are logged and swallowed (events) or surfaced as a friendly error (wallet spend). Events SHOULD be sent fire-and-forget with a small in-process retry (or an outbox table if the app already has a job runner).
 
@@ -193,6 +193,12 @@ Stat keys the apps emit (baseline; apps may add more, prefixed with their id):
 - saga: `stat.increment` `saga.turns` (player turns), `saga.worlds.created`, `saga.characters.created`; `game.finished` `{game:"campaign", result:"completed"}` when a campaign ends.
 - hollowmere: `stat.increment` `hollowmere.creatures.befriended`, `hollowmere.days.played`; `game.finished` `{game:"battle", result:…}`.
 - mc-dashboard: `stat.increment` `minecraft.playtime.minutes` (only for players linked to a Tretu-Konto).
+- city: `stat.increment` `city.playtime.minutes` (minutes played), `city.coop.sessions` (+1 per account and room visit
+  while at least two accounts build in the same city), `city.milestone.<n>` (+1 for everyone building in the city and
+  its owner when it reaches a level: 1 Dorf 300 residents, 2 Kleinstadt 1,200, 3 Stadt 4,000, 4 Großstadt 10,000,
+  5 Metropole 25,000, 6 Weltstadt 60,000). City also uses
+  presence, friends and invites (§5) and takes webhooks at `https://city.tretu.de/api/tretu/webhook` (`user.updated`,
+  `user.deleted`).
 - platform itself: `tretu.friends`, `tretu.apps.used`.
 
 Webhooks the platform sends to apps (to `TRETU_APPS_JSON[app].webhook`, convention path `/api/tretu/webhook`, signed §3, retries with backoff up to 24 h, same envelope with `app:"platform"`):

@@ -1,4 +1,4 @@
-import { BookOpen, Box, Gamepad2, Leaf, type LucideIcon } from "lucide-react";
+import { BookOpen, Box, Building2, Gamepad2, Leaf, type LucideIcon } from "lucide-react";
 
 import { formatNumber } from "@/lib/platform/format";
 import type { PlatformLocale, Translator } from "@/lib/platform/i18n-core";
@@ -68,6 +68,17 @@ export function buildStatCards(stats: Record<string, number>, t: Translator, loc
           label: t("profile.stats.minecraft.playtime"),
           value: t("profile.stats.minecraft.hours", { hours: Math.floor(n("minecraft.playtime.minutes") / 60) }),
         },
+      ],
+    });
+  }
+  if (n("city.playtime.minutes") + n("city.coop.sessions") > 0) {
+    cards.push({
+      key: "city",
+      title: t("apps.city"),
+      icon: Building2,
+      items: [
+        { label: t("profile.stats.city.playtime"), value: t("profile.stats.city.hours", { hours: Math.floor(n("city.playtime.minutes") / 60) }) },
+        { label: t("profile.stats.city.coop"), value: fmt(n("city.coop.sessions")) },
       ],
     });
   }

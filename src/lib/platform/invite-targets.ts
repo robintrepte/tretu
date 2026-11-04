@@ -4,6 +4,7 @@ export const INVITE_TARGETS = {
   saga: { label: "Saga", url: "https://saga.tretu.de" },
   hollowmere: { label: "Hollowmere", url: "https://hollowmere.tretu.de" },
   minecraft: { label: "Minecraft", url: "https://mc.tretu.de" },
+  city: { label: "Tretu City", url: "https://city.tretu.de" },
   teamspeak: { label: "TeamSpeak", url: "https://tretu.de/teamspeak" },
   discord: { label: "Discord", url: "https://tretu.de/discord" },
 } as const;

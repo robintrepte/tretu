@@ -13,7 +13,7 @@ export type BadgeRule =
   /** Tretu-Konto created on or before TRETU_EARLY_SUPPORTER_UNTIL (default 2027-03-31). */
   | { type: "earlySupporter" };
 
-export type BadgeCategory = "play" | "saga" | "hollowmere" | "minecraft" | "community";
+export type BadgeCategory = "play" | "saga" | "hollowmere" | "minecraft" | "city" | "community";
 
 export type BadgeDefinition = {
   key: string;
@@ -171,6 +171,67 @@ export const BADGES: readonly BadgeDefinition[] = [
     xp: 300,
     credits: 75,
     rule: { type: "stat", key: "minecraft.playtime.minutes", gte: 6000 },
+  },
+  // Tretu City
+  {
+    key: "city.village",
+    category: "city",
+    title: { de: "Dorfgründer", en: "Village Founder" },
+    description: { de: "Lass eine Stadt in Tretu City auf 300 Einwohner wachsen (Dorf).", en: "Grow a city in Tretu City to 300 residents (village)." },
+    icon: "House",
+    xp: 25,
+    credits: 10,
+    rule: { type: "stat", key: "city.milestone.1", gte: 1 },
+  },
+  {
+    key: "city.town",
+    category: "city",
+    title: { de: "Kleinstadt", en: "Small Town" },
+    description: { de: "Lass eine Stadt in Tretu City auf 1.200 Einwohner wachsen.", en: "Grow a city in Tretu City to 1,200 residents." },
+    icon: "Building",
+    xp: 50,
+    credits: 20,
+    rule: { type: "stat", key: "city.milestone.2", gte: 1 },
+  },
+  {
+    key: "city.metropolis",
+    category: "city",
+    title: { de: "Großstadt", en: "Big City" },
+    description: { de: "Lass eine Stadt in Tretu City auf 10.000 Einwohner wachsen.", en: "Grow a city in Tretu City to 10,000 residents." },
+    icon: "Building2",
+    xp: 150,
+    credits: 40,
+    rule: { type: "stat", key: "city.milestone.4", gte: 1 },
+  },
+  {
+    key: "city.world-city",
+    category: "city",
+    title: { de: "Weltstadt", en: "World City" },
+    description: { de: "Lass eine Stadt in Tretu City auf 60.000 Einwohner wachsen.", en: "Grow a city in Tretu City to 60,000 residents." },
+    icon: "Landmark",
+    xp: 300,
+    credits: 75,
+    rule: { type: "stat", key: "city.milestone.6", gte: 1 },
+  },
+  {
+    key: "city.together",
+    category: "city",
+    title: { de: "Gemeinsam gebaut", en: "Built Together" },
+    description: { de: "Baue in Tretu City zusammen mit anderen an einer Stadt.", en: "Build a city together with others in Tretu City." },
+    icon: "Handshake",
+    xp: 50,
+    credits: 20,
+    rule: { type: "stat", key: "city.coop.sessions", gte: 1 },
+  },
+  {
+    key: "city.planner-10h",
+    category: "city",
+    title: { de: "Stadtplaner", en: "City Planner" },
+    description: { de: "Spiele 10 Stunden Tretu City.", en: "Play Tretu City for 10 hours." },
+    icon: "DraftingCompass",
+    xp: 100,
+    credits: 25,
+    rule: { type: "stat", key: "city.playtime.minutes", gte: 600 },
   },
   // Community (cross-app)
   {

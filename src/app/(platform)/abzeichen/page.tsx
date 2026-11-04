@@ -20,7 +20,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return pageMetadata({ title: t("badges.metaTitle"), description: t("badges.intro"), path: "/abzeichen" });
 }
 
-const CATEGORIES: BadgeCategory[] = ["community", "play", "saga", "hollowmere", "minecraft"];
+const CATEGORIES: BadgeCategory[] = ["community", "play", "saga", "hollowmere", "minecraft", "city"];
 
 export default async function BadgesPage() {
   const ctx = await getPageContext();

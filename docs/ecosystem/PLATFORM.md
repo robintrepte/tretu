@@ -64,7 +64,8 @@ avatar only. Owners without Steam see "Steam verbinden" (→ Mein Konto) when `T
 - XP (app XP capped per user, app and Europe/Berlin day; badge XP uncapped): game played 10, win +15,
   `completed` +40, achievement 25; stats: `saga.turns` 2/turn, `saga.worlds.created` 10,
   `saga.characters.created` 10, `hollowmere.creatures.befriended` 15, `hollowmere.days.played` 10,
-  `minecraft.playtime.minutes` 1 XP per 5 min (computed on the running total, no rounding loss).
+  `minecraft.playtime.minutes` and `city.playtime.minutes` 1 XP per 5 min (computed on the running total, no rounding
+  loss).
 - Level curve: level L → L+1 costs 100·L XP; total for level L = 50·L·(L−1) (L2 100, L5 1000, L10 4500).
   A higher level emits `level.up {level}` and a `level` notification.
 - Badges (`src/lib/platform/badges.ts`) are re-evaluated after every change and awarded exactly once
@@ -127,6 +128,12 @@ Sign rules: `spend` must be negative, `adjust` may be negative, all other kinds 
 | `minecraft.playtime-1h` | Erste Schicht / First Shift | `minecraft.playtime.minutes` ≥ 60 | Pickaxe | 25 | 10 |
 | `minecraft.playtime-10h` | Baumeister / Master Builder | `minecraft.playtime.minutes` ≥ 600 | Hammer | 100 | 25 |
 | `minecraft.playtime-100h` | Blockveteran / Block Veteran | `minecraft.playtime.minutes` ≥ 6000 | Mountain | 300 | 75 |
+| `city.village` | Dorfgründer / Village Founder | `city.milestone.1` ≥ 1 (300 residents) | House | 25 | 10 |
+| `city.town` | Kleinstadt / Small Town | `city.milestone.2` ≥ 1 (1,200 residents) | Building | 50 | 20 |
+| `city.metropolis` | Großstadt / Big City | `city.milestone.4` ≥ 1 (10,000 residents) | Building2 | 150 | 40 |
+| `city.world-city` | Weltstadt / World City | `city.milestone.6` ≥ 1 (60,000 residents) | Landmark | 300 | 75 |
+| `city.together` | Gemeinsam gebaut / Built Together | `city.coop.sessions` ≥ 1 | Handshake | 50 | 20 |
+| `city.planner-10h` | Stadtplaner / City Planner | `city.playtime.minutes` ≥ 600 | DraftingCompass | 100 | 25 |
 | `wins-10` | Siegesserie / Winning Streak | sum of `*.games.won` ≥ 10 | Medal | 100 | 25 |
 | `wins-50` | Champion / Champion | sum of `*.games.won` ≥ 50 | Crown | 250 | 50 |
 | `wins-250` | Legende / Legend | sum of `*.games.won` ≥ 250 | Gem | 500 | 100 |

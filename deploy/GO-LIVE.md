@@ -301,7 +301,7 @@ delivered. `npm run platform:outbox -- status` shows the backlog per app, `-- re
 | Play | `play/.env` → `/srv/play/.env`, deploy ([DEPLOY.md](https://github.com/robintrepte/play/blob/main/DEPLOY.md)) | `smoke.sh --only play`, a finished game shows up in the profile | same for `play.tretu.de` (PM2 name and port: `PLAY_PM2_NAME`/`PLAY_PORT`, default `play.tretu.de` on 3041 = nginx upstream) |
 | Minecraft dashboard | `mc-dashboard/.env` → `/srv/tretu-minecraft/dashboard/.env`, `npm ci --omit=dev && npm run migrate`, reload ([README](https://github.com/robintrepte/tretu-minecraft/blob/main/README.md)) | `smoke.sh --only mc`, Tretu login, "Minecraft verknüpfen" | same for `mc-dashboard` |
 | Hollowmere | `hollowmere/server.env` → `server/.env`, `hollowmere/local.yml` → `server/nakama/local.yml`, `nakama.sh check`, reload ([HOSTING.md](https://github.com/robintrepte/hollowmere/blob/main/HOSTING.md) §5, §10) | `smoke.sh --only hollowmere`, Tretu sign-in in the web build | previous `local.yml`, reload |
-| Tretu City | checkout in `/srv/city`, `city/.env` → `/srv/city/.env`, `npm ci && npm run build`, `pm2 start ecosystem.config.cjs` (`city.tretu.de` on 127.0.0.1:3060), nginx `deploy/nginx/city.tretu.de.conf` ([DEPLOY.md](https://github.com/robintrepte/city.tretu.de/blob/main/DEPLOY.md)) | `smoke.sh --only city`, Tretu login (new app: no old accounts) | `pm2 stop city.tretu.de` (a new app, nothing to restore) |
+| Tretu City | checkout in `/srv/city`, `city/.env` → `/srv/city/.env`, `npm ci && npm run build`, `pm2 start ecosystem.config.cjs` (`city.tretu.de` on 127.0.0.1:3060), nginx `deploy/nginx/city.tretu.de.conf` ([DEPLOY.md](https://github.com/robintrepte/city.tretu.de/blob/main/DEPLOY.md)) | `smoke.sh --only city`, Tretu login (new app: no old accounts), `--webhook-test city` | `pm2 stop city.tretu.de` (a new app, nothing to restore) |
 
 Then the optional parts in `/srv/tretu/.env.local`: web push (VAPID keys are already set), Discord bot +
 `TRETU_BADGE_DISCORD_ROLES_JSON`, `TS_QUERY_*` + `TRETU_BADGE_TS_GROUPS_JSON` → `pm2 reload ecosystem.config.cjs --update-env`.
@@ -314,14 +314,17 @@ City (city.tretu.de) came after the go-live. On a running server, add it in this
 
 1. DNS: `city` → `$IP` / `$IP6` (step 1).
 2. Secrets: run step 3 again with the same `--out` (and the same `--import`s): only City's values are added
-   (`city/.env`, the `city` client in `tretu-auth/.env`, `CITY_DB_PASSWORD` in `postgres/roles.env`, City in
-   `TRETU_STATUS_TARGETS_JSON`). Install the new `tretu-auth/.env` and reload auth (`pm2 reload ecosystem.config.cjs
-   --update-env` in `/srv/tretu/auth`: clients are synced at boot), then the new `tretu-web/.env.local` (the same in
-   `/srv/tretu`) so /status lists City.
+   (`city/.env`, the `city` client in `tretu-auth/.env`, `CITY_DB_PASSWORD` in `postgres/roles.env`, City's secret
+   and webhook in `TRETU_APPS_JSON`, City in `TRETU_STATUS_TARGETS_JSON`). Install the new `tretu-auth/.env` and
+   reload auth (`pm2 reload ecosystem.config.cjs --update-env` in `/srv/tretu/auth`: clients are synced at boot), then
+   the new `tretu-web/.env.local` (the same in `/srv/tretu`) so the platform accepts City's signed calls and /status
+   lists City.
 3. Database: step 4 with `--only city`. Do this before the next nightly backup: `pg-backup.sh` includes `city`.
 4. Checkout `/srv/city`, certificate and nginx (step 6 for `city`), then the Tretu City row of 7.5.
 
-Check: `smoke.sh --only city`, `https://city.tretu.de/api/health` answers `"app":"city"`, sign-in with a Tretu-Konto.
+Check: `smoke.sh --only city`, `https://city.tretu.de/api/health` answers `"app":"city"`, sign-in with a Tretu-Konto,
+then `npm run smoke -- --webhook-test city --only webhook` (in `/srv/tretu`) PASSes, and time played in City shows up in
+the profile stats on tretu.de.
 **Rollback:** `pm2 stop city.tretu.de`, remove its nginx link; the extra client and database do no harm.
 
 ## 8. Verification

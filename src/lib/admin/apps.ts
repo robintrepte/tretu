@@ -7,7 +7,7 @@ export type EcosystemApp = {
   name: string;
   /** Public site. */
   url: string;
-  /** The app's own admin, or null (Hollowmere has no web admin). */
+  /** The app's own admin, or null (Hollowmere and Tretu City have no web admin). */
   adminUrl: string | null;
   /** Deep link into the app's admin user list for one Tretu sub. */
   userAdminUrl: ((sub: string) => string) | null;
@@ -38,6 +38,7 @@ export const ECOSYSTEM_APPS: readonly EcosystemApp[] = [
     userAdminUrl: (sub) => `https://mc.tretu.de/admin?tretuSub=${q(sub)}`,
   },
   { id: "hollowmere", name: "Hollowmere", url: "https://hollowmere.tretu.de", adminUrl: null, userAdminUrl: null },
+  { id: "city", name: "Tretu City", url: "https://city.tretu.de", adminUrl: null, userAdminUrl: null },
 ];
 
 const BY_ID = new Map(ECOSYSTEM_APPS.map((a) => [a.id, a]));
