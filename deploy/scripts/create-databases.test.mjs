@@ -55,7 +55,7 @@ test("creates one least-privileged role and database per app, idempotently", { s
   const first = sh(["--passwords", passwords, "--prefix", prefix]);
   assert.equal(first.status, 0, first.stderr);
   assert.match(first.stdout, new RegExp(`${prefix}saga\\s+${prefix}saga\\s+created, role created`));
-  for (const app of ["tretu_web", "tretu_auth", "saga", "play", "mc_dashboard", "nakama"]) {
+  for (const app of ["tretu_web", "tretu_auth", "saga", "play", "mc_dashboard", "city", "nakama"]) {
     const name = `${prefix}${app}`;
     assert.equal(
       value(`select rolcanlogin, rolsuper, rolcreatedb, rolcreaterole, rolreplication, rolbypassrls from pg_roles where rolname = '${name}'`),

@@ -12,6 +12,7 @@ Every step says how to check it and how to roll it back. Each app's own deploy d
 | Play | play.tretu.de | [play DEPLOY.md](https://github.com/robintrepte/play/blob/main/DEPLOY.md) |
 | Hollowmere (Nakama + web + MCP relay) | hollowmere.tretu.de, mcp.hollowmere.tretu.de | [hollowmere HOSTING.md](https://github.com/robintrepte/hollowmere/blob/main/HOSTING.md) |
 | Minecraft dashboard + map | mc.tretu.de, map.tretu.de | [tretu-minecraft README.md](https://github.com/robintrepte/tretu-minecraft/blob/main/README.md) |
+| Tretu City | city.tretu.de | [city.tretu.de DEPLOY.md](https://github.com/robintrepte/city.tretu.de/blob/main/DEPLOY.md) |
 | Status page (part of tretu.de) | tretu.de/status | [DEPLOY.md](../DEPLOY.md#status-page-tretudestatus) |
 
 Tools used below (all in this repo, all tested in CI): `deploy/scripts/generate-secrets.mjs`,
@@ -52,7 +53,7 @@ nginx file is `/var/www/letsencrypt` (`certbot certonly --webroot -w /var/www/le
 | Type | Name | Value |
 |---|---|---|
 | A / AAAA | `tretu.de`, `www` | `$IP` / `$IP6` |
-| A / AAAA | `auth`, `saga`, `play`, `hollowmere`, `mcp.hollowmere`, `mc`, `map` | `$IP` / `$IP6` |
+| A / AAAA | `auth`, `saga`, `play`, `hollowmere`, `mcp.hollowmere`, `mc`, `map`, `city` | `$IP` / `$IP6` |
 
 There is no analytics or status host: remove old `stats` / `status` records if they exist (the status page is
 https://tretu.de/status).
@@ -60,7 +61,7 @@ https://tretu.de/status).
 Check (every line must end in `$IP`):
 
 ```bash
-for h in tretu.de www auth saga play hollowmere mcp.hollowmere mc map; do
+for h in tretu.de www auth saga play hollowmere mcp.hollowmere mc map city; do
   [ "$h" = tretu.de ] || h="$h.tretu.de"; printf '%-26s %s\n' "$h" "$(dig +short A "$h" | tail -n 1)"
 done
 ```
@@ -91,7 +92,7 @@ node deploy/scripts/generate-secrets.mjs --out /root/tretu-secrets \
 ```
 
 - Writes `/root/tretu-secrets/` (mode 700, files 600): `tretu-web/.env.local`, `tretu-auth/.env`, `saga/.env`,
-  `play/.env`, `hollowmere/server.env` + `hollowmere/local.yml`, `mc-dashboard/.env`,
+  `play/.env`, `hollowmere/server.env` + `hollowmere/local.yml`, `mc-dashboard/.env`, `city/.env`,
   `postgres/roles.env` and the state file `tretu-secrets.json`. Nothing secret is printed.
 - Templates of all of them: [deploy/env/](env/). Values marked `external` (auth's Discord/Google/Apple OAuth apps, SES,
   OpenAI, Replicate, ElevenLabs, TMDB, TeamSpeak ServerQuery, Discord bots, status Discord webhook) are filled in by
@@ -108,7 +109,7 @@ app has its Tretu-Konto settings (no output = good):
 
 ```bash
 cd /root/tretu-secrets
-for f in tretu-web/.env.local saga/.env play/.env mc-dashboard/.env; do
+for f in tretu-web/.env.local saga/.env play/.env mc-dashboard/.env city/.env; do
   for k in TRETU_AUTH_ISSUER TRETU_AUTH_CLIENT_ID TRETU_AUTH_CLIENT_SECRET; do grep -q "^$k=." "$f" || echo "MISSING $k in $f"; done
 done
 grep -q '"TRETU_AUTH_ISSUER=https://auth\.' hollowmere/local.yml || echo "MISSING TRETU_AUTH_ISSUER in hollowmere/local.yml"
@@ -127,7 +128,7 @@ sudo -u postgres /srv/tretu/deploy/scripts/create-databases.sh --passwords /tmp/
 shred -u /tmp/tretu-roles.env
 ```
 
-- Creates `tretu_web`, `tretu_auth`, `saga`, `play`, `mc_dashboard`, `nakama` (owner = same-named role,
+- Creates `tretu_web`, `tretu_auth`, `saga`, `play`, `mc_dashboard`, `city`, `nakama` (owner = same-named role,
   LOGIN only, CONNECT revoked from PUBLIC) and the read-only `tretu_legacy_reader` for auth's legacy import.
 - **Existing databases** owned by another role (e.g. Play's old `tretu` role) are reported as `SKIPPED`. Either keep
   that app's existing `DATABASE_URL` (edit the generated env file), or hand the data to the new role inside that
@@ -165,12 +166,13 @@ Check: `sudo -u postgres /srv/tretu/deploy/scripts/pg-restore-test.sh` → `rest
 ## 6. nginx and certificates
 
 ```bash
-# every repo's site files (tretu, tretu/auth, adventure.ai, play, hollowmere, tretu-minecraft)
+# every repo's site files (tretu, tretu/auth, adventure.ai, play, hollowmere, tretu-minecraft, city.tretu.de)
 /srv/tretu/deploy/scripts/check-nginx.sh /srv/tretu/deploy/nginx/*.conf /srv/tretu/auth/deploy/nginx/*.conf \
-  /srv/saga/deploy/nginx/*.conf /srv/play/deploy/nginx/*.conf /srv/hollowmere/deploy/nginx/*.conf /srv/tretu-minecraft/deploy/nginx/*.conf
+  /srv/saga/deploy/nginx/*.conf /srv/play/deploy/nginx/*.conf /srv/hollowmere/deploy/nginx/*.conf /srv/tretu-minecraft/deploy/nginx/*.conf \
+  /srv/city/deploy/nginx/*.conf
 cp <those files> /etc/nginx/sites-available/ && ln -s /etc/nginx/sites-available/<host>.conf /etc/nginx/sites-enabled/
 certbot --nginx -d tretu.de -d www.tretu.de        # then once per host: auth, saga, play, hollowmere,
-                                                   # mcp.hollowmere, mc, map
+                                                   # mcp.hollowmere, mc, map, city
 nginx -t && systemctl reload nginx && certbot renew --dry-run
 ```
 
@@ -191,7 +193,7 @@ Before installing an app's env file (here and in 7.5), check its Tretu-Konto set
 good):
 
 ```bash
-for f in /srv/tretu/.env.local /srv/saga/.env /srv/play/.env /srv/tretu-minecraft/dashboard/.env; do
+for f in /srv/tretu/.env.local /srv/saga/.env /srv/play/.env /srv/tretu-minecraft/dashboard/.env /srv/city/.env; do
   [ -f "$f" ] || continue
   for k in TRETU_AUTH_ISSUER TRETU_AUTH_CLIENT_ID TRETU_AUTH_CLIENT_SECRET; do grep -q "^$k=." "$f" || echo "MISSING $k in $f"; done
 done
@@ -232,7 +234,7 @@ Check: `oidc discovery PASS`, `oidc jwks PASS`; register a test account, `https:
 ### 7.3 Status page and alerts
 
 Nothing to install: `tretu-platform-worker` (started in 7.1) checks every service's `/api/health` once a minute and
-https://tretu.de/status shows the result. The generated `.env.local` already lists the six services in
+https://tretu.de/status shows the result. The generated `.env.local` already lists the seven services in
 `TRETU_STATUS_TARGETS_JSON`, the Minecraft server (`TRETU_STATUS_MINECRAFT`) and the extra certificate hosts; the
 TeamSpeak row appears with `TS_QUERY_*` (or `TRETU_STATUS_TEAMSPEAK`). The webhook also gets certificate warnings
 (14 and 3 days before expiry). Optionally create a Discord webhook (channel settings → Integrations → Webhooks) and set
@@ -281,7 +283,7 @@ npm run admin -- merge <from> <into> --yes    # merge; the platform moves wallet
 
 ### 7.5 Switch the apps on, one at a time
 
-Only after 7.2 and 7.4 are complete. Order: **tretu.de login → Saga → Play → Minecraft dashboard → Hollowmere**. For
+Only after 7.2 and 7.4 are complete. Order: **tretu.de login → Saga → Play → Minecraft dashboard → Hollowmere → Tretu City**. For
 each: backup, check `TRETU_AUTH_*` (7, above), install the env file, deploy its Tretu-only version per its doc, smoke,
 sign in with a test Tretu-Konto and with an old local account (it must land on the old account through the
 `legacy_ids` claim), then the next one.
@@ -299,11 +301,28 @@ delivered. `npm run platform:outbox -- status` shows the backlog per app, `-- re
 | Play | `play/.env` → `/srv/play/.env`, deploy ([DEPLOY.md](https://github.com/robintrepte/play/blob/main/DEPLOY.md)) | `smoke.sh --only play`, a finished game shows up in the profile | same for `play.tretu.de` (PM2 name and port: `PLAY_PM2_NAME`/`PLAY_PORT`, default `play.tretu.de` on 3041 = nginx upstream) |
 | Minecraft dashboard | `mc-dashboard/.env` → `/srv/tretu-minecraft/dashboard/.env`, `npm ci --omit=dev && npm run migrate`, reload ([README](https://github.com/robintrepte/tretu-minecraft/blob/main/README.md)) | `smoke.sh --only mc`, Tretu login, "Minecraft verknüpfen" | same for `mc-dashboard` |
 | Hollowmere | `hollowmere/server.env` → `server/.env`, `hollowmere/local.yml` → `server/nakama/local.yml`, `nakama.sh check`, reload ([HOSTING.md](https://github.com/robintrepte/hollowmere/blob/main/HOSTING.md) §5, §10) | `smoke.sh --only hollowmere`, Tretu sign-in in the web build | previous `local.yml`, reload |
+| Tretu City | checkout in `/srv/city`, `city/.env` → `/srv/city/.env`, `npm ci && npm run build`, `pm2 start ecosystem.config.cjs` (`city.tretu.de` on 127.0.0.1:3060), nginx `deploy/nginx/city.tretu.de.conf` ([DEPLOY.md](https://github.com/robintrepte/city.tretu.de/blob/main/DEPLOY.md)) | `smoke.sh --only city`, Tretu login (new app: no old accounts) | `pm2 stop city.tretu.de` (a new app, nothing to restore) |
 
 Then the optional parts in `/srv/tretu/.env.local`: web push (VAPID keys are already set), Discord bot +
 `TRETU_BADGE_DISCORD_ROLES_JSON`, `TS_QUERY_*` + `TRETU_BADGE_TS_GROUPS_JSON` → `pm2 reload ecosystem.config.cjs --update-env`.
 Rollback: empty the mapping (the worker then removes the granted roles: an empty mapping means "no badge maps";
 to switch off without removing, remove `DISCORD_BOT_TOKEN` instead).
+
+### 7.6 Tretu City on an ecosystem that is already live
+
+City (city.tretu.de) came after the go-live. On a running server, add it in this order (steps 1–6 for one host):
+
+1. DNS: `city` → `$IP` / `$IP6` (step 1).
+2. Secrets: run step 3 again with the same `--out` (and the same `--import`s): only City's values are added
+   (`city/.env`, the `city` client in `tretu-auth/.env`, `CITY_DB_PASSWORD` in `postgres/roles.env`, City in
+   `TRETU_STATUS_TARGETS_JSON`). Install the new `tretu-auth/.env` and reload auth (`pm2 reload ecosystem.config.cjs
+   --update-env` in `/srv/tretu/auth`: clients are synced at boot), then the new `tretu-web/.env.local` (the same in
+   `/srv/tretu`) so /status lists City.
+3. Database: step 4 with `--only city`. Do this before the next nightly backup: `pg-backup.sh` includes `city`.
+4. Checkout `/srv/city`, certificate and nginx (step 6 for `city`), then the Tretu City row of 7.5.
+
+Check: `smoke.sh --only city`, `https://city.tretu.de/api/health` answers `"app":"city"`, sign-in with a Tretu-Konto.
+**Rollback:** `pm2 stop city.tretu.de`, remove its nginx link; the extra client and database do no harm.
 
 ## 8. Verification
 

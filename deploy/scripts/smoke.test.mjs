@@ -85,7 +85,7 @@ before(async () => {
 after(() => server.close());
 
 function smoke(extraArgs = [], env = {}, script = "smoke.sh") {
-  const maps = ["web", "auth", "saga", "play", "hollowmere", "mc"].flatMap((n) => ["--map", `${n}=${origin}/${n}`]);
+  const maps = ["web", "auth", "saga", "play", "hollowmere", "mc", "city"].flatMap((n) => ["--map", `${n}=${origin}/${n}`]);
   return new Promise((resolve) => {
     const child = spawn("bash", [path.join(here, script), ...maps, "--timeout", "5", ...extraArgs], { env: { ...process.env, ...env } });
     let out = "";
@@ -98,7 +98,7 @@ function smoke(extraArgs = [], env = {}, script = "smoke.sh") {
 test("all services healthy and the signed ping accepted → exit 0, table of PASS rows", async () => {
   const { code, out } = await smoke([], { SMOKE_APP_SECRET: SECRET });
   assert.equal(code, 0, out);
-  for (const check of ["health web", "health auth", "health saga", "health play", "health hollowmere", "health mc", "status page", "oidc discovery", "oidc jwks", "platform unsigned", "platform signed ping"]) {
+  for (const check of ["health web", "health auth", "health saga", "health play", "health hollowmere", "health mc", "health city", "status page", "oidc discovery", "oidc jwks", "platform unsigned", "platform signed ping"]) {
     assert.match(out, new RegExp(`^${check}\\s+PASS`, "m"), check);
   }
   assert.match(out, /all checks passed/);

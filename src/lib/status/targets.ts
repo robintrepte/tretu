@@ -66,6 +66,7 @@ export const KNOWN_SERVICES: Record<string, { name: string; host: string }> = {
   play: { name: "Play", host: "play.tretu.de" },
   hollowmere: { name: "Hollowmere", host: "hollowmere.tretu.de" },
   "mc-dashboard": { name: "Minecraft-Dashboard", host: "mc.tretu.de" },
+  city: { name: "Tretu City", host: "city.tretu.de" },
 };
 
 /** Order and URLs used when TRETU_STATUS_TARGETS_JSON is not set (contract §0). */
@@ -76,6 +77,7 @@ const DEFAULT_TARGETS: { id: string; url: string }[] = [
   { id: "play", url: "https://play.tretu.de/api/health" },
   { id: "hollowmere", url: "https://hollowmere.tretu.de/api/health" },
   { id: "mc-dashboard", url: "https://mc.tretu.de/api/health" },
+  { id: "city", url: "https://city.tretu.de/api/health" },
 ];
 
 const MAX_TARGETS = 20;

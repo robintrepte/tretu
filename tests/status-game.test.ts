@@ -213,6 +213,7 @@ test("certificate warnings: thresholds 14 and 3 days, once each, German message"
       "play.tretu.de:443",
       "hollowmere.tretu.de:443",
       "mc.tretu.de:443",
+      "city.tretu.de:443",
       "map.tretu.de:443",
       "mcp.hollowmere.tretu.de:8443",
     ]

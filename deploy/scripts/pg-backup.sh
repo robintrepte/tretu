@@ -11,7 +11,7 @@
 #
 # Env (all optional):
 #   BACKUP_DIR        /var/backups/tretu-postgres
-#   BACKUP_DATABASES  "tretu_web tretu_auth saga play mc_dashboard nakama"
+#   BACKUP_DATABASES  "tretu_web tretu_auth saga play mc_dashboard city nakama"
 #   RETENTION_DAYS    14
 #   BACKUP_REMOTE     e.g. u123456@u123456.your-storagebox.de:tretu-postgres/  (rsync -e "ssh -p 23")
 #   BACKUP_RSYNC_SSH  ssh -p 23 -i /var/lib/postgresql/.ssh/backup_ed25519
@@ -24,7 +24,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/alert.sh"
 trap 'alert_on_failure $? "Tretu-Backup"' EXIT
 
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/tretu-postgres}"
-BACKUP_DATABASES="${BACKUP_DATABASES:-tretu_web tretu_auth saga play mc_dashboard nakama}"
+BACKUP_DATABASES="${BACKUP_DATABASES:-tretu_web tretu_auth saga play mc_dashboard city nakama}"
 RETENTION_DAYS="${RETENTION_DAYS:-14}"
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 

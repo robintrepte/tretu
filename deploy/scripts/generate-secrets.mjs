@@ -36,6 +36,7 @@ export const APPS = {
   play: { host: "play.", dir: "/srv/play", db: "play", port: 3041, pm2: "play.tretu.de" },
   hollowmere: { host: "hollowmere.", dir: "/srv/hollowmere", db: "nakama", port: 7350 },
   "mc-dashboard": { host: "mc.", dir: "/srv/tretu-minecraft", db: "mc_dashboard", port: 8130 },
+  city: { host: "city.", dir: "/srv/city", db: "city", port: 3060, pm2: "city.tretu.de" },
 };
 
 /**
@@ -45,12 +46,12 @@ export const APPS = {
 export const SAGA_STORAGE_DIR = "/var/www/saga.tretu.de/public/images";
 
 /** Postgres roles (one per database) plus the read-only role auth uses for the legacy import. */
-export const DB_ROLES = ["tretu_web", "tretu_auth", "saga", "play", "mc_dashboard", "nakama", "tretu_legacy_reader"];
+export const DB_ROLES = ["tretu_web", "tretu_auth", "saga", "play", "mc_dashboard", "city", "nakama", "tretu_legacy_reader"];
 
 /** Apps that sign platform calls (contract §1) and the ones that receive webhooks (convention path). */
 export const SIGNING_APPS = ["tretu-web", "auth", "saga", "play", "hollowmere", "mc-dashboard"];
 const WEBHOOK_APPS = ["saga", "play", "hollowmere", "mc-dashboard"];
-const CONFIDENTIAL_CLIENTS = ["tretu-web", "saga", "play", "mc-dashboard"];
+const CONFIDENTIAL_CLIENTS = ["tretu-web", "saga", "play", "mc-dashboard", "city"];
 
 const hex = (bytes) => randomBytes(bytes).toString("hex");
 const b64url = (bytes) => randomBytes(bytes).toString("base64url");
@@ -101,6 +102,7 @@ export function urls(domain) {
     play: base("play"),
     hollowmere: base("hollowmere"),
     mc: base("mc-dashboard"),
+    city: base("city"),
     mcp: `https://mcp.hollowmere.${domain}`,
   };
 }
@@ -128,6 +130,7 @@ export function statusTargets(domain) {
     { id: "play", url: `${u.play}/api/health` },
     { id: "hollowmere", url: `${u.hollowmere}/api/health` },
     { id: "mc-dashboard", url: `${u.mc}/api/health` },
+    { id: "city", url: `${u.city}/api/health` },
   ];
 }
 
@@ -161,6 +164,13 @@ export function oauthClientsJson(domain, s) {
       name: "Minecraft",
       redirectUris: [`${u.mc}/auth/callback`],
       postLogoutRedirectUris: [`${u.mc}/`],
+    },
+    city: {
+      type: "confidential",
+      secret: s["oauth.city"],
+      name: "Tretu City",
+      redirectUris: [`${u.city}/auth/callback`],
+      postLogoutRedirectUris: [`${u.city}/`],
     },
     hollowmere: {
       type: "public",
@@ -381,6 +391,20 @@ function specs(domain, s) {
         ["TRETU_PLAYTIME_EVENTS", "true"],
       ],
     },
+    city: {
+      file: "city/.env",
+      target: `${APPS.city.dir}/.env`,
+      doc: "city.tretu.de DEPLOY.md",
+      lines: [
+        ["CITY_PUBLIC_URL", u.city],
+        ["DATABASE_URL", { db: ["city", "city"], host: "127.0.0.1" }],
+        "# Tretu-Konto (confidential client city): the only sign-in, required",
+        ["TRETU_AUTH_ISSUER", u.auth],
+        ["TRETU_AUTH_CLIENT_ID", "city"],
+        ["TRETU_AUTH_CLIENT_SECRET", G("oauth.city")],
+        "# Optional limits (defaults shown)\n# CITY_CHECKPOINT_MINUTES=10\n# CITY_UNLOAD_MINUTES=10\n# CITY_MAX_RUNNING=10\n# CITY_MAX_UNATTENDED_SPEED=1",
+      ],
+    },
     postgres: {
       file: "postgres/roles.env",
       target: "(input of deploy/scripts/create-databases.sh, keep with the secrets)",
@@ -518,6 +542,7 @@ const IMPORT_SECRET_KEYS = {
   play: { BETTER_AUTH_SECRET: "play.betterAuthSecret", TRETU_APP_SECRET: "app.play", TRETU_AUTH_CLIENT_SECRET: "oauth.play", VAPID_PUBLIC_KEY: "play.vapidPublic", VAPID_PRIVATE_KEY: "play.vapidPrivate" },
   hollowmere: { NAKAMA_HTTP_KEY: "nakama.httpKey" },
   "mc-dashboard": { TRETU_APP_SECRET: "app.mc-dashboard", TRETU_AUTH_CLIENT_SECRET: "oauth.mc-dashboard" },
+  city: { TRETU_AUTH_CLIENT_SECRET: "oauth.city" },
 };
 const MIN_IMPORTED_SECRET = 16;
 

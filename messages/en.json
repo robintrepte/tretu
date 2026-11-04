@@ -101,7 +101,7 @@
     },
     "status": {
       "title": "Status",
-      "description": "Current status of every Tretu service: website, Tretu account, Saga, Play, Hollowmere and the Minecraft dashboard, with availability over the last 24 hours and 90 days."
+      "description": "Current status of every Tretu service: website, Tretu account, Saga, Play, Hollowmere, the Minecraft dashboard and Tretu City, with availability over the last 24 hours and 90 days."
     }
   },
   "notFound": {

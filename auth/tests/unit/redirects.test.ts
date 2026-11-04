@@ -82,7 +82,7 @@ describe("npm run secrets", () => {
     let n = 0
     const lines = generatedSecrets(undefined, (bytes) => `r${bytes}-${++n}`)
     expect(lines).toContain("BETTER_AUTH_SECRET=r48-1")
-    expect(lines.filter((l) => /^[a-z-]+=r32-/.test(l)).map((l) => l.split("=")[0])).toEqual(["tretu-web", "saga", "play", "mc-dashboard"])
+    expect(lines.filter((l) => /^[a-z-]+=r32-/.test(l)).map((l) => l.split("=")[0])).toEqual(["tretu-web", "saga", "play", "mc-dashboard", "city"])
     expect(confidentialClientIds(JSON.stringify({ saga: { type: "confidential" }, hollowmere: { type: "public" } }))).toEqual(["saga"])
   })
 })

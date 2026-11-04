@@ -72,6 +72,7 @@ the database at boot and by `npm run clients:sync` (removed clients are disabled
   "saga":         { "type": "confidential", "secret": "…", "name": "Saga",      "redirectUris": ["https://saga.tretu.de/api/auth/oauth2/callback/tretu"] },
   "play":         { "type": "confidential", "secret": "…", "name": "Play",      "redirectUris": ["https://play.tretu.de/api/auth/oauth2/callback/tretu"] },
   "mc-dashboard": { "type": "confidential", "secret": "…", "name": "Minecraft", "redirectUris": ["https://mc.tretu.de/auth/callback"] },
+  "city":         { "type": "confidential", "secret": "…", "name": "Tretu City", "redirectUris": ["https://city.tretu.de/auth/callback"] },
   "hollowmere":   { "type": "public",                      "name": "Hollowmere","redirectUris": ["https://hollowmere.tretu.de/auth/callback", "http://127.0.0.1/callback"] }
 }
 ```
