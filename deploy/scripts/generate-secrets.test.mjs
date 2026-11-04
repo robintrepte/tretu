@@ -28,6 +28,7 @@ function load(out) {
     play: env("play/.env"),
     hollowmere: env("hollowmere/server.env"),
     mc: env("mc-dashboard/.env"),
+    city: env("city/.env"),
     roles: env("postgres/roles.env"),
     nakamaYaml: readFileSync(path.join(out, "hollowmere/local.yml"), "utf8"),
   };
@@ -61,6 +62,9 @@ test("one TRETU_APP_SECRET per app, identical in TRETU_APPS_JSON on tretu.de and
   assert.equal(files.saga.STORAGE_DIR, "/var/www/saga.tretu.de/public/images");
   assert.equal(files.play.TRETU_APP_ID, "play");
   assert.equal(files.mc.TRETU_APP_ID, "mc-dashboard");
+  // City signs nothing yet: no app secret, no webhook.
+  assert.equal(apps.city, undefined);
+  for (const key of ["TRETU_APP_ID", "TRETU_APP_SECRET", "TRETU_PLATFORM_URL"]) assert.equal(files.city[key], undefined, key);
 });
 
 test("TRETU_OAUTH_CLIENTS_JSON matches every client's id, secret, redirect and post-logout URI", () => {
@@ -70,6 +74,7 @@ test("TRETU_OAUTH_CLIENTS_JSON matches every client's id, secret, redirect and p
     saga: [files.saga, "https://saga.tretu.de/api/auth/oauth2/callback/tretu", "https://saga.tretu.de/"],
     play: [files.play, "https://play.tretu.de/api/auth/oauth2/callback/tretu", "https://play.tretu.de/"],
     "mc-dashboard": [files.mc, "https://mc.tretu.de/auth/callback", "https://mc.tretu.de/"],
+    city: [files.city, "https://city.tretu.de/auth/callback", "https://city.tretu.de/"],
   };
   for (const [id, [env, redirect, logout]] of Object.entries(expect)) {
     assert.equal(clients[id].type, "confidential");
@@ -85,6 +90,8 @@ test("TRETU_OAUTH_CLIENTS_JSON matches every client's id, secret, redirect and p
   assert.equal(files.saga.AUTH_URL, "https://saga.tretu.de");
   assert.equal(files.play.APP_URL, "https://play.tretu.de");
   assert.equal(files.mc.PUBLIC_URL, "https://mc.tretu.de");
+  assert.equal(files.city.CITY_PUBLIC_URL, "https://city.tretu.de");
+  assert.equal(clients.city.name, "Tretu City");
   assert.deepEqual(clients.hollowmere, {
     type: "public",
     name: "Hollowmere",
@@ -103,6 +110,7 @@ test("database URLs use one role per app with the passwords from roles.env", () 
     [files.saga.DATABASE_URL, "saga", "saga"],
     [files.play.DATABASE_URL, "play", "play"],
     [files.mc.DATABASE_URL, "mc_dashboard", "mc_dashboard"],
+    [files.city.DATABASE_URL, "city", "city"],
     [files.auth.LEGACY_SAGA_DATABASE_URL, "tretu_legacy_reader", "saga"],
     [files.auth.LEGACY_PLAY_DATABASE_URL, "tretu_legacy_reader", "play"],
     [files.auth.LEGACY_TRETU_DATABASE_URL, "tretu_legacy_reader", "tretu_web"],
@@ -149,7 +157,7 @@ test("files are mode 600 in 700 directories; nothing secret is printed", () => {
   assert.equal(statSync(out).mode & 0o777, 0o700);
   const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(dir, e.name)) : [path.join(dir, e.name)]));
   const all = walk(out);
-  assert.equal(all.length, 9);
+  assert.equal(all.length, 10);
   for (const file of all) {
     assert.equal(statSync(file).mode & 0o777, 0o600, file);
     assert.equal(statSync(path.dirname(file)).mode & 0o777, 0o700, path.dirname(file));
@@ -204,11 +212,11 @@ test("--import keeps a running app's secrets and settings and feeds them into th
 });
 
 test("Tretu-Konto only: TRETU_AUTH_* filled for every app, no setting of a removed sign-in method left", () => {
-  for (const [app, env] of Object.entries({ "tretu-web": files.web, saga: files.saga, play: files.play, "mc-dashboard": files.mc })) {
+  for (const [app, env] of Object.entries({ "tretu-web": files.web, saga: files.saga, play: files.play, "mc-dashboard": files.mc, city: files.city })) {
     assert.equal(env.TRETU_AUTH_ISSUER, "https://auth.tretu.de", app);
     assert.equal(env.TRETU_AUTH_CLIENT_ID, app);
     assert.ok(env.TRETU_AUTH_CLIENT_SECRET.length >= 32, app);
-    for (const key of [...REMOVED_KEYS[app], "TRETU_DISCORD_FALLBACK", "TRETU_LOCAL_LOGIN", "TRETU_CODE_LOGIN", "TRETU_SKIP_INVITE_FOR_TRETU"]) {
+    for (const key of [...(REMOVED_KEYS[app] ?? []), "TRETU_DISCORD_FALLBACK", "TRETU_LOCAL_LOGIN", "TRETU_CODE_LOGIN", "TRETU_SKIP_INVITE_FOR_TRETU"]) {
       assert.equal(env[key], undefined, `${app}: ${key}`);
     }
   }
@@ -228,19 +236,19 @@ test("other domains (staging) produce matching hosts", () => {
   const web = parseEnv(built.find((f) => f.app === "tretu-web").content);
   assert.deepEqual(
     JSON.parse(web.TRETU_STATUS_TARGETS_JSON).map((t) => t.url),
-    ["https://staging.tretu.de", "https://auth.staging.tretu.de", "https://saga.staging.tretu.de", "https://play.staging.tretu.de", "https://hollowmere.staging.tretu.de", "https://mc.staging.tretu.de"].map((h) => `${h}/api/health`)
+    ["https://staging.tretu.de", "https://auth.staging.tretu.de", "https://saga.staging.tretu.de", "https://play.staging.tretu.de", "https://hollowmere.staging.tretu.de", "https://mc.staging.tretu.de", "https://city.staging.tretu.de"].map((h) => `${h}/api/health`)
   );
   assert.throws(() => main(["--out", tmp, "--domain", "not a domain"], () => {}));
 });
 
 test("status targets: one /api/health per service, no analytics or status host left", () => {
   const targets = JSON.parse(files.web.TRETU_STATUS_TARGETS_JSON);
-  assert.deepEqual(targets.map((t) => t.id), ["tretu-web", "auth", "saga", "play", "hollowmere", "mc-dashboard"]);
+  assert.deepEqual(targets.map((t) => t.id), ["tretu-web", "auth", "saga", "play", "hollowmere", "mc-dashboard", "city"]);
   for (const t of targets) assert.match(t.url, /^https:\/\/([a-z]+\.)?tretu\.de\/api\/health$/);
   assert.equal(files.web.TRETU_STATUS_DISCORD_WEBHOOK_URL, "");
   assert.equal(files.web.TRETU_STATUS_MINECRAFT, "mc.tretu.de:25565");
   assert.equal(files.web.TRETU_STATUS_CERT_HOSTS, "map.tretu.de,mcp.hollowmere.tretu.de");
-  for (const env of [files.web, files.auth, files.saga, files.play, files.mc]) {
+  for (const env of [files.web, files.auth, files.saga, files.play, files.mc, files.city]) {
     for (const key of Object.keys(env)) assert.doesNotMatch(key, /UMAMI/);
     for (const value of Object.values(env)) assert.doesNotMatch(value, /stats\.tretu|status\.tretu/);
   }

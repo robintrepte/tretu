@@ -20,7 +20,7 @@
 # Connection: the usual libpq variables (PGHOST, PGPORT, PGUSER, PGDATABASE=postgres); default local socket.
 set -euo pipefail
 
-APPS=(tretu_web tretu_auth saga play mc_dashboard nakama)
+APPS=(tretu_web tretu_auth saga play mc_dashboard city nakama)
 LEGACY_DBS=(saga play tretu_web nakama)
 LEGACY_ROLE=tretu_legacy_reader
 

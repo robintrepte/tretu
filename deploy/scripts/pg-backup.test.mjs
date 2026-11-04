@@ -79,6 +79,14 @@ test("retention removes old dumps; a missing database fails the backup", { skip:
   const missing = run("pg-backup.sh", [], { BACKUP_DATABASES: `${db} ${db}_does_not_exist` });
   assert.equal(missing.status, 1);
   assert.match(missing.stdout, /does_not_exist\s+MISSING/);
+  // An optional database (an app not deployed yet, e.g. city) is skipped instead, in backup and restore test.
+  const optional = { BACKUP_DATABASES: `${db} ${db}_not_yet`, BACKUP_OPTIONAL_DATABASES: `${db}_not_yet` };
+  const skipped = run("pg-backup.sh", [], optional);
+  assert.equal(skipped.status, 0, skipped.stdout + skipped.stderr);
+  assert.match(skipped.stdout, /not_yet\s+SKIPPED/);
+  const restore = run("pg-restore-test.sh", [], optional);
+  assert.equal(restore.status, 0, restore.stdout + restore.stderr);
+  assert.match(restore.stdout, /not_yet\s+SKIPPED/);
 });
 
 test("a failed run posts one German message to BACKUP_ALERT_WEBHOOK_URL, a good run none", { skip: !reachable && "no local Postgres" }, async () => {

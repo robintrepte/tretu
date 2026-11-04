@@ -11,7 +11,7 @@
 #
 # Options:
 #   --domain <d>       base domain (default tretu.de): web=https://d, auth=https://auth.d, saga, play, hollowmere,
-#                      mc=https://mc.d
+#                      mc=https://mc.d, city
 #   --map name=url     override one base URL (names above)
 #   --only a,b         run only these targets;  --skip a,b  leave these out
 #   --env-file <file>  read TRETU_APP_ID / TRETU_APP_SECRET for the signed ping (default app tretu-web)
@@ -55,6 +55,7 @@ command -v node >/dev/null || { echo "node is required" >&2; exit 2; }
 : "${base[play]:=https://play.${domain}}"
 : "${base[hollowmere]:=https://hollowmere.${domain}}"
 : "${base[mc]:=https://mc.${domain}}"
+: "${base[city]:=https://city.${domain}}"
 for k in "${!base[@]}"; do base[$k]="${base[$k]%/}"; done
 
 app_id="${SMOKE_APP_ID:-}"
@@ -109,7 +110,7 @@ check_health() {
   fi
 }
 
-for name in web auth saga play hollowmere mc; do check_health "$name"; done
+for name in web auth saga play hollowmere mc city; do check_health "$name"; done
 
 # tretu.de/status: the platform worker's checks must be recent (a stopped worker shows up as stale).
 if selected web; then

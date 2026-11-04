@@ -11,7 +11,7 @@ const ok = (ms = 50): CheckResult => ({ state: "up", responseMs: ms, httpStatus:
 const down = (error = "timeout"): CheckResult => ({ state: "down", responseMs: null, httpStatus: null, error });
 const degraded = (error = "checks:db"): CheckResult => ({ state: "degraded", responseMs: 80, httpStatus: 503, error });
 
-test("targets default to the contract's six services", () => {
+test("targets default to the contract's seven services", () => {
   const { targets, error } = parseStatusTargets(undefined);
   assert.equal(error, undefined);
   assert.deepEqual(
@@ -23,6 +23,7 @@ test("targets default to the contract's six services", () => {
       ["play", "Play", "play.tretu.de", "https://play.tretu.de/api/health"],
       ["hollowmere", "Hollowmere", "hollowmere.tretu.de", "https://hollowmere.tretu.de/api/health"],
       ["mc-dashboard", "Minecraft-Dashboard", "mc.tretu.de", "https://mc.tretu.de/api/health"],
+      ["city", "Tretu City", "city.tretu.de", "https://city.tretu.de/api/health"],
     ]
   );
 });
@@ -43,7 +44,7 @@ test("targets from TRETU_STATUS_TARGETS_JSON: custom list, [] = off, invalid = d
   for (const bad of ["{", '[{"id":"Saga!","url":"https://x"}]', '[{"id":"a","url":"ftp://x"}]', '[{"id":"a","url":"https://x"},{"id":"a","url":"https://y"}]']) {
     const parsed = parseStatusTargets(bad);
     assert.ok(parsed.error, bad);
-    assert.equal(parsed.targets.length, 6, bad);
+    assert.equal(parsed.targets.length, 7, bad);
   }
 });
 
@@ -162,7 +163,7 @@ test("target options: excludeFromOverall and maintenance (true or a note, option
   for (const bad of [{ maintenance: "" }, { maintenance: 1 }, { until: "nächsten Freitag", maintenance: true }, { until: "2026-11-05T18:00:00", maintenance: true }, { excludeFromOverall: "yes" }]) {
     const parsed = parseStatusTargets(JSON.stringify([{ id: "saga", url: "https://saga.tretu.de/api/health", ...bad }]));
     assert.ok(parsed.error, JSON.stringify(bad));
-    assert.equal(parsed.targets.length, 6, "invalid config falls back to the defaults");
+    assert.equal(parsed.targets.length, 7, "invalid config falls back to the defaults");
   }
 });
 

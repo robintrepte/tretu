@@ -20,6 +20,7 @@ import done before any app's Tretu-only version is opened to members (`deploy/GO
 | Play | play.tretu.de | play | play.tretu.de | 3041 | play |
 | Hollowmere web + Nakama | hollowmere.tretu.de | hollowmere | hollowmere-nakama | 7350 (console 7351, localhost) | nakama |
 | Minecraft dashboard | mc.tretu.de | tretu-minecraft/dashboard | mc-dashboard | 8130 | mc_dashboard |
+| Tretu City | city.tretu.de | city.tretu.de | city.tretu.de | 3060 | city |
 
 One Postgres server on the same machine, one database per app. Every repo ships:
 - `ecosystem.config.cjs` (PM2) using the names/ports above,
@@ -69,6 +70,7 @@ App IDs: `tretu-web`, `auth`, `saga`, `play`, `hollowmere`, `mc-dashboard`.
 | saga | confidential | `https://saga.tretu.de/api/auth/oauth2/callback/tretu` |
 | play | confidential | `https://play.tretu.de/api/auth/oauth2/callback/tretu` |
 | mc-dashboard | confidential | `https://mc.tretu.de/auth/callback` |
+| city | confidential | `https://city.tretu.de/auth/callback` |
 | hollowmere | public (PKCE only) | `https://hollowmere.tretu.de/auth/callback`, `http://127.0.0.1/callback` (loopback: any port allowed, RFC 8252 §7.3) |
 
   (Local dev: each client may additionally allow `http://localhost:<its port>/...` equivalents — configured by env in auth, never hard-coded in prod.)

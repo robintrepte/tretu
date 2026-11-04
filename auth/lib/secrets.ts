@@ -1,5 +1,5 @@
 /** The confidential OIDC clients of contract §2, used when TRETU_OAUTH_CLIENTS_JSON is not set yet. */
-const DEFAULT_CONFIDENTIAL_CLIENTS = ["tretu-web", "saga", "play", "mc-dashboard"]
+const DEFAULT_CONFIDENTIAL_CLIENTS = ["tretu-web", "saga", "play", "mc-dashboard", "city"]
 
 /** Confidential client ids from TRETU_OAUTH_CLIENTS_JSON (public clients like Hollowmere have no secret). */
 export function confidentialClientIds(clientsJson: string | undefined): string[] {

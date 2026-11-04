@@ -14,12 +14,17 @@ trap 'alert_on_failure $? "Tretu-Restore-Test"' EXIT
 
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/tretu-postgres}"
 MAX_AGE_HOURS="${MAX_AGE_HOURS:-26}"
-if [ $# -gt 0 ]; then dbs=("$@"); else read -r -a dbs <<<"${BACKUP_DATABASES:-tretu_web tretu_auth saga play mc_dashboard nakama}"; fi
+if [ $# -gt 0 ]; then dbs=("$@"); else read -r -a dbs <<<"${BACKUP_DATABASES:-tretu_web tretu_auth saga play mc_dashboard city nakama}"; fi
 
 failed=0
 printf '%-16s %-8s %8s %10s  %s\n' DATABASE RESULT TABLES ROWS DUMP
 for db in "${dbs[@]}"; do
   dump="$(ls -1t "$BACKUP_DIR/$db"/"$db"-*.dump 2>/dev/null | head -n 1 || true)"
+  if [ -z "$dump" ] && [[ " ${BACKUP_OPTIONAL_DATABASES-city} " == *" $db "* ]] \
+    && [ "$(psql -X -At -d postgres -c "select count(*) from pg_database where datname = '$db'")" != "1" ]; then
+    printf '%-16s %-8s %8s %10s  %s\n' "$db" SKIPPED - - "(optional, not created yet)"
+    continue
+  fi
   if [ -z "$dump" ]; then
     printf '%-16s %-8s %8s %10s  %s\n' "$db" FAILED - - "no dump in $BACKUP_DIR/$db"
     failed=$((failed + 1)); continue

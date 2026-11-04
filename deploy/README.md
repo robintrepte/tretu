@@ -9,7 +9,7 @@ rollbacks). Tools in this folder:
 
 | Path | What |
 |---|---|
-| `env/*.example` | env templates for every app (tretu-web, tretu-auth, saga, play, Hollowmere `server/.env` + Nakama `local.yml`, mc-dashboard, Postgres roles), rendered by `generate-secrets.mjs --templates deploy/env` |
+| `env/*.example` | env templates for every app (tretu-web, tretu-auth, saga, play, Hollowmere `server/.env` + Nakama `local.yml`, mc-dashboard, city, Postgres roles), rendered by `generate-secrets.mjs --templates deploy/env` |
 | `scripts/generate-secrets.mjs` | one consistent set of secrets → filled env files (mode 600), `--import` keeps running apps' values |
 | `scripts/create-databases.sh` | one least-privileged role + database per app, idempotent |
 | `scripts/smoke.sh` | every `/api/health`, OIDC discovery + JWKS, the status data (`/api/status` fresh), signed platform ping, optionally `--webhook-test <app>\|all` (signed test webhook, expects 204) → pass/fail table |
@@ -28,6 +28,7 @@ rollbacks). Tools in this folder:
 | Play | play.tretu.de | play | play.tretu.de | 3041 | play |
 | Hollowmere web + Nakama | hollowmere.tretu.de | hollowmere | hollowmere-nakama | 7350 (console 7351, localhost) | nakama |
 | Minecraft dashboard | mc.tretu.de | tretu-minecraft/dashboard | mc-dashboard | 8130 | mc_dashboard |
+| Tretu City | city.tretu.de | city.tretu.de | city.tretu.de | 3060 | city |
 
 tretu.de additionally runs the workers `tretu-orchestrator`, `tretu-ts-rank` and `tretu-platform-worker` (see
 [DEPLOY.md](../DEPLOY.md)). There is no analytics service and no separate status service.
@@ -45,7 +46,7 @@ install -m 600 -o postgres /root/tretu-secrets/postgres/roles.env /tmp/tretu-rol
 sudo -u postgres deploy/scripts/create-databases.sh --passwords /tmp/tretu-roles.env && shred -u /tmp/tretu-roles.env
 ```
 
-- Roles `tretu_web`, `tretu_auth`, `saga`, `play`, `mc_dashboard`, `nakama`: LOGIN only (no superuser,
+- Roles `tretu_web`, `tretu_auth`, `saga`, `play`, `mc_dashboard`, `city`, `nakama`: LOGIN only (no superuser,
   createdb, createrole, replication), each owns its database and its `public` schema, `CONNECT` is revoked from
   PUBLIC, so no app can open another app's database. `tretu_legacy_reader` can only read saga, play, tretu_web and
   nakama (auth's one-time legacy import). Running the script again only re-applies passwords and grants; databases
@@ -64,7 +65,7 @@ sudo systemctl enable --now tretu-pg-backup.timer tretu-pg-restore-test.timer
 
 | What | When | Details |
 |---|---|---|
-| `pg_dump -Fc` of tretu_web, tretu_auth, saga, play, mc_dashboard, nakama + `pg_dumpall --globals-only` | daily 03:17 (`tretu-pg-backup.timer`) | `/var/backups/tretu-postgres/<db>/<db>-<UTC time>.dump` + `.sha256`, mode 600, verified with `pg_restore --list`, kept 14 days (`RETENTION_DAYS`) |
+| `pg_dump -Fc` of tretu_web, tretu_auth, saga, play, mc_dashboard, city, nakama + `pg_dumpall --globals-only` | daily 03:17 (`tretu-pg-backup.timer`) | `/var/backups/tretu-postgres/<db>/<db>-<UTC time>.dump` + `.sha256`, mode 600, verified with `pg_restore --list`, kept 14 days (`RETENTION_DAYS`) |
 | copy off the machine | after each backup | `BACKUP_REMOTE` + `BACKUP_RSYNC_SSH` (rsync over SSH, e.g. Hetzner Storage Box port 23) |
 | restore test | Sundays 05:41 (`tretu-pg-restore-test.timer`) | newest dump of each database → `<db>_restore_test`, counts tables/rows, drops it; fails on missing, older than 26 h, or checksum mismatch |
 | alerting | on failure | `BACKUP_ALERT_WEBHOOK_URL` in `/etc/tretu/pg-backup.env` (a Discord webhook, e.g. the same channel as the status alerts): a failed backup or restore test posts "Tretu-Backup auf <host> ist fehlgeschlagen …". A backup that silently stops running fails the weekly restore test (newest dump older than 26 h), which posts the same way. `systemctl list-timers 'tretu-pg-*'` shows the last runs. |

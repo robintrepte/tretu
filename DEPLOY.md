@@ -75,7 +75,7 @@ There is no separate status service: no extra PM2 process, nginx site or certifi
   `platform_status_rollups` (counts per hour and per day in Europe/Berlin, updated with every check, kept 90 days),
   `platform_status_services` (current state per service incl. players / users online, used for alerts),
   `platform_status_certs` (certificate expiry and warnings sent). The worker's 10-minute maintenance pass
-  prunes old rows. About 8 600 rows per day for six services.
+  prunes old rows. About 10 000 rows per day for seven services.
 - **The page reads only the database** (cached 30 s per process) and never calls the services. When the worker stops,
   it keeps showing the last results with "Stand: …" and a note that the checks are not running; `deploy/scripts/smoke.sh`
   fails its "status page" row in that case.
@@ -123,7 +123,7 @@ web services fall back to the contract's hosts, a game server to its default add
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `TRETU_STATUS_TARGETS_JSON` | the contract's six hosts | JSON array `[{"id":"saga","url":"https://saga.tretu.de/api/health"}, …]`, optional `name`/`host` and the options above per entry; `[]` switches checks and list off. Ids `tretu-web`, `auth`, `saga`, `play`, `hollowmere`, `mc-dashboard` get their names ("Website", "Tretu-Konto", …) automatically. Read by the worker and the page: set it in `.env.local` and reload both. |
+| `TRETU_STATUS_TARGETS_JSON` | the contract's seven hosts | JSON array `[{"id":"saga","url":"https://saga.tretu.de/api/health"}, …]`, optional `name`/`host` and the options above per entry; `[]` switches checks and list off. Ids `tretu-web`, `auth`, `saga`, `play`, `hollowmere`, `mc-dashboard`, `city` get their names ("Website", "Tretu-Konto", …) automatically. Read by the worker and the page: set it in `.env.local` and reload both. |
 | `TRETU_STATUS_MINECRAFT` | `mc.tretu.de:25565` | Minecraft server for the Server List Ping (`host[:port]`), `off` = no row, or `{"address"?, …options}` |
 | `TRETU_STATUS_TEAMSPEAK` | – | `host:port` for a TCP check of TeamSpeak when `TS_QUERY_*` is not set, or `{"address"?, …options}` |
 | `TRETU_STATUS_CERT_HOSTS` | – | extra hosts (`host[:port]`, comma-separated) whose certificates are watched, e.g. `map.tretu.de,mcp.hollowmere.tretu.de` |
