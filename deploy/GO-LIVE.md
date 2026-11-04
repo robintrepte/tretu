@@ -319,7 +319,7 @@ City (city.tretu.de) came after the go-live. On a running server, add it in this
    reload auth (`pm2 reload ecosystem.config.cjs --update-env` in `/srv/tretu/auth`: clients are synced at boot), then
    the new `tretu-web/.env.local` (the same in `/srv/tretu`) so the platform accepts City's signed calls and /status
    lists City.
-3. Database: step 4 with `--only city`. Do this before the next nightly backup: `pg-backup.sh` includes `city`.
+3. Database: step 4 with `--only city`. Until then the nightly backup lists `city` as SKIPPED (optional database, `BACKUP_OPTIONAL_DATABASES`).
 4. Checkout `/srv/city`, certificate and nginx (step 6 for `city`), then the Tretu City row of 7.5.
 
 Check: `smoke.sh --only city`, `https://city.tretu.de/api/health` answers `"app":"city"`, sign-in with a Tretu-Konto,
