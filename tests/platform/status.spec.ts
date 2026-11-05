@@ -291,7 +291,11 @@ test("game servers: TeamSpeak users (ServerQuery stub) and Minecraft down are st
 });
 
 test("maintenance: no Discord alerts while it lasts, shown as maintenance, excluded from the overall status", async () => {
-  const until = new Date(Date.UTC(2026, 10, 2, 12, 5));
+  // Around the real time: /api/status below asks with the real clock, so the maintenance must still be running then
+  // (it ends at minute(5), at least a minute from now).
+  const base = Math.floor(Date.now() / 60_000) * 60_000 - 3 * 60_000;
+  const minute = (n: number) => new Date(base + n * 60_000);
+  const until = minute(5);
   process.env.TRETU_STATUS_TARGETS_JSON = JSON.stringify([
     { id: "saga", url: "https://saga.test/api/health", maintenance: "Umzug auf einen neuen Server", until: until.toISOString() },
     { id: "play", url: "https://play.test/api/health", excludeFromOverall: true },
@@ -305,7 +309,6 @@ test("maintenance: no Discord alerts while it lasts, shown as maintenance, exclu
   };
   const posts: { url: string; body: { content: string; allowed_mentions: unknown } }[] = [];
   const fetchImpl = fakeFetch(answers, posts);
-  const minute = (n: number) => new Date(Date.UTC(2026, 10, 2, 12, n));
 
   for (let m = 0; m < 4; m++) await runStatusTick(minute(m), { fetchImpl });
   // play (only excluded from the overall status) still alerts; saga (maintenance) does not.

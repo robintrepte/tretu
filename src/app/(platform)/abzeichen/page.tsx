@@ -7,7 +7,7 @@ import { platformDb } from "@/lib/platform/db";
 import { formatDate } from "@/lib/platform/format";
 import { getTranslations } from "@/lib/platform/i18n";
 import { getEarnedBadges } from "@/lib/platform/profile";
-import { getStats } from "@/lib/platform/progress";
+import { getAchievementKeys, getStats } from "@/lib/platform/progress";
 import { loginUrl } from "@/lib/platform/current-user";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +29,7 @@ export default async function BadgesPage() {
     ctx.available && ctx.user
       ? await loadSafely(async () => ({
           stats: await getStats(platformDb, ctx.user!.sub),
+          achievements: await getAchievementKeys(platformDb, ctx.user!.sub),
           earned: new Map((await getEarnedBadges(platformDb, ctx.user!.sub, locale)).map((b) => [b.key, b.earnedAt])),
         }))
       : null;
@@ -55,7 +56,7 @@ export default async function BadgesPage() {
             <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {badges.map((badge) => {
                 const earnedAt = progress?.earned.get(badge.key);
-                const state = progress ? badgeProgress(badge, { stats: progress.stats, accountCreatedAt }) : null;
+                const state = progress ? badgeProgress(badge, { stats: progress.stats, achievements: progress.achievements, accountCreatedAt }) : null;
                 const pct = state ? Math.round((state.current / Math.max(1, state.target)) * 100) : 0;
                 return (
                   <li

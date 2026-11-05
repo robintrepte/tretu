@@ -196,7 +196,12 @@ Stat keys the apps emit (baseline; apps may add more, prefixed with their id):
 - city: `stat.increment` `city.playtime.minutes` (minutes played), `city.coop.sessions` (+1 per account and room visit
   while at least two accounts build in the same city), `city.milestone.<n>` (+1 for everyone building in the city and
   its owner when it reaches a level: 1 Dorf 300 residents, 2 Kleinstadt 1,200, 3 Stadt 4,000, 4 Großstadt 10,000,
-  5 Metropole 25,000, 6 Weltstadt 60,000). City also uses
+  5 Metropole 25,000, 6 Weltstadt 60,000), `city.buildings.grown` (buildings that grew in a city while the player was
+  building there; every account present, sent in batches), `city.roads.km` (whole kilometres of road built by the
+  player's own commands); `achievement.unlocked` `city.population.10k`, `city.population.50k`, `city.population.100k`
+  (the owner and everyone building in the city when it crosses 10,000 / 50,000 / 100,000 residents; 10k is the same
+  moment as milestone 4, whose badge it shares). Milestones, population achievements and the building and road stats
+  count only beyond what a city had when it was loaded or uploaded, and never in sandbox cities. City also uses
   presence, friends and invites (§5) and takes webhooks at `https://city.tretu.de/api/tretu/webhook` (`user.updated`,
   `user.deleted`).
 - platform itself: `tretu.friends`, `tretu.apps.used`.

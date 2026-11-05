@@ -8,6 +8,7 @@ import { and, eq, sql } from "drizzle-orm";
 import {
   platformBadgeRevocations,
   platformDailyCounters,
+  platformUserAchievements,
   platformUserBadges,
   platformUserProgress,
   platformUserStats,
@@ -76,6 +77,15 @@ export async function getStats(db: Executor, sub: string): Promise<Record<string
     .from(platformUserStats)
     .where(eq(platformUserStats.sub, sub));
   return Object.fromEntries(rows.map((r) => [r.key, r.value]));
+}
+
+/** Keys of the achievements the user unlocked (`achievement.unlocked`, stored once per key). */
+export async function getAchievementKeys(db: Executor, sub: string): Promise<Set<string>> {
+  const rows = await db
+    .select({ key: platformUserAchievements.key })
+    .from(platformUserAchievements)
+    .where(eq(platformUserAchievements.sub, sub));
+  return new Set(rows.map((r) => r.key));
 }
 
 /**
@@ -234,11 +244,12 @@ export async function settleProgress(
   options: { now: Date; sourceEventId?: string | null }
 ): Promise<{ newBadges: string[]; level: number; leveledUp: boolean }> {
   const stats = await getStats(db, sub);
+  const achievements = await getAchievementKeys(db, sub);
   const user = await getDirectoryUser(db, sub);
   const earned = await getEarnedBadgeKeys(db, sub);
   for (const key of await getRevokedBadgeKeys(db, sub)) earned.add(key);
   const newBadges: string[] = [];
-  for (const badge of newlyEarnedBadges({ stats, accountCreatedAt: user?.authCreatedAt ?? null }, earned)) {
+  for (const badge of newlyEarnedBadges({ stats, achievements, accountCreatedAt: user?.authCreatedAt ?? null }, earned)) {
     if (await awardBadge(db, sub, badge, options)) newBadges.push(badge.key);
   }
 

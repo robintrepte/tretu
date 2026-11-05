@@ -265,3 +265,51 @@ test("Tretu City: signed city.* stats count, give XP and City badges", async () 
     process.env.TRETU_APPS_JSON = before;
   }
 });
+
+test("Tretu City: grown buildings, road kilometres and population achievements give City badges", async () => {
+  const secret = "city-secret-0123456789abcdef";
+  const before = process.env.TRETU_APPS_JSON;
+  process.env.TRETU_APPS_JSON = JSON.stringify({ ...JSON.parse(before ?? "{}"), city: { secret, webhook: "https://city.test/api/tretu/webhook" } });
+  try {
+    const sub = uuid();
+    await seedUser(sub, "hanna");
+    const sendCity = async (body: unknown) => {
+      const res = await postEvents(await signedRequest("city", "POST", "/api/v1/events", body, { secret }), ctx());
+      return { status: res.status, body: (await res.json()) as Record<string, unknown> };
+    };
+    const first = await sendCity({
+      events: [
+        envelope("city", sub, "stat.increment", { key: "city.buildings.grown", by: 600 }),
+        envelope("city", sub, "stat.increment", { key: "city.roads.km", by: 9 }),
+        envelope("city", sub, "achievement.unlocked", { key: "city.population.10k" }),
+      ],
+    });
+    assert.equal(first.status, 202);
+    // 10k is the moment of milestone 4 (its badge is city.metropolis); nothing else is reached yet.
+    assert.deepEqual((await badgeRows(sub)).map((b) => b.badgeKey), []);
+
+    await sendCity({
+      events: [
+        envelope("city", sub, "stat.increment", { key: "city.buildings.grown", by: 400 }),
+        envelope("city", sub, "stat.increment", { key: "city.roads.km", by: 1 }),
+        envelope("city", sub, "achievement.unlocked", { key: "city.population.50k" }),
+        // The same achievement again (another city, another player's session) counts once.
+        envelope("city", sub, "achievement.unlocked", { key: "city.population.50k" }),
+      ],
+    });
+    const stats = await getStats(platformDb, sub);
+    assert.equal(stats["city.buildings.grown"], 1000);
+    assert.equal(stats["city.roads.km"], 10);
+    assert.equal(stats["city.achievements"], 2);
+    assert.deepEqual((await badgeRows(sub)).map((b) => b.badgeKey).sort(), ["city.builder-1000", "city.population-50k", "city.roads-10km"]);
+
+    await sendCity(envelope("city", sub, "achievement.unlocked", { key: "city.population.100k" }));
+    await sendCity(envelope("city", sub, "stat.increment", { key: "city.roads.km", by: 90 }));
+    assert.deepEqual(
+      (await badgeRows(sub)).map((b) => b.badgeKey).sort(),
+      ["city.builder-1000", "city.population-100k", "city.population-50k", "city.roads-100km", "city.roads-10km"]
+    );
+  } finally {
+    process.env.TRETU_APPS_JSON = before;
+  }
+});

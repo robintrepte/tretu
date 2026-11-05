@@ -69,7 +69,8 @@ avatar only. Owners without Steam see "Steam verbinden" (→ Mein Konto) when `T
 - Level curve: level L → L+1 costs 100·L XP; total for level L = 50·L·(L−1) (L2 100, L5 1000, L10 4500).
   A higher level emits `level.up {level}` and a `level` notification.
 - Badges (`src/lib/platform/badges.ts`) are re-evaluated after every change and awarded exactly once
-  (primary key sub+badge): one-time XP + credits (wallet key `badge:<key>:<sub>`), a `badge` notification,
+  (primary key sub+badge); a rule is a stat threshold, a sum of stats by suffix, an unlocked achievement key
+  (`achievement.unlocked`, e.g. `city.population.50k`) or the early-supporter date: one-time XP + credits (wallet key `badge:<key>:<sub>`), a `badge` notification,
   `badge.earned {badge,title,xp,credits}`, Discord/TS sync jobs.
 - `user.created/updated` (from auth) upsert the directory (`platform_users`, incl. `links.steam` → `steam_id` and
   `links.teamspeak`); older `occurredAt` than the
@@ -134,6 +135,11 @@ Sign rules: `spend` must be negative, `adjust` may be negative, all other kinds 
 | `city.world-city` | Weltstadt / World City | `city.milestone.6` ≥ 1 (60,000 residents) | Landmark | 300 | 75 |
 | `city.together` | Gemeinsam gebaut / Built Together | `city.coop.sessions` ≥ 1 | Handshake | 50 | 20 |
 | `city.planner-10h` | Stadtplaner / City Planner | `city.playtime.minutes` ≥ 600 | DraftingCompass | 100 | 25 |
+| `city.builder-1000` | Bauboom / Building Boom | `city.buildings.grown` ≥ 1000 | Construction | 100 | 25 |
+| `city.roads-10km` | Straßenbauer / Road Builder | `city.roads.km` ≥ 10 | Route | 50 | 20 |
+| `city.roads-100km` | Verkehrsplaner / Traffic Planner | `city.roads.km` ≥ 100 | Signpost | 200 | 50 |
+| `city.population-50k` | Fünfzigtausend / Fifty Thousand | achievement `city.population.50k` | UsersRound | 250 | 60 |
+| `city.population-100k` | Megastadt / Megacity | achievement `city.population.100k` | Castle | 400 | 100 |
 | `wins-10` | Siegesserie / Winning Streak | sum of `*.games.won` ≥ 10 | Medal | 100 | 25 |
 | `wins-50` | Champion / Champion | sum of `*.games.won` ≥ 50 | Crown | 250 | 50 |
 | `wins-250` | Legende / Legend | sum of `*.games.won` ≥ 250 | Gem | 500 | 100 |

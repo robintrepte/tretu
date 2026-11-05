@@ -71,7 +71,7 @@ export function buildStatCards(stats: Record<string, number>, t: Translator, loc
       ],
     });
   }
-  if (n("city.playtime.minutes") + n("city.coop.sessions") > 0) {
+  if (n("city.playtime.minutes") + n("city.coop.sessions") + n("city.buildings.grown") + n("city.roads.km") > 0) {
     cards.push({
       key: "city",
       title: t("apps.city"),
@@ -79,6 +79,8 @@ export function buildStatCards(stats: Record<string, number>, t: Translator, loc
       items: [
         { label: t("profile.stats.city.playtime"), value: t("profile.stats.city.hours", { hours: Math.floor(n("city.playtime.minutes") / 60) }) },
         { label: t("profile.stats.city.coop"), value: fmt(n("city.coop.sessions")) },
+        { label: t("profile.stats.city.grown"), value: fmt(n("city.buildings.grown")) },
+        { label: t("profile.stats.city.roads"), value: t("profile.stats.city.km", { km: fmt(n("city.roads.km")) }) },
       ],
     });
   }
