@@ -94,7 +94,10 @@
       "city": {
         "playtime": "Playtime",
         "hours": "{hours, plural, one {# hour} other {# hours}}",
-        "coop": "Co-op sessions"
+        "coop": "Co-op sessions",
+        "grown": "Buildings grown",
+        "roads": "Roads built",
+        "km": "{km} km"
       }
     },
     "linkedTitle": "Linked accounts",

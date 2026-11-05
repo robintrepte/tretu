@@ -10,6 +10,8 @@ export type BadgeRule =
   | { type: "stat"; key: string; gte: number }
   /** Sum of all stats ending in `suffix` (e.g. `.games.won` across apps) reaches `gte`. */
   | { type: "statSuffixSum"; suffix: string; gte: number }
+  /** The app sent `achievement.unlocked` with this key (stored once per user). */
+  | { type: "achievement"; key: string }
   /** Tretu-Konto created on or before TRETU_EARLY_SUPPORTER_UNTIL (default 2027-03-31). */
   | { type: "earlySupporter" };
 
@@ -233,6 +235,65 @@ export const BADGES: readonly BadgeDefinition[] = [
     credits: 25,
     rule: { type: "stat", key: "city.playtime.minutes", gte: 600 },
   },
+  {
+    key: "city.builder-1000",
+    category: "city",
+    title: { de: "Bauboom", en: "Building Boom" },
+    description: {
+      de: "Erlebe in Tretu City, wie 1.000 Gebäude wachsen, während du an der Stadt baust.",
+      en: "See 1,000 buildings grow in Tretu City while you build the city.",
+    },
+    icon: "Construction",
+    xp: 100,
+    credits: 25,
+    rule: { type: "stat", key: "city.buildings.grown", gte: 1000 },
+  },
+  {
+    key: "city.roads-10km",
+    category: "city",
+    title: { de: "Straßenbauer", en: "Road Builder" },
+    description: { de: "Baue in Tretu City 10 km Straßen.", en: "Build 10 km of roads in Tretu City." },
+    icon: "Route",
+    xp: 50,
+    credits: 20,
+    rule: { type: "stat", key: "city.roads.km", gte: 10 },
+  },
+  {
+    key: "city.roads-100km",
+    category: "city",
+    title: { de: "Verkehrsplaner", en: "Traffic Planner" },
+    description: { de: "Baue in Tretu City 100 km Straßen.", en: "Build 100 km of roads in Tretu City." },
+    icon: "Signpost",
+    xp: 200,
+    credits: 50,
+    rule: { type: "stat", key: "city.roads.km", gte: 100 },
+  },
+  {
+    key: "city.population-50k",
+    category: "city",
+    title: { de: "Fünfzigtausend", en: "Fifty Thousand" },
+    description: {
+      de: "Sei dabei, wenn eine Stadt in Tretu City 50.000 Einwohner erreicht.",
+      en: "Be there when a city in Tretu City reaches 50,000 residents.",
+    },
+    icon: "UsersRound",
+    xp: 250,
+    credits: 60,
+    rule: { type: "achievement", key: "city.population.50k" },
+  },
+  {
+    key: "city.population-100k",
+    category: "city",
+    title: { de: "Megastadt", en: "Megacity" },
+    description: {
+      de: "Sei dabei, wenn eine Stadt in Tretu City 100.000 Einwohner erreicht.",
+      en: "Be there when a city in Tretu City reaches 100,000 residents.",
+    },
+    icon: "Castle",
+    xp: 400,
+    credits: 100,
+    rule: { type: "achievement", key: "city.population.100k" },
+  },
   // Community (cross-app)
   {
     key: "wins-10",
@@ -333,6 +394,8 @@ export function earlySupporterCutoff(): Date {
 
 export type BadgeContext = {
   stats: Record<string, number>;
+  /** Keys of the user's `achievement.unlocked` events (missing: none known). */
+  achievements?: ReadonlySet<string>;
   /** Tretu-Konto creation time from auth (null if unknown). */
   accountCreatedAt: Date | null;
 };
@@ -352,6 +415,10 @@ export function badgeProgress(badge: BadgeDefinition, ctx: BadgeContext): BadgeP
         if (key.endsWith(rule.suffix) && key.split(".").length === rule.suffix.split(".").length) sum += value;
       }
       return { current: Math.min(sum, rule.gte), target: rule.gte, done: sum >= rule.gte };
+    }
+    case "achievement": {
+      const done = ctx.achievements?.has(rule.key) ?? false;
+      return { current: done ? 1 : 0, target: 1, done };
     }
     case "earlySupporter": {
       const done = Boolean(ctx.accountCreatedAt && ctx.accountCreatedAt.getTime() <= earlySupporterCutoff().getTime());

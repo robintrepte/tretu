@@ -94,7 +94,10 @@
       "city": {
         "playtime": "Spielzeit",
         "hours": "{hours, plural, one {# Stunde} other {# Stunden}}",
-        "coop": "Gemeinsam gebaut"
+        "coop": "Gemeinsam gebaut",
+        "grown": "Gebäude gewachsen",
+        "roads": "Straßen gebaut",
+        "km": "{km} km"
       }
     },
     "linkedTitle": "Verknüpfte Konten",
